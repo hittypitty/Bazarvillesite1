@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Preview | Bazarville</title>
+<meta name="description" content="Super Admin enquiry reporting preview — daily, weekly and monthly enquiry volume, top products and recent activity.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"></head><body class="dash-shell">
+
+<div class="dash-topbar"><div class="container" style="display:flex;justify-content:space-between;align-items:center">
+  <a class="brand" href="index.html" style="color:#fff"><img src="assets/logo.png" alt="Bazarville"><b style="color:#fff">Bazarville</b><span style="background:var(--lime);color:var(--ink);font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;margin-left:6px">SUPER ADMIN</span></a>
+  <div style="display:flex;align-items:center;gap:14px">
+    
+    <a href="index.html" class="btn btn-outline btn-sm" style="border-color:#444;color:#fff">← Exit preview</a>
+  </div>
+</div></div>
+
+<main class="section" id="dashRoot" style="padding-top:34px">
+<div class="container">
+  <div class="title reveal"><h2>Enquiry Reporting</h2><p>Daily, weekly and monthly overview — this is a Phase 1 blueprint preview (section 11) with sample data.</p></div>
+
+  <div class="dash-grid stagger">
+    <div class="dash-card reveal"><div class="dlabel">Enquiries today</div><div class="dnum">18</div><div class="dtrend up">▲ 12% vs yesterday</div></div>
+    <div class="dash-card reveal"><div class="dlabel">Enquiries this week</div><div class="dnum">126</div><div class="dtrend up">▲ 8% vs last week</div></div>
+    <div class="dash-card reveal"><div class="dlabel">Enquiries this month</div><div class="dnum">514</div><div class="dtrend up">▲ 21% vs last month</div></div>
+    <div class="dash-card reveal"><div class="dlabel">Top searched</div><div class="dnum" style="font-size:18px;line-height:1.4">Steel Bottles</div><div class="dtrend" style="color:var(--muted)">312 searches this month</div></div>
+  </div>
+
+  <div class="dash-panels">
+    <div class="panel reveal-left">
+      <h3>Top enquired products (this month)</h3>
+      <div class="barchart" id="barChart"></div>
+    </div>
+    <div class="panel reveal-right">
+      <h3>Enquiries by purpose</h3>
+      <div class="donut-wrap">
+        <div class="donut" id="donutChart"></div>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel reveal" style="margin-top:20px">
+    <h3>Recent activity</h3>
+    <div class="activity-feed" id="activityFeed"></div>
+  </div>
+</div>
+</main>
+
+<footer class="footer" id="footer"><div class="container">
+  <div class="footgrid">
+    <div><div class="fbrand"><img src="assets/logo.png" alt=""><b>Bazarville</b></div><p>A digital showroom for corporate gifting and bulk orders — discover, compare and enquire in one place.</p></div>
+    <div><h4>Discover</h4><a href="products.html">All Products</a><br><a href="galaxy.html">By Profession</a><br><a href="products.html?purpose=Client%20Gifting">By Purpose</a><br><a href="products.html?occasion=Diwali">By Occasion</a></div>
+    <div><h4>Company</h4><a href="about.html">About Bazarville</a><br><a href="about.html#timeline">Client Stories</a><br><a href="index.html#footer">Contact Us</a><br><a href="#">Careers</a></div>
+    <div><h4>Support</h4><a href="track.html">Track Enquiry</a><br><a href="#">Shipping Info</a><br><a href="index.html#footer">FAQs</a></div>
+    <div><h4>Legal</h4><a href="#">Privacy Policy</a><br><a href="#">Terms of Service</a><br><a href="#">Refund Policy</a></div>
+  </div>
+  <div class="copyright">© 2026 Bazarville. All rights reserved. • Phase 1 Digital Showroom Demo</div>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/data-store.js"></script>
+<script src="assets/script.js"></script></body></html>

@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>All Products | Bazarville</title>
+<meta name="description" content="Browse Bazarville's bulk and corporate gifting catalogue with profession, purpose, occasion, budget and MOQ filters.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"></head><body>
+
+<div class="topbar"><div class="ticker"><span>🛍️ 5,000+ products in the catalogue</span><span>✅ Design approval before dispatch</span><span>💬 Structured WhatsApp bulk enquiry</span><span>🚚 Pan-India bulk shipping</span></div></div>
+
+<header class="nav"><div class="container navin">
+<a class="brand" href="index.html"><img src="assets/logo.png" alt="Bazarville"><b>Bazarville</b></a>
+<nav class="links"><a href="products.html">Shop Products</a><a href="galaxy.html">Shop by Profession</a><a href="products.html?purpose=Event%20Merchandise">Shop by Purpose</a><a href="index.html#collections">Collections</a><a href="index.html#footer">Contact</a></nav>
+<div class="navactions"><span class="searchbtn">⌕</span><span class="menu-btn">☰</span></div>
+</div></header>
+
+<main>
+<section class="pagehead"><div class="container reveal">
+  <h1>All Products</h1><p>Filter by profession, purpose, occasion, quantity and budget — results refresh instantly, no submit button needed.</p>
+</div></section>
+
+<section class="section" style="padding-top:10px"><div class="container">
+  <button class="btn btn-outline filter-toggle btn-sm" style="margin-bottom:16px">⚙ Filters</button>
+  <div class="shell">
+    <aside class="filters reveal-left">
+      <div class="fgroup">
+        <h4>Profession</h4>
+        <div class="chiprow">
+          <span class="fchip active" data-profession="All">All</span>
+          <span class="fchip" data-profession="Corporate">Corporate</span>
+          <span class="fchip" data-profession="IT / Tech">IT / Tech</span>
+          <span class="fchip" data-profession="Education">Education</span>
+          <span class="fchip" data-profession="Healthcare">Healthcare</span>
+          <span class="fchip" data-profession="Retail">Retail</span>
+          <span class="fchip" data-profession="Hospitality">Hospitality</span>
+        </div>
+      </div>
+      <div class="fgroup">
+        <h4>Purpose</h4>
+        <select id="purposeSelect"><option value="All">All purposes</option><option>Employee Gifting</option><option>Client Gifting</option><option>Event Merchandise</option><option>Promotional</option></select>
+      </div>
+      <div class="fgroup">
+        <h4>Occasion</h4>
+        <select id="occasionSelect"><option value="All">All occasions</option><option>Onboarding</option><option>Diwali</option><option>Annual Day</option><option>Conference</option><option>Store Launch</option><option>New Year</option></select>
+      </div>
+      <div class="fgroup">
+        <h4>Quantity needed</h4>
+        <input type="number" id="qtyFilter" placeholder="e.g. 100" min="1">
+      </div>
+      <div class="fgroup">
+        <h4>Budget per piece (₹)</h4>
+        <input type="number" id="budgetFilter" placeholder="e.g. 300" min="1">
+        <div class="range-row"><span>Price recalculated at your quantity slab</span></div>
+      </div>
+    </aside>
+    <div class="reveal-right">
+      <div class="resultbar">
+        <span class="count" id="resultCount">16 products</span>
+        <select id="sortSelect">
+          <option value="relevance">Sort: Relevance</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="moq-asc">MOQ: Low to High</option>
+          <option value="newest">Newest</option>
+        </select>
+      </div>
+      <div class="grid4" id="productGrid"></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer class="footer" id="footer"><div class="container">
+  <div class="footgrid">
+    <div><div class="fbrand"><img src="assets/logo.png" alt=""><b>Bazarville</b></div><p>A digital showroom for corporate gifting and bulk orders — discover, compare and enquire in one place.</p></div>
+    <div><h4>Discover</h4><a href="products.html">All Products</a><br><a href="galaxy.html">By Profession</a><br><a href="products.html?purpose=Client%20Gifting">By Purpose</a><br><a href="products.html?occasion=Diwali">By Occasion</a></div>
+    <div><h4>Company</h4><a href="about.html">About Bazarville</a><br><a href="about.html#timeline">Client Stories</a><br><a href="index.html#footer">Contact Us</a><br><a href="#">Careers</a></div>
+    <div><h4>Support</h4><a href="track.html">Track Enquiry</a><br><a href="#">Shipping Info</a><br><a href="index.html#footer">FAQs</a></div>
+    <div><h4>Legal</h4><a href="#">Privacy Policy</a><br><a href="#">Terms of Service</a><br><a href="#">Refund Policy</a></div>
+  </div>
+  <div class="copyright">© 2026 Bazarville. All rights reserved. • Phase 1 Digital Showroom Demo</div>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/data-store.js"></script>
+<script src="assets/script.js"></script></body></html>

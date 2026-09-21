@@ -1,0 +1,157 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Panel | Bazarville</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/admin.css"></head>
+<body>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="loginScreen" class="ad-login">
+  <div class="ad-login-card">
+    <img src="assets/logo.png" alt="Bazarville" class="ad-login-logo">
+    <h1>Admin Panel</h1>
+    <p>Sign in to manage products, collections and site settings.</p>
+    <div class="ad-field">
+      <label>Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com">
+    </div>
+    <div class="ad-field">
+      <label>Password</label>
+      <input id="loginPassword" type="password" placeholder="••••••••">
+    </div>
+    <button class="btn btn-lime" id="loginBtn" style="width:100%">Sign In</button>
+    <p class="ad-demo-note">Real Supabase Auth — create your account under Authentication → Users in your Supabase dashboard first (see supabase/schema.sql for the full setup steps).</p>
+  </div>
+</div>
+
+<!-- ===================== ADMIN SHELL ===================== -->
+<div id="adminShell" class="ad-shell" style="display:none">
+  <aside class="ad-sidebar">
+    <div class="ad-brand"><img src="assets/logo.png" alt=""><b>Bazarville</b></div>
+    <nav class="ad-nav" id="adNav">
+      <a href="#dashboard" data-view="dashboard" class="active">📊 Dashboard</a>
+      <a href="#products" data-view="products">📦 Products</a>
+      <a href="#collections" data-view="collections">🗂️ Collections</a>
+      <a href="#settings" data-view="settings" class="ad-super-only">⚙️ Site Settings</a>
+      <a href="#roles" data-view="roles" class="ad-super-only">👥 Users &amp; Roles</a>
+      <a href="dashboard.html" target="_blank">💬 Enquiry Reports ↗</a>
+      <a href="index.html" target="_blank">🌐 View Live Site ↗</a>
+    </nav>
+    <div class="ad-roleinfo">
+      <span class="ad-role-badge" id="roleBadge">Super Admin</span>
+      <button class="btn btn-outline btn-sm" id="logoutBtn" style="width:100%;margin-top:10px">Log Out</button>
+    </div>
+  </aside>
+
+  <main class="ad-main">
+    <!-- Dashboard -->
+    <section class="ad-view" id="view-dashboard">
+      <div class="ad-header"><h1>Dashboard</h1><p>Quick overview of your catalogue.</p></div>
+      <div class="ad-stats" id="adStats"></div>
+      <div class="ad-panel">
+        <h3>What you can manage here</h3>
+        <ul class="ad-checklist">
+          <li>✅ Add, edit and delete products — pricing tiers, MOQ, stock, images, variants</li>
+          <li>✅ Add, edit and delete featured collections shown on the homepage</li>
+          <li>✅ Upload the homepage hero banner images</li>
+          <li>✅ Change the WhatsApp number all enquiries are sent to</li>
+          <li>⏳ Not yet wired up: bulk CSV upload, draft/review workflow, real multi-user login — see the note on the Settings page</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Products -->
+    <section class="ad-view" id="view-products" style="display:none">
+      <div class="ad-header"><h1>Products</h1><p>Everything shown in the public catalogue.</p>
+        <button class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+      </div>
+      <div class="ad-table-wrap">
+        <table class="ad-table" id="productsTable"></table>
+      </div>
+    </section>
+
+    <!-- Collections -->
+    <section class="ad-view" id="view-collections" style="display:none">
+      <div class="ad-header"><h1>Collections</h1><p>Featured collections shown on the homepage.</p>
+        <button class="btn btn-primary" id="addCollectionBtn">+ Add Collection</button>
+      </div>
+      <div class="ad-coll-grid" id="collectionsGrid"></div>
+    </section>
+
+    <!-- Settings -->
+    <section class="ad-view" id="view-settings" style="display:none">
+      <div class="ad-header"><h1>Site Settings</h1><p>Global settings for the public site.</p></div>
+      <div class="ad-panel">
+        <h3>WhatsApp enquiry number</h3>
+        <p class="ad-hint">Country code + number, no spaces or +. e.g. 919999999999</p>
+        <div class="ad-field"><input id="settingsWaNumber" placeholder="919999999999"></div>
+        <button class="btn btn-primary btn-sm" id="saveWaBtn">Save Number</button>
+      </div>
+      <div class="ad-panel">
+        <h3>Homepage hero banner images</h3>
+        <p class="ad-hint">The 3 floating images in the homepage hero section.</p>
+        <div class="ad-hero-upload" id="heroUploadRow"></div>
+      </div>
+      <div class="ad-panel">
+        <h3>Not built into this UI</h3>
+        <p class="ad-hint">Bulk CSV upload and a draft/review/publish workflow (blueprint sections 3 &amp; 4) aren't wired up yet — every save here publishes immediately. To reload the original 16 demo products/8 collections, re-run <code>supabase/seed.sql</code> in your Supabase SQL editor (it won't duplicate rows you've already edited).</p>
+      </div>
+    </section>
+
+    <!-- Roles -->
+    <section class="ad-view" id="view-roles" style="display:none">
+      <div class="ad-header"><h1>Users &amp; Roles</h1><p>How access is split, per the Phase 1 blueprint.</p></div>
+      <div class="ad-roles-grid">
+        <div class="ad-panel">
+          <h3>👑 Super Admin</h3>
+          <p class="ad-hint">Full system control.</p>
+          <ul class="ad-checklist"><li>✅ Everything a Catalog Manager can do</li><li>✅ Site settings (WhatsApp number, hero banners)</li><li>✅ User &amp; role management</li><li>✅ Full enquiry reporting</li></ul>
+        </div>
+        <div class="ad-panel">
+          <h3>🗂️ Catalog Manager</h3>
+          <p class="ad-hint">Cataloguing only.</p>
+          <ul class="ad-checklist"><li>✅ Create, edit, publish products</li><li>✅ Manage collections</li><li>🚫 No access to site settings</li><li>🚫 No access to user/role management</li></ul>
+        </div>
+      </div>
+      <div class="ad-panel">
+        <h3>How to add a team member</h3>
+        <p class="ad-hint">This is now real, server-enforced access — the role lives in the <code>profiles</code> table and Row Level Security checks it on every request, so it can't be bypassed from the browser. To add someone: Supabase dashboard → Authentication → Users → Add user (creates them as Catalog Manager automatically) — then, to make them Super Admin, run <code>update public.profiles set role='super_admin' where email='them@example.com';</code> in the SQL editor. There's no invite/remove UI here yet — that's the next thing worth building if you get more than one or two admins.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===================== PRODUCT MODAL ===================== -->
+<div class="ad-modal-backdrop" id="productModalBackdrop">
+  <div class="ad-modal ad-modal-lg">
+    <div class="ad-modal-head"><h2 id="productModalTitle">Add Product</h2><span class="ad-modal-close" id="closeProductModal">✕</span></div>
+    <div class="ad-modal-body" id="productForm"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelProductBtn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveProductBtn">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== COLLECTION MODAL ===================== -->
+<div class="ad-modal-backdrop" id="collectionModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2 id="collectionModalTitle">Add Collection</h2><span class="ad-modal-close" id="closeCollectionModal">✕</span></div>
+    <div class="ad-modal-body" id="collectionForm"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelCollectionBtn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveCollectionBtn">Save Collection</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/data-store.js"></script>
+<script src="assets/script.js"></script>
+<script src="assets/admin.js"></script>
+</body></html>
