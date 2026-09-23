@@ -52,7 +52,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderDashboard();
     renderProductsTable();
     renderCollectionsGrid();
+    renderEnquiriesTable();
     renderSettingsView();
+    renderColorSwatches();
     switchView(location.hash.replace("#","") || "dashboard");
   }
 
@@ -63,6 +65,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(target) target.style.display = "block"; else document.querySelector("#view-dashboard").style.display = "block";
     document.querySelectorAll("#adNav a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===name));
     if(name==="dashboard") renderDashboard();
+    if(name==="enquiries") renderEnquiriesTable();
   }
   document.querySelectorAll("#adNav a[data-view]").forEach(a=>{
     a.addEventListener("click", (e)=>{ e.preventDefault(); location.hash = "#"+a.dataset.view; switchView(a.dataset.view); });
@@ -138,6 +141,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="ad-img-grid" id="pf_imgGrid"></div>
         <input type="file" id="pf_imgInput" accept="image/*" multiple style="display:none">
         <p class="ad-hint" id="pf_uploadStatus" style="margin-top:8px"></p>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="url" id="pf_imgUrlInput" placeholder="Or paste an image link (e.g. Dropbox direct link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addImgUrlBtn">Add link</button>
+        </div>
       </div>
     </div>`;
   }
@@ -188,6 +195,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         }
       }
       status.textContent = "";
+    });
+    // Paste a direct image link (Dropbox, Google Drive direct link, etc.)
+    // instead of uploading — the file then lives wherever that link points,
+    // not in Supabase Storage, so it doesn't count against its free quota.
+    document.querySelector("#pf_addImgUrlBtn").addEventListener("click", ()=>{
+      const input = document.querySelector("#pf_imgUrlInput");
+      const url = input.value.trim();
+      if(!url) return;
+      if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
+      productImages.push(url);
+      input.value = "";
+      renderImgGrid();
     });
     document.querySelector("#productModalBackdrop").classList.add("show");
   }
@@ -276,6 +295,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="ad-img-grid" id="cf_imgGrid"></div>
         <input type="file" id="cf_imgInput" accept="image/*" style="display:none">
         <p class="ad-hint" id="cf_uploadStatus" style="margin-top:8px"></p>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input type="url" id="cf_imgUrlInput" placeholder="Or paste an image link (e.g. Dropbox direct link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="cf_addImgUrlBtn">Add link</button>
+        </div>
       </div>`;
   }
   function renderCollImgGrid(){
@@ -299,6 +322,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       status.textContent = "Uploading…";
       try{ collImage = await BazDS.uploadImage(file, "collections"); renderCollImgGrid(); status.textContent = ""; }
       catch(err){ status.textContent = "Upload failed: " + (err.message||""); }
+    });
+    // Paste a direct image link instead of uploading (see product form note above)
+    document.querySelector("#cf_addImgUrlBtn").addEventListener("click", ()=>{
+      const input = document.querySelector("#cf_imgUrlInput");
+      const url = input.value.trim();
+      if(!url) return;
+      if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
+      collImage = url;
+      input.value = "";
+      renderCollImgGrid();
     });
     document.querySelector("#collectionModalBackdrop").classList.add("show");
   }
@@ -376,6 +409,66 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     catch(err){ alert("Could not save: " + err.message); }
     finally{ busy(saveWaBtn, false); }
   });
+
+  /* ================= BRAND COLOUR THEME ================= */
+  // 10 preset corporate-friendly accents, including a monochrome "Charcoal"
+  // and "Silver" pair for a black/white-leaning look. Charcoal/Silver use
+  // slightly-off shades (not pure #000/#fff) so text sitting on them, or on
+  // the near-black/white surfaces elsewhere on the site, always stays
+  // readable — applyBrandColor() (in script.js) also auto-picks light or
+  // dark text for whichever colour is chosen.
+  const BRAND_PRESETS = [
+    {name:"Lime",     hex:"#c6f000"},
+    {name:"Ocean",     hex:"#2563eb"},
+    {name:"Emerald",   hex:"#10b981"},
+    {name:"Royal",     hex:"#7c3aed"},
+    {name:"Crimson",   hex:"#dc2626"},
+    {name:"Sunset",    hex:"#f97316"},
+    {name:"Teal",      hex:"#0d9488"},
+    {name:"Hot Pink",  hex:"#ec4899"},
+    {name:"Charcoal",  hex:"#52525b"},
+    {name:"Silver",    hex:"#cbd5e1"}
+  ];
+  function renderColorSwatches(){
+    const el = document.querySelector("#colorGrid"); if(!el) return;
+    const current = (SETTINGS.brandColor || "#c6f000").toLowerCase();
+    el.innerHTML = BRAND_PRESETS.map(p=>`
+      <div class="ad-color-swatch ${p.hex.toLowerCase()===current?'active':''}" data-hex="${p.hex}">
+        <div class="sw-dot" style="background:${p.hex}"></div>
+        <span>${p.name}</span>
+      </div>`).join("");
+    el.querySelectorAll(".ad-color-swatch").forEach(sw=>{
+      sw.addEventListener("click", async ()=>{
+        const hex = sw.dataset.hex;
+        SETTINGS.brandColor = hex;
+        applyBrandColor(hex); // instant preview in the admin panel itself
+        el.querySelectorAll(".ad-color-swatch").forEach(s=>s.classList.remove("active"));
+        sw.classList.add("active");
+        try{ await BazDS.updateSettings(SETTINGS); }
+        catch(err){ alert("Could not save colour: " + err.message); }
+      });
+    });
+  }
+
+  /* ================= ENQUIRIES ================= */
+  async function renderEnquiriesTable(){
+    const el = document.querySelector("#enquiriesTable"); if(!el) return;
+    let enquiries = [];
+    try{ enquiries = await BazDS.getEnquiries(); }catch(err){ console.error(err); }
+    if(!enquiries.length){
+      el.innerHTML = "";
+      el.closest(".ad-table-wrap").innerHTML = `<p class="ad-enq-empty">No enquiries yet — they'll show up here as soon as a visitor uses the WhatsApp enquiry button on the live site.</p>`;
+      return;
+    }
+    el.innerHTML = `<tr><th>Reference</th><th>Product</th><th>Quantity</th><th>Date</th></tr>` +
+      enquiries.map(e=>`
+        <tr>
+          <td><b>${e.ref}</b></td>
+          <td>${e.product_name || "—"}</td>
+          <td>${e.quantity ? e.quantity+" pcs" : "—"}</td>
+          <td>${new Date(e.created_at).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+        </tr>`).join("");
+  }
 
   window.addEventListener("hashchange", ()=>switchView(location.hash.replace("#","")||"dashboard"));
 });
