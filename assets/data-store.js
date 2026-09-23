@@ -75,17 +75,18 @@ const BazDS = (function(){
   }
 
   async function getSettings(){
-    const sb = getClient(); if(!sb) return { whatsappNumber:"919999999999", heroImages:[] };
+    const sb = getClient(); if(!sb) return { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000" };
     const { data, error } = await sb.from("settings").select("*").eq("id",1).single();
-    if(error){ console.error("getSettings:", error.message); return { whatsappNumber:"919999999999", heroImages:[] }; }
-    return { whatsappNumber: data.whatsapp_number, heroImages: data.hero_images || [] };
+    if(error){ console.error("getSettings:", error.message); return { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000" }; }
+    return { whatsappNumber: data.whatsapp_number, heroImages: data.hero_images || [], brandColor: data.brand_color || "#c6f000" };
   }
 
   async function updateSettings(settings){
     const sb = getClient(); if(!sb) return false;
     const { error } = await sb.from("settings").update({
       whatsapp_number: settings.whatsappNumber,
-      hero_images: settings.heroImages
+      hero_images: settings.heroImages,
+      brand_color: settings.brandColor
     }).eq("id",1);
     if(error){ console.error("updateSettings:", error.message); throw error; }
     return true;
