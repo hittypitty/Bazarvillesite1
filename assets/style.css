@@ -3,6 +3,7 @@
   --lime:#c6f000; --lime-deep:#9fc400; --ink:#1a1a1a; --ink-soft:#3a3a38;
   --paper:#ffffff; --surface:#ffffff; --text:#1a1a1a;
   --soft:#f6f8ee; --soft2:#eef6d8; --card:#ffffff; --line:#e7e9dd; --muted:#63685f;
+  --on-accent:var(--ink);
   --r-sm:12px; --r-md:20px; --r-lg:30px;
   --shadow:0 20px 44px -18px rgba(26,26,26,.35);
   --wa:#25D366;
@@ -47,7 +48,7 @@ img{max-width:100%;display:block}
 .btn-primary{background:var(--ink);color:var(--lime);box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 20px -8px rgba(0,0,0,.35)}
 .btn-primary:hover{transform:translateY(-1px);box-shadow:0 1px 2px rgba(0,0,0,.08),0 14px 28px -10px rgba(0,0,0,.45)}
 .btn-primary:active{transform:translateY(0) scale(.98);opacity:.92}
-.btn-lime{background:var(--lime);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 22px -10px rgba(159,196,0,.55)}
+.btn-lime{background:var(--lime);color:var(--on-accent);box-shadow:0 1px 2px rgba(0,0,0,.05),0 10px 22px -10px rgba(159,196,0,.55)}
 .btn-lime:hover{transform:translateY(-1px);box-shadow:0 1px 2px rgba(0,0,0,.06),0 16px 28px -10px rgba(159,196,0,.6)}
 .btn-lime:active{transform:translateY(0) scale(.98);opacity:.92}
 .btn-outline{border:2px solid var(--ink);background:transparent;color:var(--ink)}
@@ -68,7 +69,7 @@ img{max-width:100%;display:block}
 .hero p{font-size:17.5px;color:var(--muted);line-height:1.65;max-width:520px}
 .searchbar{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px;display:flex;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 20px 40px -20px rgba(26,26,26,.25);max-width:560px}
 .searchbar input{border:0;outline:0;flex:1;padding:12px 14px;font-size:15px;font-family:inherit;background:transparent}
-.searchbar button{border:0;background:var(--lime);color:var(--ink);border-radius:12px;padding:0 20px;font-weight:700;cursor:pointer;font-family:"Plus Jakarta Sans"}
+.searchbar button{border:0;background:var(--lime);color:var(--on-accent);border-radius:12px;padding:0 20px;font-weight:700;cursor:pointer;font-family:"Plus Jakarta Sans"}
 .quicktags{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .qtag{font-size:12.5px;font-weight:600;border:1.5px solid var(--line);padding:7px 13px;border-radius:30px;color:var(--ink-soft);transition:.2s}
 .qtag:hover{border-color:var(--ink);background:var(--ink);color:var(--lime)}
@@ -110,6 +111,7 @@ img{max-width:100%;display:block}
 .gate p{color:var(--ink-soft);font-size:14px;margin:0 0 14px}
 .gate .go{font-weight:700;font-size:13.5px;display:inline-flex;align-items:center;gap:6px;transition:gap .3s ease}
 .gate.g1{background:linear-gradient(155deg,#eaffb0,var(--lime))}
+.gate.g1 h3,.gate.g1 p,.gate.g1 .go{color:var(--on-accent)}
 .gate.g2{background:linear-gradient(155deg,var(--surface),var(--soft));border:1px solid var(--line)}
 .gate.g3{background:linear-gradient(155deg,var(--ink),#333)}
 .gate.g3 h3,.gate.g3 .go{color:#fff}
@@ -134,7 +136,7 @@ img{max-width:100%;display:block}
 .pcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;transform-style:preserve-3d;transition:transform .15s ease-out,box-shadow .35s ease,border-color .35s ease;position:relative;will-change:transform}
 .pcard:hover{box-shadow:0 26px 48px -18px rgba(26,26,26,.28);border-color:transparent}
 .pcard .badge-stock{position:absolute;top:12px;left:12px;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:20px;z-index:2;font-family:"Plus Jakarta Sans"}
-.badge-stock.in{background:var(--lime);color:var(--ink)}
+.badge-stock.in{background:var(--lime);color:var(--on-accent)}
 .badge-stock.out{background:var(--ink);color:#fff}
 .pimg{height:210px;overflow:hidden;background:var(--soft)}
 .pimg img{width:100%;height:100%;object-fit:cover;transform:translateZ(0) scale(1);transition:transform .5s cubic-bezier(.16,1,.3,1)}
@@ -211,7 +213,7 @@ img{max-width:100%;display:block}
 .pd-price span{font-size:13px;color:var(--muted);font-weight:600}
 .tier-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
 .tier-table td,.tier-table th{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line)}
-.tier-table tr.active-tier{background:var(--lime);border-radius:8px}
+.tier-table tr.active-tier{background:var(--lime);color:var(--on-accent);border-radius:8px}
 .opt-title{font-weight:700;margin:18px 0 10px;font-size:14px}
 .swatches{display:flex;gap:10px}
 .swatch{width:36px;height:36px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--line);cursor:pointer;transition:.2s}
