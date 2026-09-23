@@ -85,6 +85,7 @@ const DEFAULT_COLLECTIONS = [
 
 const DEFAULT_SETTINGS = {
   whatsappNumber: "919999999999",
+  brandColor: "#c6f000",
   heroImages: [
     "https://picsum.photos/seed/bzv101/500/620",
     "https://picsum.photos/seed/bzv102/450/560",
@@ -92,12 +93,10 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
-// Seed localStorage on first load, then read the CURRENT (possibly
-// admin-edited) data — this is what makes admin panel changes show up on
-// the public site immediately, in this browser.
 // PRODUCTS/COLLECTIONS/SETTINGS are populated asynchronously from Supabase
-// once the page loads (see bootAndRender() near the bottom of this file).
-// They start empty/default so nothing throws before that load finishes.
+// once the page loads (see the DOMContentLoaded handler near the bottom of
+// this file). They start empty/default so nothing throws before that load
+// finishes.
 let PRODUCTS = [];
 let COLLECTIONS = [];
 let SETTINGS = DEFAULT_SETTINGS;
@@ -586,6 +585,37 @@ function initHeroImages(){
   });
 }
 
+/* ---------- brand colour theming (admin-editable via Settings) ----------
+   The whole site only ever references two accent variables, --lime and
+   --lime-deep (a darker shade for hover/shadow), plus --on-accent (the text
+   colour to use on TOP of the accent — dark text on a light accent, white
+   text on a dark one). Switching the whole site's colour is just computing
+   these three from one chosen hex and setting them at the root — no other
+   file needs to know a theme change happened. */
+function hexToRgb(hex){
+  hex = hex.replace("#","");
+  if(hex.length===3) hex = hex.split("").map(c=>c+c).join("");
+  const n = parseInt(hex,16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+function darken(hex, amount){
+  const {r,g,b} = hexToRgb(hex);
+  const f = c => Math.max(0, Math.round(c*(1-amount)));
+  return `#${[f(r),f(g),f(b)].map(v=>v.toString(16).padStart(2,"0")).join("")}`;
+}
+function relativeLuminance(hex){
+  const {r,g,b} = hexToRgb(hex);
+  const [R,G,B] = [r,g,b].map(v=>{ v/=255; return v<=.03928 ? v/12.92 : Math.pow((v+.055)/1.055,2.4); });
+  return .2126*R + .7152*G + .0722*B;
+}
+function applyBrandColor(hex){
+  if(!hex) return;
+  const root = document.documentElement.style;
+  root.setProperty("--lime", hex);
+  root.setProperty("--lime-deep", darken(hex, .2));
+  root.setProperty("--on-accent", relativeLuminance(hex) > .5 ? "#1a1a1a" : "#ffffff");
+}
+
 /* ---------- shared: nav + ticker duplication + init ---------- */
 document.addEventListener("DOMContentLoaded", async ()=>{
   document.querySelectorAll(".ticker").forEach(t=>{ if(!t.dataset.doubled){ t.innerHTML += t.innerHTML; t.dataset.doubled = "1"; } });
@@ -611,6 +641,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     console.error("Could not load live data from Supabase — showing built-in demo data instead.", err);
     PRODUCTS = DEFAULT_PRODUCTS; COLLECTIONS = DEFAULT_COLLECTIONS; SETTINGS = DEFAULT_SETTINGS;
   }
+  applyBrandColor(SETTINGS.brandColor);
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
