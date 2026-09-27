@@ -44,8 +44,17 @@ const BazDS = (function(){
   async function upsertProduct(product){
     const sb = getClient(); if(!sb) return null;
     const row = appToDb(product);
-    if(!row.id) delete row.id; // let the DB assign a new id on insert
-    const { data, error } = await sb.from("products").upsert(row).select().single();
+    const id = row.id;
+    delete row.id; // the "id" column is an identity column the DB assigns — it
+                   // can never be sent in an insert/update payload, or Postgres
+                   // rejects it with "cannot insert a non-DEFAULT value into
+                   // column id". Editing an existing product goes through
+                   // .update().eq("id", id) instead, which targets the row by
+                   // id without ever writing to that column.
+    const query = id
+      ? sb.from("products").update(row).eq("id", id)
+      : sb.from("products").insert(row);
+    const { data, error } = await query.select().single();
     if(error){ console.error("upsertProduct:", error.message); throw error; }
     return dbToApp(data);
   }
@@ -67,8 +76,11 @@ const BazDS = (function(){
   async function upsertCollection(coll){
     const sb = getClient(); if(!sb) return null;
     const row = { name: coll.name, tag: coll.tag, image_url: coll.img, sort_order: coll.sort_order || 0 };
-    if(coll.id) row.id = coll.id;
-    const { data, error } = await sb.from("collections").upsert(row).select().single();
+    // same identity-column rule as products — never send "id" in the payload.
+    const query = coll.id
+      ? sb.from("collections").update(row).eq("id", coll.id)
+      : sb.from("collections").insert(row);
+    const { data, error } = await query.select().single();
     if(error){ console.error("upsertCollection:", error.message); throw error; }
     return { name:data.name, tag:data.tag, img:data.image_url, id:data.id, sort_order:data.sort_order };
   }
