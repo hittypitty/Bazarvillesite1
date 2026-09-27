@@ -174,12 +174,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <button class="btn btn-outline btn-sm" type="button" id="pf_addSizeBtn">+ Add size</button>
         </div>
       </div>
+      <div class="ad-field full">
+        <label>Printing options <span class="ad-hint" style="display:inline">(optional — shown as a variant selector on the product page, e.g. Screen Print / Embroidery)</span></label>
+        <div class="ad-tag-group" id="pf_printOptChips"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_printOptInput" placeholder="e.g. Embroidery" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addPrintOptBtn">+ Add option</button>
+        </div>
+      </div>
       <div class="ad-field"><label>Status</label>
         <select id="pf_status">
           <option value="published" ${(!p||(p.status||'published')==='published')?'selected':''}>Published (visible on live site)</option>
           <option value="draft" ${p&&p.status==='draft'?'selected':''}>Draft (hidden from customers)</option>
         </select>
       </div>
+      <div class="ad-field full"><h4 style="margin:6px 0 -4px">SEO (optional — shown in Google search results and the browser tab)</h4></div>
+      <div class="ad-field full"><label>Meta title</label><input id="pf_metaTitle" value="${p&&p.metaTitle?p.metaTitle.replace(/"/g,'&quot;'):''}" placeholder="Defaults to the product name if left blank" maxlength="70"></div>
+      <div class="ad-field full"><label>Meta description</label><input id="pf_metaDesc" value="${p&&p.metaDescription?p.metaDescription.replace(/"/g,'&quot;'):''}" placeholder="1-2 line summary shown under the title in Google" maxlength="160"></div>
+      <div class="ad-field full"><label>URL slug</label><input id="pf_slug" value="${p&&p.slug?p.slug:''}" placeholder="e.g. steel-water-bottle-750ml (auto-generated from the name if left blank)"></div>
       <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
       <div class="ad-field full">
         <label>Quantity-tier pricing</label>
@@ -209,6 +221,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   /* ---------- colour / size tag chips (product form) ---------- */
   let workingColors = [];
   let workingSizes = [];
+  let workingPrintOpts = [];
   function renderColorChips(){
     const el = document.querySelector("#pf_colorChips"); if(!el) return;
     el.innerHTML = workingColors.map((c,i)=>`
@@ -219,9 +232,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     el.innerHTML = workingSizes.map((s,i)=>`
       <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removeSize(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No sizes added yet</span>`;
   }
+  function renderPrintOptChips(){
+    const el = document.querySelector("#pf_printOptChips"); if(!el) return;
+    el.innerHTML = workingPrintOpts.map((s,i)=>`
+      <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removePrintOpt(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">None yet — leave empty if this product only has one printing method</span>`;
+  }
   window.AdminUI = window.AdminUI || {};
   AdminUI.removeColor = (i)=>{ workingColors.splice(i,1); renderColorChips(); };
   AdminUI.removeSize = (i)=>{ workingSizes.splice(i,1); renderSizeChips(); };
+  AdminUI.removePrintOpt = (i)=>{ workingPrintOpts.splice(i,1); renderPrintOptChips(); };
 
   /* ---------- image link helpers (used by both product + collection forms) ----------
      A pasted link only works as an <img src> if it's a DIRECT file link. Two common
@@ -229,6 +248,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
      file) and a Google Images search-result link (opens Google's page, not the photo).
      normalizeImageUrl fixes the Dropbox case automatically; testImageLoads actually
      tries loading it so we can warn immediately instead of silently saving a dead link. */
+  function slugify(str){
+    return (str||"").toString().toLowerCase().trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
   function normalizeImageUrl(url){
     if(/dropbox\.com/i.test(url)){
       if(/[?&]dl=0(&|$)/.test(url)) return url.replace(/dl=0/, "dl=1");
@@ -276,12 +302,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     workingTiers = p ? p.tiers.map(t=>({...t})) : [{min:p?p.moq:10, price:0}];
     workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
     workingSizes = p ? p.sizes.slice() : ["Standard"];
+    workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
     document.querySelector("#productForm").innerHTML = productFormHtml(p);
     renderTierRows(workingTiers);
     renderImgGrid();
     renderColorChips();
     renderSizeChips();
+    renderPrintOptChips();
+    document.querySelector("#pf_addPrintOptBtn").addEventListener("click", ()=>{
+      const input = document.querySelector("#pf_printOptInput");
+      const val = input.value.trim();
+      if(!val) return;
+      if(!workingPrintOpts.some(s=>s.toLowerCase()===val.toLowerCase())) workingPrintOpts.push(val);
+      input.value = "";
+      renderPrintOptChips();
+    });
+    document.querySelector("#pf_printOptInput").addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addPrintOptBtn").click(); }
+    });
     document.querySelector("#pf_addColorBtn").addEventListener("click", ()=>{
       const hex = document.querySelector("#pf_colorPicker").value;
       if(!workingColors.includes(hex)) workingColors.push(hex);
@@ -386,8 +425,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       status: document.querySelector("#pf_status").value,
       colors: workingColors.slice(),
       sizes: workingSizes.slice(),
+      printOptions: workingPrintOpts.slice(),
       tiers: workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min),
-      img: productImages
+      img: productImages,
+      metaTitle: document.querySelector("#pf_metaTitle").value.trim(),
+      metaDescription: document.querySelector("#pf_metaDesc").value.trim(),
+      slug: document.querySelector("#pf_slug").value.trim() || slugify(name)
     };
     busy(saveProductBtn, true, "Saving…");
     try{
