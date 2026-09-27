@@ -25,8 +25,14 @@ const BazDS = (function(){
     return client;
   }
 
-  function dbToApp(row){ const {images, ...rest} = row; return {...rest, img: images || []}; }
-  function appToDb(p){ const {img, ...rest} = p; return {...rest, images: img || []}; }
+  function dbToApp(row){
+    const {images, ...rest} = row;
+    return {...rest, img: images || [], professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : [])};
+  }
+  function appToDb(p){
+    const {img, ...rest} = p;
+    return {...rest, images: img || [], profession: (p.professions && p.professions[0]) || p.profession || "", professions: p.professions || (p.profession ? [p.profession] : [])};
+  }
 
   async function getProducts(){
     const sb = getClient(); if(!sb) return [];
@@ -74,11 +80,19 @@ const BazDS = (function(){
     return true;
   }
 
+  const SETTINGS_FALLBACK = { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle" };
+
   async function getSettings(){
-    const sb = getClient(); if(!sb) return { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000" };
+    const sb = getClient(); if(!sb) return SETTINGS_FALLBACK;
     const { data, error } = await sb.from("settings").select("*").eq("id",1).single();
-    if(error){ console.error("getSettings:", error.message); return { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000" }; }
-    return { whatsappNumber: data.whatsapp_number, heroImages: data.hero_images || [], brandColor: data.brand_color || "#c6f000" };
+    if(error){ console.error("getSettings:", error.message); return SETTINGS_FALLBACK; }
+    return {
+      whatsappNumber: data.whatsapp_number,
+      heroImages: data.hero_images || [],
+      brandColor: data.brand_color || "#c6f000",
+      brandFont: data.brand_font || "inter",
+      animationLevel: data.animation_level || "subtle"
+    };
   }
 
   async function updateSettings(settings){
@@ -86,7 +100,9 @@ const BazDS = (function(){
     const { error } = await sb.from("settings").update({
       whatsapp_number: settings.whatsappNumber,
       hero_images: settings.heroImages,
-      brand_color: settings.brandColor
+      brand_color: settings.brandColor,
+      brand_font: settings.brandFont,
+      animation_level: settings.animationLevel
     }).eq("id",1);
     if(error){ console.error("updateSettings:", error.message); throw error; }
     return true;
@@ -131,18 +147,33 @@ const BazDS = (function(){
     return data;
   }
 
-  async function getEnquiries(){
+  /** opts.since: ISO timestamp — only enquiries on/after this are returned. */
+  async function getEnquiries(opts){
     const sb = getClient(); if(!sb) return [];
-    const { data, error } = await sb.from("enquiries").select("*").order("created_at",{ascending:false}).limit(500);
+    let q = sb.from("enquiries").select("*").order("created_at",{ascending:false}).limit(500);
+    if(opts && opts.since) q = q.gte("created_at", opts.since);
+    const { data, error } = await q;
     if(error){ console.error("getEnquiries:", error.message); return []; }
     return data;
+  }
+
+  /** Admin follow-up mini-CRM: update an enquiry's status/notes/follow-up date. */
+  async function updateEnquiry(id, fields){
+    const sb = getClient(); if(!sb) return false;
+    const row = {};
+    if("status" in fields) row.status = fields.status;
+    if("notes" in fields) row.notes = fields.notes;
+    if("followupAt" in fields) row.followup_at = fields.followupAt;
+    const { error } = await sb.from("enquiries").update(row).eq("id", id);
+    if(error){ console.error("updateEnquiry:", error.message); throw error; }
+    return true;
   }
 
   return {
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings,
-    logEnquiry, getEnquiries, uploadImage,
+    logEnquiry, getEnquiries, updateEnquiry, uploadImage,
     signIn, signOut, getCurrentAdmin
   };
 })();
