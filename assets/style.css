@@ -93,6 +93,12 @@ img{max-width:100%;display:block}
 .orb1{width:220px;height:220px;top:-30px;right:40px}
 .orb2{width:180px;height:180px;bottom:20px;left:-20px;background:#ffd400;opacity:.35}
 
+/* ---- hero v2 — single flat photo instead of the floating 3D stack ---- */
+.eyebrow-plain{font-family:"Plus Jakarta Sans";font-weight:700;font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--lime-deep)}
+.hero-v2 h1{margin-top:14px}
+.hero-photo{border-radius:28px;overflow:hidden;aspect-ratio:1/1;box-shadow:0 30px 60px -20px rgba(26,26,26,.3);background:var(--soft)}
+.hero-photo img{width:100%;height:100%;object-fit:cover;display:block}
+
 /* ---- trusted-by strip ---- */
 .trusted{padding:34px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .trusted p{text-align:center;color:var(--muted);font-size:13px;font-weight:700;letter-spacing:.03em;margin-bottom:22px}
