@@ -4,7 +4,7 @@
 <meta name="description" content="Super Admin enquiry reporting preview — daily, weekly and monthly enquiry volume, top products and recent activity.">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Work+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css"></head><body class="dash-shell">
 
 <div class="dash-topbar"><div class="container" style="display:flex;justify-content:space-between;align-items:center">
@@ -17,7 +17,18 @@
 
 <main class="section" id="dashRoot" style="padding-top:34px">
 <div class="container">
-  <div class="title reveal"><h2>Enquiry Reporting</h2><p>Daily, weekly and monthly overview — this is a Phase 1 blueprint preview (section 11) with sample data.</p></div>
+  <div class="title reveal"><h2>Enquiry Reporting</h2><p>Daily, weekly and monthly overview, backed by real logged enquiries.</p></div>
+
+  <div class="reveal" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:-6px 0 22px">
+    <select id="dashRangeSelect" style="border:1.5px solid var(--line);border-radius:10px;padding:9px 13px;font:inherit;background:#fff">
+      <option value="1">Today</option>
+      <option value="7" selected>Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last quarter (90 days)</option>
+      <option value="0">All time</option>
+    </select>
+    <button class="btn btn-outline btn-sm" id="dashExportBtn" type="button">⬇ Export CSV</button>
+  </div>
 
   <div class="dash-grid stagger">
     <div class="dash-card reveal"><div class="dlabel">Enquiries today</div><div class="dnum">18</div><div class="dtrend up">▲ 12% vs yesterday</div></div>
