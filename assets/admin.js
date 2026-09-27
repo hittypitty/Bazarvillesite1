@@ -1,6 +1,31 @@
 /* ===================== BAZARVILLE ADMIN PANEL (Supabase-backed) ===================== */
 document.addEventListener("DOMContentLoaded", async ()=>{
 
+  // NOTE: these two preset lists are declared right here at the very top,
+  // before anything else — including before the "resume an existing login"
+  // check below. That check can call showShell() (which renders these
+  // presets) before the rest of this function has finished running, and a
+  // `const` declared further down wouldn't exist yet at that moment ("Cannot
+  // access before initialization"), silently breaking the whole admin panel.
+  // Keeping them here removes that timing trap entirely.
+  const BRAND_PRESETS = [
+    {name:"Lime",     hex:"#c6f000"},
+    {name:"Ocean",     hex:"#2563eb"},
+    {name:"Emerald",   hex:"#10b981"},
+    {name:"Royal",     hex:"#7c3aed"},
+    {name:"Crimson",   hex:"#dc2626"},
+    {name:"Sunset",    hex:"#f97316"},
+    {name:"Teal",      hex:"#0d9488"},
+    {name:"Hot Pink",  hex:"#ec4899"},
+    {name:"Charcoal",  hex:"#52525b"},
+    {name:"Silver",    hex:"#cbd5e1"}
+  ];
+  const ANIM_LEVELS = [
+    {id:"off",    label:"Off",              desc:"No hover-tilt or motion — fastest, most accessible."},
+    {id:"subtle", label:"Subtle (Default)", desc:"Gentle hover-tilt and fade-in, as originally designed."},
+    {id:"full",   label:"Full 3D",          desc:"Deeper hover-tilt, plus an idle 3D floating effect on product cards."}
+  ];
+
   /* ---------- real Supabase Auth ---------- */
   const loginBtn = document.querySelector("#loginBtn");
   const loginError = document.createElement("p");
@@ -55,6 +80,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderEnquiriesTable();
     renderSettingsView();
     renderColorSwatches();
+    renderFontSwatches();
+    renderAnimationOptions();
     switchView(location.hash.replace("#","") || "dashboard");
   }
 
@@ -92,9 +119,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   /* ================= PRODUCTS ================= */
   function renderProductsTable(){
     const el = document.querySelector("#productsTable"); if(!el) return;
-    el.innerHTML = `<tr><th></th><th>Product</th><th>Category</th><th>Starting price</th><th>MOQ</th><th>Stock</th><th></th></tr>` +
+    el.innerHTML = `<tr><th></th><th>Product</th><th>Category</th><th>Starting price</th><th>MOQ</th><th>Stock</th><th>Status</th><th></th></tr>` +
       PRODUCTS.map(p=>{
         const t = tierFor(p, p.moq);
+        const isDraft = (p.status||"published") === "draft";
         return `<tr>
           <td><img src="${(p.img&&p.img[0])||''}" alt=""></td>
           <td><b>${p.name}</b></td>
@@ -102,6 +130,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <td>${money(t.price)}</td>
           <td>${p.moq} pcs</td>
           <td><span class="ad-badge ${p.stock?'in':'out'}">${p.stock?'In stock':'Out of stock'}</span></td>
+          <td><span class="ad-badge ${isDraft?'out':'in'}">${isDraft?'Draft':'Published'}</span></td>
           <td><div class="ad-row-actions">
             <button class="ad-icon-btn" title="Edit" onclick="AdminUI.editProduct(${p.id})">✏️</button>
             <button class="ad-icon-btn danger" title="Delete" onclick="AdminUI.deleteProduct(${p.id})">🗑️</button>
@@ -119,8 +148,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-field full"><label>Product name</label><input id="pf_name" value="${p?p.name.replace(/"/g,'&quot;'):''}"></div>
       <div class="ad-field"><label>Category</label><input id="pf_cat" value="${p?p.cat:''}" placeholder="e.g. T-Shirts"></div>
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
-      <div class="ad-field"><label>Profession</label>
-        <select id="pf_profession">${PROFESSIONS.map(pr=>`<option ${p&&p.profession===pr.name?'selected':''}>${pr.name}</option>`).join("")}</select>
+      <div class="ad-field full">
+        <label>Profession (select all that apply)</label>
+        <div class="ad-chip-group" id="pf_professions">${professionCheckboxesHtml(p?p.professions:[])}</div>
       </div>
       <div class="ad-field"><label>Purpose</label>
         <select id="pf_purpose">${["Employee Gifting","Client Gifting","Event Merchandise","Promotional"].map(v=>`<option ${p&&p.purpose===v?'selected':''}>${v}</option>`).join("")}</select>
@@ -128,9 +158,29 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-field"><label>Occasion</label><input id="pf_occasion" value="${p?p.occasion:''}" placeholder="e.g. Diwali"></div>
       <div class="ad-field"><label>MOQ (pcs)</label><input id="pf_moq" type="number" value="${p?p.moq:10}"></div>
       <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
-      <div class="ad-field"><label>Colours (comma-separated hex)</label><input id="pf_colors" value="${p?p.colors.join(","):"#1a1a1a,#c6f000"}"></div>
-      <div class="ad-field"><label>Sizes (comma-separated)</label><input id="pf_sizes" value="${p?p.sizes.join(","):"Standard"}"></div>
-      <div class="ad-field full ad-checkbox-row"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
+      <div class="ad-field full">
+        <label>Colours</label>
+        <div class="ad-tag-group" id="pf_colorChips"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <input type="color" id="pf_colorPicker" value="#1a1a1a" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addColorBtn">+ Add colour</button>
+        </div>
+      </div>
+      <div class="ad-field full">
+        <label>Sizes</label>
+        <div class="ad-tag-group" id="pf_sizeChips"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_sizeInput" placeholder="e.g. XL" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addSizeBtn">+ Add size</button>
+        </div>
+      </div>
+      <div class="ad-field"><label>Status</label>
+        <select id="pf_status">
+          <option value="published" ${(!p||(p.status||'published')==='published')?'selected':''}>Published (visible on live site)</option>
+          <option value="draft" ${p&&p.status==='draft'?'selected':''}>Draft (hidden from customers)</option>
+        </select>
+      </div>
+      <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
       <div class="ad-field full">
         <label>Quantity-tier pricing</label>
         <div id="pf_tiers"></div>
@@ -149,6 +199,55 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     </div>`;
   }
 
+  /* ---------- profession multi-select (product form) ---------- */
+  function professionCheckboxesHtml(selected){
+    const sel = selected && selected.length ? selected : [];
+    return PROFESSIONS.map(pr=>`
+      <label class="ad-chip-check"><input type="checkbox" value="${pr.name}" ${sel.includes(pr.name)?'checked':''}><span>${pr.icon} ${pr.name}</span></label>`).join("");
+  }
+
+  /* ---------- colour / size tag chips (product form) ---------- */
+  let workingColors = [];
+  let workingSizes = [];
+  function renderColorChips(){
+    const el = document.querySelector("#pf_colorChips"); if(!el) return;
+    el.innerHTML = workingColors.map((c,i)=>`
+      <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
+  }
+  function renderSizeChips(){
+    const el = document.querySelector("#pf_sizeChips"); if(!el) return;
+    el.innerHTML = workingSizes.map((s,i)=>`
+      <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removeSize(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No sizes added yet</span>`;
+  }
+  window.AdminUI = window.AdminUI || {};
+  AdminUI.removeColor = (i)=>{ workingColors.splice(i,1); renderColorChips(); };
+  AdminUI.removeSize = (i)=>{ workingSizes.splice(i,1); renderSizeChips(); };
+
+  /* ---------- image link helpers (used by both product + collection forms) ----------
+     A pasted link only works as an <img src> if it's a DIRECT file link. Two common
+     mistakes: a Dropbox share link (ends ?dl=0 — opens an HTML preview page, not the
+     file) and a Google Images search-result link (opens Google's page, not the photo).
+     normalizeImageUrl fixes the Dropbox case automatically; testImageLoads actually
+     tries loading it so we can warn immediately instead of silently saving a dead link. */
+  function normalizeImageUrl(url){
+    if(/dropbox\.com/i.test(url)){
+      if(/[?&]dl=0(&|$)/.test(url)) return url.replace(/dl=0/, "dl=1");
+      if(!/[?&]dl=1(&|$)/.test(url)) return url + (url.includes("?") ? "&" : "?") + "dl=1";
+    }
+    return url;
+  }
+  function testImageLoads(url){
+    return new Promise(resolve=>{
+      const img = new Image();
+      let done = false;
+      img.onload = ()=>{ if(!done){ done=true; resolve(true); } };
+      img.onerror = ()=>{ if(!done){ done=true; resolve(false); } };
+      img.src = url;
+      setTimeout(()=>{ if(!done){ done=true; resolve(false); } }, 6000);
+    });
+  }
+  const BROKEN_LINK_MSG = "Ye link seedha image nahi khol raha. Google Images ka search-result link ya Dropbox ka plain share link (?dl=0) kaam nahi karega — photo par right-click karke \"Copy image address\" se seedha .jpg/.png link lo, ya Dropbox link ke end mein ?dl=1 laga kar try karo.";
+
   function renderTierRows(tiers){
     const el = document.querySelector("#pf_tiers");
     el.innerHTML = tiers.map((t,i)=>`
@@ -165,7 +264,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function renderImgGrid(){
     const el = document.querySelector("#pf_imgGrid");
     el.innerHTML = productImages.map((src,i)=>`
-      <div class="ad-img-thumb"><img src="${src}"><span class="rm" onclick="AdminUI.removeImg(${i})">✕</span></div>`).join("")
+      <div class="ad-img-thumb"><img src="${src}" onerror="this.closest('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeImg(${i})">✕</span></div>`).join("")
       + `<div class="ad-img-add" id="pf_addImgBtn">+</div>`;
     document.querySelector("#pf_addImgBtn").addEventListener("click", ()=>document.querySelector("#pf_imgInput").click());
   }
@@ -175,10 +274,30 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     editingProductId = p ? p.id : null;
     productImages = p ? p.img.slice() : [];
     workingTiers = p ? p.tiers.map(t=>({...t})) : [{min:p?p.moq:10, price:0}];
+    workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
+    workingSizes = p ? p.sizes.slice() : ["Standard"];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
     document.querySelector("#productForm").innerHTML = productFormHtml(p);
     renderTierRows(workingTiers);
     renderImgGrid();
+    renderColorChips();
+    renderSizeChips();
+    document.querySelector("#pf_addColorBtn").addEventListener("click", ()=>{
+      const hex = document.querySelector("#pf_colorPicker").value;
+      if(!workingColors.includes(hex)) workingColors.push(hex);
+      renderColorChips();
+    });
+    document.querySelector("#pf_addSizeBtn").addEventListener("click", ()=>{
+      const input = document.querySelector("#pf_sizeInput");
+      const val = input.value.trim();
+      if(!val) return;
+      if(!workingSizes.some(s=>s.toLowerCase()===val.toLowerCase())) workingSizes.push(val);
+      input.value = "";
+      renderSizeChips();
+    });
+    document.querySelector("#pf_sizeInput").addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addSizeBtn").click(); }
+    });
     document.querySelector("#pf_addTier").addEventListener("click", ()=>{ workingTiers.push({min:1,price:0}); renderTierRows(workingTiers); });
     document.querySelector("#pf_imgInput").addEventListener("change", async (e)=>{
       const status = document.querySelector("#pf_uploadStatus");
@@ -199,11 +318,22 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // Paste a direct image link (Dropbox, Google Drive direct link, etc.)
     // instead of uploading — the file then lives wherever that link points,
     // not in Supabase Storage, so it doesn't count against its free quota.
-    document.querySelector("#pf_addImgUrlBtn").addEventListener("click", ()=>{
+    // We normalize known share-link patterns (Dropbox ?dl=0→?dl=1) and actually
+    // try loading the image before saving it, so a broken link is caught right
+    // here instead of only showing up as a broken thumbnail after save.
+    document.querySelector("#pf_addImgUrlBtn").addEventListener("click", async ()=>{
       const input = document.querySelector("#pf_imgUrlInput");
-      const url = input.value.trim();
+      const btn = document.querySelector("#pf_addImgUrlBtn");
+      const status = document.querySelector("#pf_uploadStatus");
+      let url = input.value.trim();
       if(!url) return;
       if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
+      url = normalizeImageUrl(url);
+      btn.disabled = true; status.textContent = "Checking link…";
+      const ok = await testImageLoads(url);
+      btn.disabled = false;
+      if(!ok){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
+      status.textContent = "";
       productImages.push(url);
       input.value = "";
       renderImgGrid();
@@ -237,19 +367,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const name = document.querySelector("#pf_name").value.trim();
     if(!name){ alert("Product name is required."); return; }
     if(!productImages.length){ alert("Add at least one product image."); return; }
+    const professions = [...document.querySelectorAll("#pf_professions input:checked")].map(i=>i.value);
+    if(!professions.length){ alert("Select at least one profession."); return; }
+    if(!workingColors.length){ alert("Add at least one colour."); return; }
+    if(!workingSizes.length){ alert("Add at least one size."); return; }
     const data = {
       id: editingProductId || undefined,
       name,
       cat: document.querySelector("#pf_cat").value.trim() || "Uncategorised",
-      profession: document.querySelector("#pf_profession").value,
+      professions,
+      profession: professions[0],
       purpose: document.querySelector("#pf_purpose").value,
       occasion: document.querySelector("#pf_occasion").value.trim(),
       brand: document.querySelector("#pf_brand").value.trim() || null,
       moq: Number(document.querySelector("#pf_moq").value)||1,
       bulk: Number(document.querySelector("#pf_bulk").value)||1,
       stock: document.querySelector("#pf_stock").checked,
-      colors: document.querySelector("#pf_colors").value.split(",").map(s=>s.trim()).filter(Boolean),
-      sizes: document.querySelector("#pf_sizes").value.split(",").map(s=>s.trim()).filter(Boolean),
+      status: document.querySelector("#pf_status").value,
+      colors: workingColors.slice(),
+      sizes: workingSizes.slice(),
       tiers: workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min),
       img: productImages
     };
@@ -303,7 +439,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   function renderCollImgGrid(){
     const el = document.querySelector("#cf_imgGrid");
-    el.innerHTML = (collImage ? `<div class="ad-img-thumb"><img src="${collImage}"><span class="rm" onclick="AdminUI.removeCollImg()">✕</span></div>` : "")
+    el.innerHTML = (collImage ? `<div class="ad-img-thumb"><img src="${collImage}" onerror="this.closest('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeCollImg()">✕</span></div>` : "")
       + (collImage ? "" : `<div class="ad-img-add" id="cf_addImgBtn">+</div>`);
     const addBtn = document.querySelector("#cf_addImgBtn");
     if(addBtn) addBtn.addEventListener("click", ()=>document.querySelector("#cf_imgInput").click());
@@ -324,11 +460,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       catch(err){ status.textContent = "Upload failed: " + (err.message||""); }
     });
     // Paste a direct image link instead of uploading (see product form note above)
-    document.querySelector("#cf_addImgUrlBtn").addEventListener("click", ()=>{
+    document.querySelector("#cf_addImgUrlBtn").addEventListener("click", async ()=>{
       const input = document.querySelector("#cf_imgUrlInput");
-      const url = input.value.trim();
+      const btn = document.querySelector("#cf_addImgUrlBtn");
+      const status = document.querySelector("#cf_uploadStatus");
+      let url = input.value.trim();
       if(!url) return;
       if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
+      url = normalizeImageUrl(url);
+      btn.disabled = true; status.textContent = "Checking link…";
+      const ok = await testImageLoads(url);
+      btn.disabled = false;
+      if(!ok){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
+      status.textContent = "";
       collImage = url;
       input.value = "";
       renderCollImgGrid();
@@ -416,19 +560,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // slightly-off shades (not pure #000/#fff) so text sitting on them, or on
   // the near-black/white surfaces elsewhere on the site, always stays
   // readable — applyBrandColor() (in script.js) also auto-picks light or
-  // dark text for whichever colour is chosen.
-  const BRAND_PRESETS = [
-    {name:"Lime",     hex:"#c6f000"},
-    {name:"Ocean",     hex:"#2563eb"},
-    {name:"Emerald",   hex:"#10b981"},
-    {name:"Royal",     hex:"#7c3aed"},
-    {name:"Crimson",   hex:"#dc2626"},
-    {name:"Sunset",    hex:"#f97316"},
-    {name:"Teal",      hex:"#0d9488"},
-    {name:"Hot Pink",  hex:"#ec4899"},
-    {name:"Charcoal",  hex:"#52525b"},
-    {name:"Silver",    hex:"#cbd5e1"}
-  ];
+  // dark text for whichever colour is chosen. (BRAND_PRESETS itself is
+  // declared at the very top of this file — see the note there.)
   function renderColorSwatches(){
     const el = document.querySelector("#colorGrid"); if(!el) return;
     const current = (SETTINGS.brandColor || "#c6f000").toLowerCase();
@@ -450,25 +583,268 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
   }
 
-  /* ================= ENQUIRIES ================= */
-  async function renderEnquiriesTable(){
-    const el = document.querySelector("#enquiriesTable"); if(!el) return;
-    let enquiries = [];
-    try{ enquiries = await BazDS.getEnquiries(); }catch(err){ console.error(err); }
-    if(!enquiries.length){
-      el.innerHTML = "";
-      el.closest(".ad-table-wrap").innerHTML = `<p class="ad-enq-empty">No enquiries yet — they'll show up here as soon as a visitor uses the WhatsApp enquiry button on the live site.</p>`;
-      return;
-    }
-    el.innerHTML = `<tr><th>Reference</th><th>Product</th><th>Quantity</th><th>Date</th></tr>` +
-      enquiries.map(e=>`
-        <tr>
+  /* ================= SITE FONT ================= */
+  // FONT_PRESETS is defined once in script.js (also used to preload the
+  // right Google Fonts on every page) — admin.js just renders swatches for it.
+  function renderFontSwatches(){
+    const el = document.querySelector("#fontGrid"); if(!el) return;
+    const current = SETTINGS.brandFont || "inter";
+    el.innerHTML = FONT_PRESETS.map(f=>`
+      <div class="ad-font-swatch ${f.id===current?'active':''}" data-id="${f.id}" style="font-family:${f.heading}">
+        <span class="fs-preview">Aa</span><span>${f.label}</span>
+      </div>`).join("");
+    el.querySelectorAll(".ad-font-swatch").forEach(sw=>{
+      sw.addEventListener("click", async ()=>{
+        const id = sw.dataset.id;
+        SETTINGS.brandFont = id;
+        applyBrandFont(id);
+        el.querySelectorAll(".ad-font-swatch").forEach(s=>s.classList.remove("active"));
+        sw.classList.add("active");
+        try{ await BazDS.updateSettings(SETTINGS); }
+        catch(err){ alert("Could not save font: " + err.message); }
+      });
+    });
+  }
+
+  /* ================= ANIMATION INTENSITY ================= */
+  // (ANIM_LEVELS itself is declared at the very top of this file — see the note there.)
+  function renderAnimationOptions(){
+    const el = document.querySelector("#animGrid"); if(!el) return;
+    const current = SETTINGS.animationLevel || "subtle";
+    el.innerHTML = ANIM_LEVELS.map(a=>`
+      <div class="ad-anim-opt ${a.id===current?'active':''}" data-id="${a.id}">
+        <b>${a.label}</b><span>${a.desc}</span>
+      </div>`).join("");
+    el.querySelectorAll(".ad-anim-opt").forEach(opt=>{
+      opt.addEventListener("click", async ()=>{
+        const id = opt.dataset.id;
+        SETTINGS.animationLevel = id;
+        applyAnimationLevel(id);
+        el.querySelectorAll(".ad-anim-opt").forEach(o=>o.classList.remove("active"));
+        opt.classList.add("active");
+        try{ await BazDS.updateSettings(SETTINGS); }
+        catch(err){ alert("Could not save: " + err.message); }
+      });
+    });
+  }
+
+  /* ================= ENQUIRIES (mini-CRM: status + notes + follow-up) ================= */
+  let allEnquiriesCache = [];
+
+  function enqRowHtml(e){
+    return `
+        <tr data-id="${e.id}">
           <td><b>${e.ref}</b></td>
           <td>${e.product_name || "—"}</td>
           <td>${e.quantity ? e.quantity+" pcs" : "—"}</td>
           <td>${new Date(e.created_at).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
-        </tr>`).join("");
+          <td>
+            <select class="enq-status">
+              <option value="new" ${e.status==="new"||!e.status?"selected":""}>New</option>
+              <option value="contacted" ${e.status==="contacted"?"selected":""}>Contacted</option>
+              <option value="closed" ${e.status==="closed"?"selected":""}>Closed</option>
+            </select>
+          </td>
+          <td><input type="date" class="enq-followup" value="${e.followup_at ? new Date(e.followup_at).toISOString().slice(0,10) : ""}" style="border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit"></td>
+          <td><input type="text" class="enq-notes" value="${(e.notes||"").replace(/"/g,'&quot;')}" placeholder="Add a note…" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit"></td>
+          <td><button class="ad-icon-btn" title="Save" onclick="AdminUI.saveEnquiryRow(${e.id})">💾</button></td>
+        </tr>`;
   }
+
+  AdminUI.saveEnquiryRow = async (id)=>{
+    const row = document.querySelector(`#enquiriesTable tr[data-id="${id}"]`); if(!row) return;
+    const status = row.querySelector(".enq-status").value;
+    const followupVal = row.querySelector(".enq-followup").value;
+    const notes = row.querySelector(".enq-notes").value;
+    try{
+      await BazDS.updateEnquiry(id, { status, notes, followupAt: followupVal ? new Date(followupVal).toISOString() : null });
+      const cached = allEnquiriesCache.find(e=>e.id===id);
+      if(cached){ cached.status = status; cached.notes = notes; cached.followup_at = followupVal ? new Date(followupVal).toISOString() : null; }
+      const btn = row.querySelector(".ad-icon-btn");
+      const orig = btn.textContent; btn.textContent = "✓"; setTimeout(()=>{ btn.textContent = orig; }, 1200);
+    }catch(err){ alert("Could not save: " + err.message); }
+  };
+
+  function renderEnquiriesFromCache(){
+    const el = document.querySelector("#enquiriesTable"); if(!el) return;
+    const filterSel = document.querySelector("#enqStatusFilter");
+    const filter = filterSel ? filterSel.value : "all";
+    const list = filter==="all" ? allEnquiriesCache : allEnquiriesCache.filter(e=>(e.status||"new")===filter);
+    if(!list.length){
+      el.innerHTML = "";
+      el.closest(".ad-table-wrap").innerHTML = `<p class="ad-enq-empty">No enquiries here yet — they'll show up as soon as a visitor uses the WhatsApp enquiry button on the live site, or try a different status filter above.</p>`;
+      return;
+    }
+    el.innerHTML = `<tr><th>Reference</th><th>Product</th><th>Quantity</th><th>Date</th><th>Status</th><th>Follow-up</th><th>Notes</th><th></th></tr>` +
+      list.map(enqRowHtml).join("");
+  }
+
+  function exportEnquiriesCsv(list){
+    const header = ["Reference","Product","Quantity","Status","Follow-up date","Notes","Date"];
+    const rows = list.map(e=>[
+      e.ref, e.product_name||"", e.quantity||"", e.status||"new",
+      e.followup_at ? new Date(e.followup_at).toLocaleDateString("en-IN") : "",
+      e.notes||"", new Date(e.created_at).toLocaleString("en-IN")
+    ]);
+    const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bazarville-enquiries-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  let enquiryControlsBound = false;
+  function bindEnquiryControlsOnce(){
+    if(enquiryControlsBound) return;
+    enquiryControlsBound = true;
+    const filterSel = document.querySelector("#enqStatusFilter");
+    const exportBtn = document.querySelector("#enqExportBtn");
+    if(filterSel) filterSel.addEventListener("change", renderEnquiriesFromCache);
+    if(exportBtn) exportBtn.addEventListener("click", ()=>{
+      const filter = filterSel ? filterSel.value : "all";
+      const list = filter==="all" ? allEnquiriesCache : allEnquiriesCache.filter(e=>(e.status||"new")===filter);
+      exportEnquiriesCsv(list);
+    });
+  }
+
+  async function renderEnquiriesTable(){
+    const el = document.querySelector("#enquiriesTable"); if(!el) return;
+    try{ allEnquiriesCache = await BazDS.getEnquiries(); }catch(err){ console.error(err); allEnquiriesCache = []; }
+    bindEnquiryControlsOnce();
+    renderEnquiriesFromCache();
+  }
+
+  /* ================= BULK CSV UPLOAD (products) ================= */
+  // Minimal CSV parser: handles quoted fields with embedded commas ("like, this").
+  // Multi-value fields (professions/colors/sizes/images) are pipe-separated inside
+  // their own cell — e.g. "Corporate|IT / Tech" — so a plain comma split won't work.
+  function parseCsv(text){
+    const lines = text.replace(/\r\n/g,"\n").split("\n").filter(l=>l.trim().length);
+    if(!lines.length) return [];
+    function parseLine(line){
+      const out = []; let cur = ""; let inQuotes = false;
+      for(let i=0;i<line.length;i++){
+        const c = line[i];
+        if(inQuotes){
+          if(c === '"'){ if(line[i+1] === '"'){ cur += '"'; i++; } else inQuotes = false; }
+          else cur += c;
+        } else {
+          if(c === '"') inQuotes = true;
+          else if(c === ","){ out.push(cur); cur = ""; }
+          else cur += c;
+        }
+      }
+      out.push(cur);
+      return out.map(s=>s.trim());
+    }
+    const headers = parseLine(lines[0]).map(h=>h.toLowerCase().trim());
+    return lines.slice(1).map(line=>{
+      const cells = parseLine(line);
+      const row = {};
+      headers.forEach((h,i)=>{ row[h] = cells[i] !== undefined ? cells[i] : ""; });
+      return row;
+    });
+  }
+
+  const BULK_CSV_TEMPLATE = `name,category,professions,purpose,occasion,brand,moq,bulk_threshold,price_tiers,colors,sizes,images,stock,status
+Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding,Cello,20,50,"20:399|50:349|100:299",#1a1a1a|#c6f000,S|M|L|XL,https://example.com/img1.jpg|https://example.com/img2.jpg,TRUE,published
+`;
+
+  let bulkParsedRows = [];
+  function renderBulkResults(rows){
+    const el = document.querySelector("#bulkResults");
+    const runBtn = document.querySelector("#runBulkBtn");
+    if(!rows.length){ el.innerHTML = `<p class="ad-hint">No rows found in this file.</p>`; runBtn.disabled = true; return; }
+    const errors = rows.map((r,i)=>{
+      const problems = [];
+      if(!r.name) problems.push("missing name");
+      if(!r.images) problems.push("missing images");
+      if(!r.professions) problems.push("missing professions");
+      return {i, problems};
+    }).filter(r=>r.problems.length);
+    const validCount = rows.length - errors.length;
+    let html = `<p class="ad-hint"><b>${rows.length}</b> row(s) found — <b>${validCount}</b> look valid and ready to upload.</p>`;
+    if(errors.length){
+      html += `<p class="ad-hint" style="color:#c0392b">${errors.length} row(s) will be skipped: ` +
+        errors.map(e=>`row ${e.i+2} (${e.problems.join(", ")})`).join("; ") + `</p>`;
+    }
+    el.innerHTML = html;
+    runBtn.disabled = validCount === 0;
+  }
+
+  async function runBulkUpload(rows){
+    const el = document.querySelector("#bulkResults");
+    const runBtn = document.querySelector("#runBulkBtn");
+    runBtn.disabled = true; runBtn.textContent = "Uploading…";
+    let ok = 0, fail = 0; const failMsgs = [];
+    for(const r of rows){
+      if(!r.name || !r.images || !r.professions) continue;
+      const tiers = (r.price_tiers||"").split("|").filter(Boolean).map(t=>{
+        const [min,price] = t.split(":"); return {min:Number(min)||1, price:Number(price)||0};
+      });
+      const existing = PRODUCTS.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
+      const data = {
+        id: existing ? existing.id : undefined,
+        name: r.name,
+        cat: r.category || "Uncategorised",
+        professions: r.professions.split("|").map(s=>s.trim()).filter(Boolean),
+        profession: r.professions.split("|")[0].trim(),
+        purpose: r.purpose || "Employee Gifting",
+        occasion: r.occasion || "",
+        brand: r.brand || null,
+        moq: Number(r.moq) || 1,
+        bulk: Number(r.bulk_threshold) || 1,
+        stock: /^(true|yes|1)$/i.test(r.stock || "true"),
+        status: /^draft$/i.test(r.status || "published") ? "draft" : "published",
+        colors: (r.colors||"#1a1a1a").split("|").map(s=>s.trim()).filter(Boolean),
+        sizes: (r.sizes||"Standard").split("|").map(s=>s.trim()).filter(Boolean),
+        tiers: tiers.length ? tiers : [{min:Number(r.moq)||1, price:0}],
+        img: r.images.split("|").map(s=>s.trim()).filter(Boolean)
+      };
+      try{
+        const saved = await BazDS.upsertProduct(data);
+        if(existing) PRODUCTS = PRODUCTS.map(p=>p.id===existing.id?saved:p);
+        else PRODUCTS.push(saved);
+        ok++;
+      }catch(err){ fail++; failMsgs.push(`${r.name}: ${err.message}`); }
+    }
+    renderProductsTable(); renderDashboard();
+    runBtn.textContent = "Upload Rows";
+    el.innerHTML = `<p class="ad-hint"><b>${ok}</b> product(s) saved.${fail?` <b style="color:#c0392b">${fail} failed</b>: ${failMsgs.join("; ")}`:""}</p>`;
+    bulkParsedRows = [];
+  }
+
+  const bulkFileInput = document.querySelector("#bulkFileInput");
+  if(bulkFileInput) bulkFileInput.addEventListener("change", (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{ bulkParsedRows = parseCsv(reader.result); renderBulkResults(bulkParsedRows); };
+    reader.readAsText(file);
+  });
+  const runBulkBtn = document.querySelector("#runBulkBtn");
+  if(runBulkBtn) runBulkBtn.addEventListener("click", ()=>runBulkUpload(bulkParsedRows));
+  const bulkTemplateLink = document.querySelector("#bulkTemplateLink");
+  if(bulkTemplateLink) bulkTemplateLink.addEventListener("click", (e)=>{
+    e.preventDefault();
+    const blob = new Blob([BULK_CSV_TEMPLATE], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "bazarville-bulk-upload-template.csv";
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+  const bulkUploadBtn = document.querySelector("#bulkUploadBtn");
+  const bulkModalBackdrop = document.querySelector("#bulkModalBackdrop");
+  if(bulkUploadBtn) bulkUploadBtn.addEventListener("click", ()=>{
+    bulkParsedRows = [];
+    document.querySelector("#bulkResults").innerHTML = "";
+    document.querySelector("#bulkFileInput").value = "";
+    document.querySelector("#runBulkBtn").disabled = true;
+    bulkModalBackdrop.classList.add("show");
+  });
+  const closeBulkModal = document.querySelector("#closeBulkModal");
+  const cancelBulkBtn = document.querySelector("#cancelBulkBtn");
+  [closeBulkModal, cancelBulkBtn].forEach(b=>{ if(b) b.addEventListener("click", ()=>bulkModalBackdrop.classList.remove("show")); });
 
   window.addEventListener("hashchange", ()=>switchView(location.hash.replace("#","")||"dashboard"));
 });
