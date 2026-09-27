@@ -144,8 +144,13 @@ img{max-width:100%;display:block}
 .pcard .badge-stock{position:absolute;top:12px;left:12px;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:20px;z-index:2;font-family:"Plus Jakarta Sans"}
 .badge-stock.in{background:var(--lime);color:var(--on-accent)}
 .badge-stock.out{background:var(--ink);color:#fff}
-.pimg{height:210px;overflow:hidden;background:var(--soft)}
-.pimg img{width:100%;height:100%;object-fit:cover;transform:translateZ(0) scale(1);transition:transform .5s cubic-bezier(.16,1,.3,1)}
+.pimg{height:210px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center}
+/* object-fit:contain (not cover) — a fixed-height box + cover always crops
+   whichever edge doesn't match the box's aspect ratio, cutting corners off
+   portrait/square/odd-shaped product photos. contain always shows the WHOLE
+   photo, letting the soft background pad the gap instead of cropping — so
+   this never needs revisiting for future products of any shape. */
+.pimg img{width:100%;height:100%;object-fit:contain;transform:translateZ(0) scale(1);transition:transform .5s cubic-bezier(.16,1,.3,1)}
 .pcard:hover .pimg img{transform:scale(1.06)}
 .pbody{padding:16px;transform:translateZ(30px)}
 .pcat{font-size:11px;font-weight:700;color:var(--lime-deep);text-transform:uppercase;letter-spacing:.04em}
@@ -206,8 +211,8 @@ img{max-width:100%;display:block}
 
 /* ================= PRODUCT DETAIL ================= */
 .pd-layout{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
-.pd-gallery-main{border-radius:var(--r-lg);overflow:hidden;height:460px;border:1px solid var(--line);background:var(--soft)}
-.pd-gallery-main img{width:100%;height:100%;object-fit:cover}
+.pd-gallery-main{border-radius:var(--r-lg);overflow:hidden;height:460px;border:1px solid var(--line);background:var(--soft);display:flex;align-items:center;justify-content:center}
+.pd-gallery-main img{width:100%;height:100%;object-fit:contain}
 .pd-thumbs{display:flex;gap:10px;margin-top:12px}
 .pd-thumbs img{width:70px;height:70px;object-fit:cover;border-radius:10px;border:2px solid var(--line);cursor:pointer;transition:.2s}
 .pd-thumbs img.active{border-color:var(--ink)}
