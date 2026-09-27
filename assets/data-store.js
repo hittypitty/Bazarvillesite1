@@ -26,12 +26,27 @@ const BazDS = (function(){
   }
 
   function dbToApp(row){
-    const {images, ...rest} = row;
-    return {...rest, img: images || [], professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : [])};
+    const {images, print_options, meta_title, meta_description, ...rest} = row;
+    return {
+      ...rest,
+      img: images || [],
+      professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : []),
+      printOptions: print_options || [],
+      metaTitle: meta_title || "",
+      metaDescription: meta_description || ""
+    };
   }
   function appToDb(p){
-    const {img, ...rest} = p;
-    return {...rest, images: img || [], profession: (p.professions && p.professions[0]) || p.profession || "", professions: p.professions || (p.profession ? [p.profession] : [])};
+    const {img, printOptions, metaTitle, metaDescription, ...rest} = p;
+    return {
+      ...rest,
+      images: img || [],
+      profession: (p.professions && p.professions[0]) || p.profession || "",
+      professions: p.professions || (p.profession ? [p.profession] : []),
+      print_options: printOptions || [],
+      meta_title: metaTitle || "",
+      meta_description: metaDescription || ""
+    };
   }
 
   async function getProducts(){
@@ -129,10 +144,51 @@ const BazDS = (function(){
 
   /** Uploads a File to Storage and returns its public URL. folder is just a
    *  path prefix for organisation, e.g. "products" or "collections". */
+  /* Shopify-style auto-optimize: resize to a sane max dimension and re-encode as
+     JPEG/WebP at ~82% quality in the browser, before it ever leaves the device.
+     No paid CDN/image-transform add-on needed — this alone typically cuts a
+     4-6MB phone-camera photo down to a few hundred KB with no visible quality
+     loss on a product-card/gallery size image. Falls back to the original file
+     untouched if anything goes wrong (corrupt image, browser without canvas
+     support, etc.) so an upload never hard-fails because of this step. */
+  const MAX_DIMENSION = 1600;
+  const JPEG_QUALITY = 0.82;
+  function optimizeImage(file){
+    return new Promise(resolve=>{
+      if(!file.type || !file.type.startsWith("image/") || file.type === "image/svg+xml"){
+        resolve(file); return; // vector/unknown files pass through untouched
+      }
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if(width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size < 400*1024){
+          resolve(file); return; // already small enough, don't bother re-encoding
+        }
+        const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const outType = file.type === "image/png" ? "image/png" : "image/jpeg";
+        canvas.toBlob(blob => {
+          if(!blob){ resolve(file); return; }
+          const newName = file.name.replace(/\.\w+$/, outType === "image/png" ? ".png" : ".jpg");
+          resolve(new File([blob], newName, { type: outType }));
+        }, outType, JPEG_QUALITY);
+      };
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+      img.src = objectUrl;
+    });
+  }
+
   async function uploadImage(file, folder){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
-    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g,"")}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, file, { cacheControl:"3600", upsert:false });
+    const optimized = await optimizeImage(file);
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${optimized.name.replace(/[^a-zA-Z0-9.\-_]/g,"")}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, optimized, { cacheControl:"3600", upsert:false });
     if(error){ console.error("uploadImage:", error.message); throw error; }
     const { data } = sb.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
