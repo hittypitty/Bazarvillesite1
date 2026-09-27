@@ -4,7 +4,7 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Work+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/admin.css"></head>
 <body>
@@ -70,7 +70,10 @@
     <!-- Products -->
     <section class="ad-view" id="view-products" style="display:none">
       <div class="ad-header"><h1>Products</h1><p>Everything shown in the public catalogue.</p>
-        <button class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-outline" id="bulkUploadBtn">⬆ Bulk Upload (CSV)</button>
+          <button class="btn btn-primary" id="addProductBtn">+ Add Product</button>
+        </div>
       </div>
       <div class="ad-table-wrap">
         <table class="ad-table" id="productsTable"></table>
@@ -87,7 +90,16 @@
 
     <!-- Enquiries -->
     <section class="ad-view" id="view-enquiries" style="display:none">
-      <div class="ad-header"><h1>Enquiries</h1><p>Every WhatsApp enquiry raised from the live site, logged in order.</p></div>
+      <div class="ad-header"><h1>Enquiries</h1><p>Every WhatsApp enquiry raised from the live site — track follow-ups here.</p></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">
+        <select id="enqStatusFilter">
+          <option value="all">All statuses</option>
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="closed">Closed</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="enqExportBtn" type="button">⬇ Export CSV</button>
+      </div>
       <div class="ad-table-wrap">
         <table class="ad-table" id="enquiriesTable"></table>
       </div>
@@ -100,6 +112,16 @@
         <h3>Brand colour</h3>
         <p class="ad-hint">Pick an accent colour — it updates buttons, badges, highlights and hover effects across the whole live site.</p>
         <div class="ad-color-grid" id="colorGrid"></div>
+      </div>
+      <div class="ad-panel">
+        <h3>Site font</h3>
+        <p class="ad-hint">Pick the typeface used across the whole live site — headings and body text update together.</p>
+        <div class="ad-font-grid" id="fontGrid"></div>
+      </div>
+      <div class="ad-panel">
+        <h3>Animation intensity</h3>
+        <p class="ad-hint">Controls the hover-tilt and motion effects site-wide — pick what feels right for your audience.</p>
+        <div class="ad-anim-grid" id="animGrid"></div>
       </div>
       <div class="ad-panel">
         <h3>WhatsApp enquiry number</h3>
@@ -139,6 +161,22 @@
       </div>
     </section>
   </main>
+</div>
+
+<!-- ===================== BULK UPLOAD MODAL ===================== -->
+<div class="ad-modal-backdrop" id="bulkModalBackdrop">
+  <div class="ad-modal ad-modal-lg">
+    <div class="ad-modal-head"><h2>Bulk Upload Products (CSV)</h2><span class="ad-modal-close" id="closeBulkModal">✕</span></div>
+    <div class="ad-modal-body">
+      <p class="ad-hint">Upload a CSV to add or update many products at once. Rows with an existing product name are updated in place; new names create new products. <a href="#" id="bulkTemplateLink">Download a starter template</a> to see the exact column format.</p>
+      <input type="file" id="bulkFileInput" accept=".csv">
+      <div id="bulkResults" style="margin-top:16px"></div>
+    </div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelBulkBtn">Close</button>
+      <button class="btn btn-primary btn-sm" id="runBulkBtn" disabled>Upload Rows</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===================== PRODUCT MODAL ===================== -->
