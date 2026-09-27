@@ -86,12 +86,27 @@ const DEFAULT_COLLECTIONS = [
 const DEFAULT_SETTINGS = {
   whatsappNumber: "919999999999",
   brandColor: "#c6f000",
+  brandFont: "inter",
+  animationLevel: "subtle",
   heroImages: [
     "https://picsum.photos/seed/bzv101/500/620",
     "https://picsum.photos/seed/bzv102/450/560",
     "https://picsum.photos/seed/bzv103/400/500"
   ]
 };
+
+// Font presets for the admin "Site font" picker. Every family here is already
+// preloaded via the Google Fonts <link> in every page's <head>, so switching
+// is instant — nothing is fetched at runtime. admin.js reads this same list
+// to render the swatches.
+const FONT_PRESETS = [
+  {id:"inter",        label:"Inter (Default)", body:'"Inter",system-ui,sans-serif',        heading:'"Plus Jakarta Sans","Inter",sans-serif'},
+  {id:"poppins",       label:"Poppins",         body:'"Poppins",sans-serif',                heading:'"Poppins",sans-serif'},
+  {id:"manrope",       label:"Manrope",         body:'"Manrope",sans-serif',                heading:'"Manrope",sans-serif'},
+  {id:"sora",          label:"Sora",            body:'"Sora",sans-serif',                   heading:'"Sora",sans-serif'},
+  {id:"work-sans",     label:"Work Sans",       body:'"Work Sans",sans-serif',              heading:'"Work Sans",sans-serif'},
+  {id:"space-grotesk", label:"Space Grotesk",   body:'"Space Grotesk",sans-serif',          heading:'"Space Grotesk",sans-serif'}
+];
 
 // PRODUCTS/COLLECTIONS/SETTINGS are populated asynchronously from Supabase
 // once the page loads (see the DOMContentLoaded handler near the bottom of
@@ -106,6 +121,13 @@ const PROFESSIONS = [
   {name:"Healthcare",icon:"🩺"},{name:"Retail",icon:"🛍️"},{name:"Hospitality",icon:"🏨"},
   {name:"Manufacturing",icon:"🏭"},{name:"Finance",icon:"📊"}
 ];
+
+// Admin can save a product as "draft" (e.g. mid-edit, not ready to show
+// customers). Draft/Publish only ever hides a product from PUBLIC listing
+// grids — the admin Products table always shows every product regardless
+// of status, so this helper is only used in the public-facing render paths
+// below, never applied to the shared PRODUCTS array itself.
+function publishedProducts(){ return PRODUCTS.filter(p => (p.status||"published") === "published"); }
 
 const money = n => "₹" + n.toLocaleString("en-IN");
 function tierFor(p, qty){
@@ -151,7 +173,8 @@ function attachTilt(nodes){
       const r = card.getBoundingClientRect();
       const x = (e.clientX - r.left)/r.width - .5;
       const y = (e.clientY - r.top)/r.height - .5;
-      card.style.transform = `rotateY(${x*4}deg) rotateX(${-y*4}deg) translateZ(4px)`;
+      const m = getTiltMult();
+      card.style.transform = `rotateY(${x*4*m}deg) rotateX(${-y*4*m}deg) translateZ(4px)`;
     });
     card.addEventListener("mouseleave", ()=>{ card.style.transform = "rotateY(0) rotateX(0) translateZ(0)"; });
   });
@@ -175,7 +198,7 @@ function initFilters(){
   if(params.get("occasion")) state.occasion = params.get("occasion");
 
   function apply(){
-    let list = PRODUCTS.slice();
+    let list = publishedProducts();
     if(state.cat) list = list.filter(p=>p.cat===state.cat);
     if(state.profession && state.profession!=="All") list = list.filter(p=>p.profession===state.profession);
     if(state.purpose && state.purpose!=="All") list = list.filter(p=>p.purpose===state.purpose);
@@ -299,9 +322,9 @@ function initProductPage(){
   recalc();
 
   // similar products
-  const similar = PRODUCTS.filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,4);
+  const similar = publishedProducts().filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,4);
   const simEl = document.querySelector("#similarGrid");
-  if(simEl) renderGrid("#similarGrid", similar.length? similar : PRODUCTS.filter(x=>x.id!==p.id).slice(0,4));
+  if(simEl) renderGrid("#similarGrid", similar.length? similar : publishedProducts().filter(x=>x.id!==p.id).slice(0,4));
 }
 
 /* ---------- galaxy page ---------- */
@@ -375,7 +398,7 @@ function initGalaxy(){
   const mobileListEl = document.querySelector("#galaxyMobileList");
   if(mobileListEl){
     mobileListEl.innerHTML = PROFESSIONS.map(prof=>{
-      const count = PRODUCTS.filter(p=>p.profession===prof.name).length;
+      const count = publishedProducts().filter(p=>p.profession===prof.name).length;
       const countLabel = count > 0 ? `${count} products` : "Explore products";
       return `<a class="gm-card" href="products.html?profession=${encodeURIComponent(prof.name)}">
         <div class="gm-icon">${prof.icon}</div><div><b>${prof.name}</b><span>${countLabel}</span></div></a>`;
@@ -384,7 +407,7 @@ function initGalaxy(){
 
   function showProfession(prof){
     const panel = document.querySelector("#galaxyPanel");
-    const count = PRODUCTS.filter(p=>p.profession===prof.name).length;
+    const count = publishedProducts().filter(p=>p.profession===prof.name).length;
     panel.innerHTML = `<h3>${prof.icon} ${prof.name}</h3><p>${count>0 ? count+" curated products mapped to "+prof.name+" teams" : "Products for "+prof.name+" teams are being catalogued"} — from onboarding kits to client gifting essentials.</p>
       <a class="btn btn-lime" style="margin-top:14px" href="products.html?profession=${encodeURIComponent(prof.name)}">Explore ${prof.name} products →</a>`;
     panel.classList.add("show");
@@ -452,7 +475,8 @@ function initHeroTilt(){
     const r = hero.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width - .5;
     const y = (e.clientY - r.top) / r.height - .5;
-    stack.style.transform = `rotateY(${x*16}deg) rotateX(${-y*12}deg)`;
+    const m = getTiltMult();
+    stack.style.transform = `rotateY(${x*16*m}deg) rotateX(${-y*12*m}deg)`;
   });
   hero.addEventListener("mouseleave", ()=>{ stack.style.transform = "rotateY(0deg) rotateX(0deg)"; });
 }
@@ -477,76 +501,111 @@ async function initDashboard(){
   const root = document.querySelector("#dashRoot");
   if(!root) return;
 
-  const enquiries = await BazDS.getEnquiries();
+  const allEnquiries = await BazDS.getEnquiries();
   const now = Date.now();
   const DAY = 86400000;
-  const todayCount = enquiries.filter(e=>now-new Date(e.created_at).getTime() < DAY).length;
-  const weekCount = enquiries.filter(e=>now-new Date(e.created_at).getTime() < 7*DAY).length;
-  const monthCount = enquiries.filter(e=>now-new Date(e.created_at).getTime() < 30*DAY).length;
+
+  // The 4 top stat cards are always fixed windows (today/7d/30d + latest),
+  // regardless of the range picker below — that picker only scopes the
+  // charts, activity feed and CSV export, so you can compare "today" against
+  // a longer trend without the headline numbers moving under you.
+  const todayCount = allEnquiries.filter(e=>now-new Date(e.created_at).getTime() < DAY).length;
+  const weekCount = allEnquiries.filter(e=>now-new Date(e.created_at).getTime() < 7*DAY).length;
+  const monthCount = allEnquiries.filter(e=>now-new Date(e.created_at).getTime() < 30*DAY).length;
 
   const statEls = document.querySelectorAll(".dash-card .dnum");
   if(statEls[0]) statEls[0].textContent = todayCount;
   if(statEls[1]) statEls[1].textContent = weekCount;
   if(statEls[2]) statEls[2].textContent = monthCount;
-  if(statEls[3]) statEls[3].textContent = enquiries.length ? new Date(enquiries[0].created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—";
-  document.querySelectorAll(".dash-card .dtrend").forEach((el,i)=>{ if(i<3) el.textContent = enquiries.length ? "from live enquiries" : "no enquiries logged yet"; });
+  if(statEls[3]) statEls[3].textContent = allEnquiries.length ? new Date(allEnquiries[0].created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—";
+  document.querySelectorAll(".dash-card .dtrend").forEach((el,i)=>{ if(i<3) el.textContent = allEnquiries.length ? "from live enquiries" : "no enquiries logged yet"; });
   const latestLabel = document.querySelectorAll(".dash-card .dlabel")[3];
   if(latestLabel) latestLabel.textContent = "Latest enquiry";
   const latestTrend = document.querySelectorAll(".dash-card .dtrend")[3];
-  if(latestTrend) latestTrend.textContent = enquiries.length ? `Ref ${enquiries[0].ref}` : "none yet";
+  if(latestTrend) latestTrend.textContent = allEnquiries.length ? `Ref ${allEnquiries[0].ref}` : "none yet";
 
-  // top enquired products, by product name recorded on the enquiry row
-  const counts = {};
-  enquiries.forEach(e=>{ const name = e.product_name || "Unknown product"; counts[name] = (counts[name]||0)+1; });
-  const topProducts = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,val])=>({name,val}));
-  const barEl = document.querySelector("#barChart");
-  if(barEl){
-    if(!topProducts.length){
-      barEl.innerHTML = `<p style="color:var(--muted);font-size:13.5px">No enquiries logged yet — once visitors use the WhatsApp enquiry button on the live site, they'll show up here.</p>`;
-    } else {
-      const max = Math.max(...topProducts.map(p=>p.val));
-      barEl.innerHTML = topProducts.map(p=>`
-        <div class="bar-col"><span class="bar-val">${p.val}</span><div class="bar-fill" data-h="${(p.val/max*100).toFixed(0)}"></div><span class="bar-label">${p.name}</span></div>`).join("");
-      setTimeout(()=>{ document.querySelectorAll(".bar-fill").forEach(b=>{ b.style.height = b.dataset.h + "%"; }); }, 200);
+  function renderRangeDependent(enquiries){
+    // top enquired products, by product name recorded on the enquiry row
+    const counts = {};
+    enquiries.forEach(e=>{ const name = e.product_name || "Unknown product"; counts[name] = (counts[name]||0)+1; });
+    const topProducts = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,val])=>({name,val}));
+    const barEl = document.querySelector("#barChart");
+    if(barEl){
+      if(!topProducts.length){
+        barEl.innerHTML = `<p style="color:var(--muted);font-size:13.5px">No enquiries in this range yet.</p>`;
+      } else {
+        const max = Math.max(...topProducts.map(p=>p.val));
+        barEl.innerHTML = topProducts.map(p=>`
+          <div class="bar-col"><span class="bar-val">${p.val}</span><div class="bar-fill" data-h="${(p.val/max*100).toFixed(0)}"></div><span class="bar-label">${p.name}</span></div>`).join("");
+        setTimeout(()=>{ document.querySelectorAll(".bar-fill").forEach(b=>{ b.style.height = b.dataset.h + "%"; }); }, 200);
+      }
+    }
+
+    // purpose split — look up each enquiry's product to find its purpose
+    const purposeCounts = {};
+    enquiries.forEach(e=>{
+      const p = PRODUCTS.find(x=>x.id===e.product_id);
+      const purpose = p ? p.purpose : "Other";
+      purposeCounts[purpose] = (purposeCounts[purpose]||0)+1;
+    });
+    const donutColors = ["#c6f000","#9fc400","#5c7a00","#2d3a1a","#7a9900"];
+    const purposeSplit = Object.entries(purposeCounts).map(([label,val],i)=>({label,val,color:donutColors[i%donutColors.length]}));
+    const donutEl = document.querySelector("#donutChart");
+    if(donutEl){
+      if(!purposeSplit.length){
+        donutEl.style.background = "var(--soft)";
+        document.querySelector("#donutLegend").innerHTML = `<div style="color:var(--muted)">No enquiries in this range</div>`;
+      } else {
+        const total = purposeSplit.reduce((s,p)=>s+p.val,0);
+        let acc = 0;
+        const stops = purposeSplit.map(s=>{ const pct = s.val/total*100; const start=acc; acc+=pct; return `${s.color} ${start}% ${acc}%`; }).join(",");
+        donutEl.style.background = `conic-gradient(${stops})`;
+        document.querySelector("#donutLegend").innerHTML = purposeSplit.map(s=>`<div><i style="background:${s.color}"></i>${s.label} — ${Math.round(s.val/total*100)}%</div>`).join("");
+      }
+    }
+
+    // recent activity — latest enquiries within the selected range
+    const feedEl = document.querySelector("#activityFeed");
+    if(feedEl){
+      if(!enquiries.length){
+        feedEl.innerHTML = `<p style="color:var(--muted);font-size:13.5px">Nothing in this range — widen it, or wait for new WhatsApp enquiries to come in.</p>`;
+      } else {
+        feedEl.innerHTML = enquiries.slice(0,8).map(e=>{
+          const mins = Math.max(1, Math.round((now-new Date(e.created_at).getTime())/60000));
+          const timeLabel = mins<60 ? `${mins} min ago` : mins<1440 ? `${Math.round(mins/60)} hr ago` : `${Math.round(mins/1440)} day(s) ago`;
+          return `<div class="afeed-item"><div class="afeed-icon">💬</div><div><b>New WhatsApp enquiry received</b><span>Ref ${e.ref} • ${e.product_name||""}${e.quantity?" × "+e.quantity:""} • ${timeLabel}</span></div></div>`;
+        }).join("");
+      }
     }
   }
 
-  // purpose split — look up each enquiry's product to find its purpose
-  const purposeCounts = {};
-  enquiries.forEach(e=>{
-    const p = PRODUCTS.find(x=>x.id===e.product_id);
-    const purpose = p ? p.purpose : "Other";
-    purposeCounts[purpose] = (purposeCounts[purpose]||0)+1;
-  });
-  const donutColors = ["#c6f000","#9fc400","#5c7a00","#2d3a1a","#7a9900"];
-  const purposeSplit = Object.entries(purposeCounts).map(([label,val],i)=>({label,val,color:donutColors[i%donutColors.length]}));
-  const donutEl = document.querySelector("#donutChart");
-  if(donutEl){
-    if(!purposeSplit.length){
-      donutEl.style.background = "var(--soft)";
-      document.querySelector("#donutLegend").innerHTML = `<div style="color:var(--muted)">No enquiries yet</div>`;
-    } else {
-      const total = purposeSplit.reduce((s,p)=>s+p.val,0);
-      let acc = 0;
-      const stops = purposeSplit.map(s=>{ const pct = s.val/total*100; const start=acc; acc+=pct; return `${s.color} ${start}% ${acc}%`; }).join(",");
-      donutEl.style.background = `conic-gradient(${stops})`;
-      document.querySelector("#donutLegend").innerHTML = purposeSplit.map(s=>`<div><i style="background:${s.color}"></i>${s.label} — ${Math.round(s.val/total*100)}%</div>`).join("");
-    }
+  function enquiriesInRange(days){
+    if(!days) return allEnquiries; // "0" = all time
+    const cutoff = now - days*DAY;
+    return allEnquiries.filter(e=>new Date(e.created_at).getTime() >= cutoff);
   }
 
-  // recent activity — latest real enquiries
-  const feedEl = document.querySelector("#activityFeed");
-  if(feedEl){
-    if(!enquiries.length){
-      feedEl.innerHTML = `<p style="color:var(--muted);font-size:13.5px">Nothing yet — this feed fills up as WhatsApp enquiries come in from the live site.</p>`;
-    } else {
-      feedEl.innerHTML = enquiries.slice(0,8).map(e=>{
-        const mins = Math.max(1, Math.round((now-new Date(e.created_at).getTime())/60000));
-        const timeLabel = mins<60 ? `${mins} min ago` : mins<1440 ? `${Math.round(mins/60)} hr ago` : `${Math.round(mins/1440)} day(s) ago`;
-        return `<div class="afeed-item"><div class="afeed-icon">💬</div><div><b>New WhatsApp enquiry received</b><span>Ref ${e.ref} • ${e.product_name||""}${e.quantity?" × "+e.quantity:""} • ${timeLabel}</span></div></div>`;
-      }).join("");
-    }
+  function exportCsv(enquiries){
+    const header = ["Reference","Product","Quantity","Status","Date"];
+    const rows = enquiries.map(e=>[
+      e.ref, e.product_name||"", e.quantity||"", e.status||"new",
+      new Date(e.created_at).toLocaleString("en-IN")
+    ]);
+    const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bazarville-enquiries-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
   }
+
+  const rangeSelect = document.querySelector("#dashRangeSelect");
+  const exportBtn = document.querySelector("#dashExportBtn");
+  const currentRange = ()=> enquiriesInRange(rangeSelect ? Number(rangeSelect.value) : 7);
+  renderRangeDependent(currentRange());
+  if(rangeSelect) rangeSelect.addEventListener("change", ()=>renderRangeDependent(currentRange()));
+  if(exportBtn) exportBtn.addEventListener("click", ()=>exportCsv(currentRange()));
 }
 
 /* ---------- track enquiry demo ---------- */
@@ -573,7 +632,7 @@ function initCollectionPage(){
   document.querySelector("#collName").textContent = found.name;
   document.querySelector("#collTag").textContent = found.tag;
   document.querySelector("#collImg").src = found.img;
-  renderGrid("#collectionGrid", PRODUCTS.slice(0, 8));
+  renderGrid("#collectionGrid", publishedProducts().slice(0, 8));
 }
 
 /* ---------- hero banner images (admin-editable via Settings) ---------- */
@@ -616,6 +675,28 @@ function applyBrandColor(hex){
   root.setProperty("--on-accent", relativeLuminance(hex) > .5 ? "#1a1a1a" : "#ffffff");
 }
 
+/* ---------- brand font (admin-editable via Settings) ---------- */
+function applyBrandFont(id){
+  const preset = FONT_PRESETS.find(f=>f.id===id) || FONT_PRESETS[0];
+  document.documentElement.style.setProperty("--font-body", preset.body);
+  document.documentElement.style.setProperty("--font-heading", preset.heading);
+}
+
+/* ---------- animation intensity (admin-editable via Settings) ----------
+   "off"/"full" toggle a body class (CSS in style.css does the heavy lifting —
+   killing transitions, or adding the idle 3D card float). --tilt-mult is read
+   by attachTilt/initHeroTilt below to scale the mouse-driven tilt depth. */
+function applyAnimationLevel(level){
+  document.body.classList.remove("anim-off","anim-full");
+  if(level==="off") document.body.classList.add("anim-off");
+  if(level==="full") document.body.classList.add("anim-full");
+  document.documentElement.style.setProperty("--tilt-mult", level==="off" ? "0" : level==="full" ? "1.8" : "1");
+}
+function getTiltMult(){
+  const v = getComputedStyle(document.documentElement).getPropertyValue("--tilt-mult").trim();
+  return v ? parseFloat(v) || 1 : 1;
+}
+
 /* ---------- shared: nav + ticker duplication + init ---------- */
 document.addEventListener("DOMContentLoaded", async ()=>{
   document.querySelectorAll(".ticker").forEach(t=>{ if(!t.dataset.doubled){ t.innerHTML += t.innerHTML; t.dataset.doubled = "1"; } });
@@ -642,11 +723,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     PRODUCTS = DEFAULT_PRODUCTS; COLLECTIONS = DEFAULT_COLLECTIONS; SETTINGS = DEFAULT_SETTINGS;
   }
   applyBrandColor(SETTINGS.brandColor);
+  applyBrandFont(SETTINGS.brandFont);
+  applyAnimationLevel(SETTINGS.animationLevel);
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
   // and silently break unrelated features (reveal, menu) on the same page.
-  const inits = [()=>renderGrid("#bestGrid", PRODUCTS.slice(0,4)), ()=>renderCollections("#collGrid"),
+  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });
