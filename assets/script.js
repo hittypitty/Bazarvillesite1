@@ -154,9 +154,10 @@ function productCard(p){
     </div>
   </div></div>`;
 }
-function waLink(p, qty){
+function waLink(p, qty, printOpt){
   const t = tierFor(p, qty);
-  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs%0AApplicable price: ${money(t.price)}/pc%0APlease share more details.`;
+  const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
+  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs%0AApplicable price: ${money(t.price)}/pc${printLine}%0APlease share more details.`;
   return `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${msg}`;
 }
 
@@ -242,12 +243,43 @@ function initFilters(){
   if(filterToggle && filtersPanel) filterToggle.addEventListener("click",()=>filtersPanel.classList.toggle("open"));
 }
 
+/* ---------- per-product SEO: <title>/meta description + JSON-LD Product schema.
+   The JSON-LD block is what lets AI answer engines (and Google's rich results)
+   read the price/availability/name correctly instead of guessing from prose. */
+function applyProductSeo(p){
+  const title = p.metaTitle || `${p.name} | Bazarville`;
+  const desc = p.metaDescription || `${p.name} — bulk & corporate gifting from Bazarville. MOQ ${p.moq} pcs, quantity-based pricing, structured WhatsApp enquiry.`;
+  document.title = title;
+  let metaDesc = document.querySelector('meta[name="description"]');
+  if(!metaDesc){ metaDesc = document.createElement("meta"); metaDesc.name = "description"; document.head.appendChild(metaDesc); }
+  metaDesc.setAttribute("content", desc);
+
+  let ld = document.querySelector('script[type="application/ld+json"]#pd-jsonld');
+  if(!ld){ ld = document.createElement("script"); ld.type = "application/ld+json"; ld.id = "pd-jsonld"; document.head.appendChild(ld); }
+  ld.textContent = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.name,
+    description: desc,
+    image: p.img,
+    category: p.cat,
+    offers: {
+      "@type": "AggregateOffer",
+      priceCurrency: "INR",
+      lowPrice: Math.min(...p.tiers.map(t=>t.price)),
+      highPrice: Math.max(...p.tiers.map(t=>t.price)),
+      availability: p.stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+    }
+  });
+}
+
 /* ---------- product detail page ---------- */
 function initProductPage(){
   const el = document.querySelector("#pd-root");
   if(!el) return;
   const id = Number(new URLSearchParams(location.search).get("id")) || PRODUCTS[0].id;
   const p = PRODUCTS.find(x=>x.id===id) || PRODUCTS[0];
+  applyProductSeo(p);
 
   el.innerHTML = `
     <div class="pd-layout">
@@ -269,6 +301,8 @@ function initProductPage(){
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
+        ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
+        <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
         <div class="livecalc" id="liveCalc"></div>
@@ -294,8 +328,11 @@ function initProductPage(){
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
   }));
-  document.querySelectorAll(".sizebtn").forEach(s=>s.addEventListener("click",()=>{
-    document.querySelectorAll(".sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+  document.querySelectorAll("#printOptRow .sizebtn").forEach(s=>s.addEventListener("click",()=>{
+    document.querySelectorAll("#printOptRow .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+  }));
+  document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(s=>s.addEventListener("click",()=>{
+    document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
   }));
 
   const qtyInput = document.querySelector("#qtyInput");
@@ -313,7 +350,8 @@ function initProductPage(){
     if(qty < p.bulk){
       msgEl.textContent = `Bulk enquiries start from ${p.bulk} pieces — increase quantity to unlock bulk pricing support.`;
     } else { msgEl.textContent = `✓ Bulk enquiry unlocked for this quantity.`; }
-    waBtn.href = waLink(p, qty);
+    const printOptEl = document.querySelector("#printOptRow .sizebtn.active");
+    waBtn.href = waLink(p, qty, printOptEl ? printOptEl.textContent : "");
     waBtn.textContent = p.stock ? "🟢 Send WhatsApp Enquiry" : "🟢 Check Availability on WhatsApp";
   }
   document.querySelector("#qMinus").addEventListener("click",()=>{ qtyInput.value = Math.max(1,(Number(qtyInput.value)||1)-5); recalc(); });
