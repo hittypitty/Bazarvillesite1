@@ -93,6 +93,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.querySelectorAll("#adNav a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===name));
     if(name==="dashboard") renderDashboard();
     if(name==="enquiries") renderEnquiriesTable();
+    if(name==="orders") renderOrdersTable();
+    if(name==="quotes") renderQuotesTable();
   }
   document.querySelectorAll("#adNav a[data-view]").forEach(a=>{
     a.addEventListener("click", (e)=>{ e.preventDefault(); location.hash = "#"+a.dataset.view; switchView(a.dataset.view); });
@@ -246,8 +248,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
      A pasted link only works as an <img src> if it's a DIRECT file link. Two common
      mistakes: a Dropbox share link (ends ?dl=0 — opens an HTML preview page, not the
      file) and a Google Images search-result link (opens Google's page, not the photo).
-     normalizeImageUrl fixes the Dropbox case automatically; testImageLoads actually
-     tries loading it so we can warn immediately instead of silently saving a dead link. */
+     dropboxCandidates() builds every URL shape worth trying for a Dropbox link (see
+     note below), and resolveWorkingImageUrl() tries them in order so we don't have to
+     guess which one this particular link/account needs; testImageLoads is the raw
+     "does this exact URL load as an image" check used underneath. */
   function slugify(str){
     return (str||"").toString().toLowerCase().trim()
       .replace(/[^a-z0-9\s-]/g, "")
@@ -255,12 +259,28 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
   }
+  /* Newer Dropbox "scl/fi/..." share links sometimes still return an HTML
+     interstitial/redirect page from www.dropbox.com even with ?dl=1 appended —
+     the classic fix (dl=0→dl=1) doesn't always work for these. Swapping the
+     host to dl.dropboxusercontent.com serves the raw file directly in most
+     cases, so we try both host variants (each with dl=1) instead of just one. */
+  function dropboxCandidates(url){
+    const withDl1 = u => /[?&]dl=1(&|$)/.test(u) ? u : (/[?&]dl=0(&|$)/.test(u) ? u.replace(/dl=0/, "dl=1") : u + (u.includes("?") ? "&" : "?") + "dl=1");
+    const direct = url.replace(/^https?:\/\/(www\.)?dropbox\.com/i, "https://dl.dropboxusercontent.com");
+    return [withDl1(direct), withDl1(url)];
+  }
   function normalizeImageUrl(url){
-    if(/dropbox\.com/i.test(url)){
-      if(/[?&]dl=0(&|$)/.test(url)) return url.replace(/dl=0/, "dl=1");
-      if(!/[?&]dl=1(&|$)/.test(url)) return url + (url.includes("?") ? "&" : "?") + "dl=1";
+    // kept for anything still calling this directly — first Dropbox candidate
+    return /dropbox\.com/i.test(url) ? dropboxCandidates(url)[0] : url;
+  }
+  /** Tries every plausible URL shape for a pasted link and returns the first
+   *  one that actually loads as an image, or null if none of them do. */
+  async function resolveWorkingImageUrl(url){
+    const candidates = /dropbox\.com/i.test(url) ? dropboxCandidates(url) : [url];
+    for(const candidate of candidates){
+      if(await testImageLoads(candidate)) return candidate;
     }
-    return url;
+    return null;
   }
   function testImageLoads(url){
     return new Promise(resolve=>{
@@ -269,7 +289,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       img.onload = ()=>{ if(!done){ done=true; resolve(true); } };
       img.onerror = ()=>{ if(!done){ done=true; resolve(false); } };
       img.src = url;
-      setTimeout(()=>{ if(!done){ done=true; resolve(false); } }, 6000);
+      setTimeout(()=>{ if(!done){ done=true; resolve(false); } }, 9000);
     });
   }
   const BROKEN_LINK_MSG = "Ye link seedha image nahi khol raha. Google Images ka search-result link ya Dropbox ka plain share link (?dl=0) kaam nahi karega — photo par right-click karke \"Copy image address\" se seedha .jpg/.png link lo, ya Dropbox link ke end mein ?dl=1 laga kar try karo.";
@@ -367,13 +387,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       let url = input.value.trim();
       if(!url) return;
       if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
-      url = normalizeImageUrl(url);
       btn.disabled = true; status.textContent = "Checking link…";
-      const ok = await testImageLoads(url);
+      const working = await resolveWorkingImageUrl(url);
       btn.disabled = false;
-      if(!ok){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
+      if(!working){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
       status.textContent = "";
-      productImages.push(url);
+      productImages.push(working);
       input.value = "";
       renderImgGrid();
     });
@@ -510,13 +529,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       let url = input.value.trim();
       if(!url) return;
       if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
-      url = normalizeImageUrl(url);
       btn.disabled = true; status.textContent = "Checking link…";
-      const ok = await testImageLoads(url);
+      const working = await resolveWorkingImageUrl(url);
       btn.disabled = false;
-      if(!ok){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
+      if(!working){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
       status.textContent = "";
-      collImage = url;
+      collImage = working;
       input.value = "";
       renderCollImgGrid();
     });
@@ -677,14 +695,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function enqRowHtml(e){
     return `
         <tr data-id="${e.id}">
-          <td><b>${e.ref}</b></td>
-          <td>${e.product_name || "—"}</td>
+          <td><b>${e.ref}</b>${e.source==="manual"?' <span class="ad-badge in" style="font-size:10px">manual</span>':''}</td>
+          <td>${e.product_name || "—"}${e.company_name?`<br><span class="ad-hint" style="margin:0">${e.company_name}</span>`:''}</td>
           <td>${e.quantity ? e.quantity+" pcs" : "—"}</td>
           <td>${new Date(e.created_at).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
           <td>
             <select class="enq-status">
               <option value="new" ${e.status==="new"||!e.status?"selected":""}>New</option>
               <option value="contacted" ${e.status==="contacted"?"selected":""}>Contacted</option>
+              <option value="qualified" ${e.status==="qualified"?"selected":""}>Qualified</option>
+              <option value="quoted" ${e.status==="quoted"?"selected":""}>Quoted</option>
+              <option value="won" ${e.status==="won"?"selected":""}>Won</option>
+              <option value="lost" ${e.status==="lost"?"selected":""}>Lost</option>
               <option value="closed" ${e.status==="closed"?"selected":""}>Closed</option>
             </select>
           </td>
@@ -758,6 +780,208 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     bindEnquiryControlsOnce();
     renderEnquiriesFromCache();
   }
+
+  /* ================= ADD LEAD (manual CRM entry) ================= */
+  const leadModalBackdrop = document.querySelector("#leadModalBackdrop");
+  const addLeadBtn = document.querySelector("#addLeadBtn");
+  if(addLeadBtn) addLeadBtn.addEventListener("click", ()=>{
+    ["#lf_product","#lf_company","#lf_qty","#lf_notes"].forEach(sel=>{ const el = document.querySelector(sel); if(el) el.value = ""; });
+    leadModalBackdrop.classList.add("show");
+  });
+  [document.querySelector("#closeLeadModal"), document.querySelector("#cancelLeadBtn")].forEach(b=>{
+    if(b) b.addEventListener("click", ()=>leadModalBackdrop.classList.remove("show"));
+  });
+  const saveLeadBtn = document.querySelector("#saveLeadBtn");
+  if(saveLeadBtn) saveLeadBtn.addEventListener("click", async ()=>{
+    const productName = document.querySelector("#lf_product").value.trim();
+    const companyName = document.querySelector("#lf_company").value.trim();
+    const quantity = Number(document.querySelector("#lf_qty").value) || null;
+    const notes = document.querySelector("#lf_notes").value.trim();
+    if(!productName && !companyName){ alert("Add at least a product/interest or a company/contact name."); return; }
+    busy(saveLeadBtn, true, "Adding…");
+    try{
+      await BazDS.addManualLead({productName, companyName, quantity, notes});
+      leadModalBackdrop.classList.remove("show");
+      renderEnquiriesTable();
+    }catch(err){ alert("Could not add lead: " + err.message); }
+    finally{ busy(saveLeadBtn, false); }
+  });
+
+  /* ================= ORDERS ================= */
+  const ORDER_STATUSES = ["pending","confirmed","dispatched","delivered","cancelled"];
+  let allOrdersCache = [];
+  let editingOrderId = null;
+
+  function orderRowHtml(o){
+    const itemCount = (o.items||[]).reduce((n,it)=>n+(it.qty||1),0);
+    return `<tr data-id="${o.id}">
+      <td><b>${o.ref}</b></td>
+      <td>${o.customer_name||"—"}<br><span class="ad-hint" style="margin:0">${o.customer_phone||""}</span></td>
+      <td>${itemCount} pcs</td>
+      <td>${money(o.subtotal||0)}</td>
+      <td>${(o.payment_method||"cod").replace("_"," ")}</td>
+      <td><span class="ad-badge ${o.status==='delivered'?'in':(o.status==='cancelled'?'out':'in')}">${o.status||"pending"}</span></td>
+      <td>${new Date(o.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</td>
+      <td><button class="ad-icon-btn" title="View / update" onclick="AdminUI.openOrder(${o.id})">👁️</button></td>
+    </tr>`;
+  }
+
+  async function renderOrdersTable(){
+    const el = document.querySelector("#ordersTable"); if(!el) return;
+    try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); allOrdersCache = []; }
+    if(!allOrdersCache.length){
+      el.innerHTML = "";
+      el.closest(".ad-table-wrap").innerHTML = `<p class="ad-enq-empty">No orders yet — they'll show up here as soon as a customer checks out from the cart on the live site.</p>`;
+      return;
+    }
+    el.innerHTML = `<tr><th>Reference</th><th>Customer</th><th>Items</th><th>Subtotal</th><th>Payment</th><th>Status</th><th>Date</th><th></th></tr>` +
+      allOrdersCache.map(orderRowHtml).join("");
+  }
+
+  AdminUI.openOrder = (id)=>{
+    const o = allOrdersCache.find(x=>x.id===id); if(!o) return;
+    editingOrderId = id;
+    const itemsHtml = (o.items||[]).map(it=>`<div class="ad-tier-row" style="grid-template-columns:1fr auto auto">
+      <span>${it.name||it.productId||"Item"}${it.color?` — ${it.color}`:''}${it.size?` / ${it.size}`:''}${it.printOption?` / ${it.printOption}`:''}</span>
+      <span>${it.qty||1} pcs</span><span>${money(it.price||0)}</span></div>`).join("") || "<p class='ad-hint'>No item detail stored.</p>";
+    document.querySelector("#orderModalBody").innerHTML = `
+      <p><b>${o.customer_name||"—"}</b> · ${o.customer_phone||""} ${o.customer_email?" · "+o.customer_email:""}</p>
+      <p class="ad-hint">${o.shipping_address||""}</p>
+      <div style="margin:14px 0">${itemsHtml}</div>
+      <p><b>Subtotal: ${money(o.subtotal||0)}</b> · Payment: ${(o.payment_method||"cod").replace("_"," ")}</p>
+      <div class="ad-field"><label>Order status</label>
+        <select id="of_status">${ORDER_STATUSES.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select>
+      </div>
+      <div class="ad-field full"><label>Internal notes</label><input id="of_notes" value="${(o.notes||"").replace(/"/g,'&quot;')}"></div>`;
+    document.querySelector("#orderModalBackdrop").classList.add("show");
+  };
+  const closeOrderModal = ()=>document.querySelector("#orderModalBackdrop").classList.remove("show");
+  [document.querySelector("#closeOrderModal"), document.querySelector("#cancelOrderBtn")].forEach(b=>{ if(b) b.addEventListener("click", closeOrderModal); });
+  const saveOrderBtn = document.querySelector("#saveOrderBtn");
+  if(saveOrderBtn) saveOrderBtn.addEventListener("click", async ()=>{
+    if(!editingOrderId) return;
+    const status = document.querySelector("#of_status").value;
+    const notes = document.querySelector("#of_notes").value.trim();
+    busy(saveOrderBtn, true, "Saving…");
+    try{
+      await BazDS.updateOrderStatus(editingOrderId, {status, notes});
+      closeOrderModal();
+      renderOrdersTable();
+    }catch(err){ alert("Could not update order: " + err.message); }
+    finally{ busy(saveOrderBtn, false); }
+  });
+
+  /* ================= QUOTES (CPQ) ================= */
+  let allQuotesCache = [];
+  let quoteLineItems = [];
+
+  function quoteRowHtml(q){
+    const link = `${location.origin}${location.pathname.replace(/admin\.html$/,'')}quote.html?ref=${q.ref}`;
+    return `<tr data-id="${q.id}">
+      <td><b>${q.ref}</b></td>
+      <td>${q.customer_name||"—"}<br><span class="ad-hint" style="margin:0">${q.customer_company||""}</span></td>
+      <td>${money(q.subtotal||0)}</td>
+      <td><span class="ad-badge ${q.status==='accepted'?'in':'out'}">${q.status||"draft"}</span></td>
+      <td>${new Date(q.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</td>
+      <td><a href="${link}" target="_blank" class="btn btn-outline btn-sm">🔗 Open link</a></td>
+    </tr>`;
+  }
+
+  async function renderQuotesTable(){
+    const el = document.querySelector("#quotesTable"); if(!el) return;
+    try{ allQuotesCache = await BazDS.getQuotes(); }catch(err){ console.error(err); allQuotesCache = []; }
+    if(!allQuotesCache.length){
+      el.innerHTML = "";
+      el.closest(".ad-table-wrap").innerHTML = `<p class="ad-enq-empty">No quotes yet — click "+ New Quote" above to build one for a customer.</p>`;
+      return;
+    }
+    el.innerHTML = `<tr><th>Reference</th><th>Customer</th><th>Subtotal</th><th>Status</th><th>Date</th><th></th></tr>` +
+      allQuotesCache.map(quoteRowHtml).join("");
+  }
+
+  function quoteFormHtml(){
+    return `
+      <div class="ad-form-grid">
+        <div class="ad-field"><label>Customer name</label><input id="qf_name"></div>
+        <div class="ad-field"><label>Company</label><input id="qf_company"></div>
+        <div class="ad-field"><label>Phone</label><input id="qf_phone"></div>
+        <div class="ad-field"><label>Email (optional)</label><input id="qf_email" type="email"></div>
+        <div class="ad-field"><label>Valid until (optional)</label><input id="qf_validuntil" type="date"></div>
+      </div>
+      <h3>Line items</h3>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select id="qf_productPick" style="flex:1">
+          <option value="">— pick a product to add —</option>
+          ${PRODUCTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join("")}
+        </select>
+        <button class="btn btn-outline btn-sm" type="button" id="qf_addItemBtn">+ Add</button>
+      </div>
+      <div id="qf_items"></div>
+      <p style="text-align:right;margin-top:10px"><b>Subtotal: <span id="qf_subtotal">₹0</span></b></p>
+      <div class="ad-field full"><label>Notes (optional — shown to the customer)</label><input id="qf_notes"></div>`;
+  }
+
+  function renderQuoteItems(){
+    const el = document.querySelector("#qf_items"); if(!el) return;
+    el.innerHTML = quoteLineItems.map((it,i)=>`
+      <div class="ad-tier-row" style="grid-template-columns:2fr 80px 100px auto">
+        <span>${it.name}</span>
+        <input type="number" min="1" value="${it.qty}" class="qi-qty" data-i="${i}" style="width:70px">
+        <input type="number" min="0" value="${it.price}" class="qi-price" data-i="${i}" style="width:90px">
+        <button class="ad-icon-btn danger" type="button" onclick="AdminUI.removeQuoteItem(${i})">✕</button>
+      </div>`).join("") || `<p class="ad-hint">No items added yet.</p>`;
+    el.querySelectorAll(".qi-qty").forEach(inp=>inp.addEventListener("input", ()=>{ quoteLineItems[Number(inp.dataset.i)].qty = Number(inp.value)||1; updateQuoteSubtotal(); }));
+    el.querySelectorAll(".qi-price").forEach(inp=>inp.addEventListener("input", ()=>{ quoteLineItems[Number(inp.dataset.i)].price = Number(inp.value)||0; updateQuoteSubtotal(); }));
+    updateQuoteSubtotal();
+  }
+  function updateQuoteSubtotal(){
+    const sub = quoteLineItems.reduce((s,it)=>s+(it.qty*it.price),0);
+    const el = document.querySelector("#qf_subtotal"); if(el) el.textContent = money(sub);
+  }
+  AdminUI.removeQuoteItem = (i)=>{ quoteLineItems.splice(i,1); renderQuoteItems(); };
+
+  const quoteModalBackdrop = document.querySelector("#quoteModalBackdrop");
+  const addQuoteBtn = document.querySelector("#addQuoteBtn");
+  if(addQuoteBtn) addQuoteBtn.addEventListener("click", ()=>{
+    quoteLineItems = [];
+    document.querySelector("#quoteForm").innerHTML = quoteFormHtml();
+    renderQuoteItems();
+    document.querySelector("#qf_addItemBtn").addEventListener("click", ()=>{
+      const sel = document.querySelector("#qf_productPick");
+      const id = Number(sel.value); if(!id) return;
+      const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
+      const t = tierFor(p, p.moq);
+      quoteLineItems.push({productId:p.id, name:p.name, qty:p.moq||1, price:t.price||0});
+      sel.value = "";
+      renderQuoteItems();
+    });
+    quoteModalBackdrop.classList.add("show");
+  });
+  [document.querySelector("#closeQuoteModal"), document.querySelector("#cancelQuoteBtn")].forEach(b=>{
+    if(b) b.addEventListener("click", ()=>quoteModalBackdrop.classList.remove("show"));
+  });
+  const saveQuoteBtn = document.querySelector("#saveQuoteBtn");
+  if(saveQuoteBtn) saveQuoteBtn.addEventListener("click", async ()=>{
+    const customerName = document.querySelector("#qf_name").value.trim();
+    const customerPhone = document.querySelector("#qf_phone").value.trim();
+    if(!customerName || !customerPhone){ alert("Customer name and phone are required."); return; }
+    if(!quoteLineItems.length){ alert("Add at least one line item."); return; }
+    const subtotal = quoteLineItems.reduce((s,it)=>s+(it.qty*it.price),0);
+    busy(saveQuoteBtn, true, "Creating…");
+    try{
+      await BazDS.createQuote({
+        customerName, customerPhone,
+        customerCompany: document.querySelector("#qf_company").value.trim(),
+        customerEmail: document.querySelector("#qf_email").value.trim(),
+        validUntil: document.querySelector("#qf_validuntil").value || null,
+        notes: document.querySelector("#qf_notes").value.trim(),
+        items: quoteLineItems, subtotal
+      });
+      quoteModalBackdrop.classList.remove("show");
+      renderQuotesTable();
+    }catch(err){ alert("Could not create quote: " + err.message); }
+    finally{ busy(saveQuoteBtn, false); }
+  });
 
   /* ================= BULK CSV UPLOAD (products) ================= */
   // Minimal CSV parser: handles quoted fields with embedded commas ("like, this").
