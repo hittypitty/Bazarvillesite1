@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Checkout | Bazarville</title>
+<meta name="description" content="Complete your bulk order on Bazarville.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Work+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css"></head><body>
+
+<div class="topbar"><div class="ticker"><span>🛍️ 5,000+ products in the catalogue</span><span>✅ Design approval before dispatch</span><span>💬 Structured WhatsApp bulk enquiry</span><span>🚚 Pan-India bulk shipping</span></div></div>
+
+<header class="nav"><div class="container navin">
+<a class="brand" href="index.html"><img src="assets/logo.png" alt="Bazarville"><b>Bazarville</b></a>
+<nav class="links"><a href="products.html">Shop Products</a><a href="galaxy.html">Shop by Profession</a><a href="products.html?purpose=Event%20Merchandise">Shop by Purpose</a><a href="index.html#collections">Collections</a><a href="index.html#footer">Contact</a></nav>
+<div class="navactions"><span class="searchbtn">⌕</span><span class="menu-btn">☰</span></div>
+</div></header>
+
+<main class="section">
+<div class="container reveal" id="checkoutRoot" style="max-width:720px">
+  <div class="title" style="display:block;margin-bottom:24px"><h2>Checkout</h2><p style="margin-top:8px">No payment gateway yet — pay by Cash on Delivery or Bank Transfer, confirmed by our team.</p></div>
+  <div id="checkoutSummary" class="ad-panel" style="margin-bottom:20px"></div>
+  <form id="checkoutForm" class="ad-panel">
+    <h3 style="margin-top:0">Delivery details</h3>
+    <div class="ad-form-grid">
+      <div class="ad-field"><label>Full name</label><input id="co_name" required></div>
+      <div class="ad-field"><label>Phone</label><input id="co_phone" required></div>
+      <div class="ad-field full"><label>Email (optional)</label><input id="co_email" type="email"></div>
+      <div class="ad-field full"><label>Shipping address</label><input id="co_address" required></div>
+    </div>
+    <h3>Payment method</h3>
+    <div style="display:flex;gap:16px;margin-bottom:18px">
+      <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="paymethod" value="cod" checked> Cash on Delivery</label>
+      <label style="display:flex;align-items:center;gap:6px"><input type="radio" name="paymethod" value="bank_transfer"> Bank Transfer</label>
+    </div>
+    <button type="submit" class="btn btn-lime" style="width:100%">Place Order</button>
+  </form>
+</div>
+</main>
+
+<footer class="footer" id="footer"><div class="container">
+  <div class="footgrid">
+    <div><div class="fbrand"><img src="assets/logo.png" alt=""><b>Bazarville</b></div><p>A digital showroom for corporate gifting and bulk orders — discover, compare and enquire in one place.</p></div>
+    <div><h4>Discover</h4><a href="products.html">All Products</a><br><a href="galaxy.html">By Profession</a><br><a href="products.html?purpose=Client%20Gifting">By Purpose</a><br><a href="products.html?occasion=Diwali">By Occasion</a></div>
+    <div><h4>Company</h4><a href="about.html">About Bazarville</a><br><a href="about.html#timeline">Client Stories</a><br><a href="index.html#footer">Contact Us</a><br><a href="#">Careers</a></div>
+    <div><h4>Support</h4><a href="track.html">Track Enquiry</a><br><a href="#">Shipping Info</a><br><a href="index.html#footer">FAQs</a></div>
+    <div><h4>Legal</h4><a href="#">Privacy Policy</a><br><a href="#">Terms of Service</a><br><a href="#">Refund Policy</a></div>
+  </div>
+  <div class="copyright">© 2026 Bazarville. All rights reserved. • Phase 1 Digital Showroom Demo</div>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/data-store.js"></script>
+<script src="assets/script.js"></script></body></html>
