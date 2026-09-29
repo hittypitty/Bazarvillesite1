@@ -83,11 +83,32 @@ const DEFAULT_COLLECTIONS = [
   {name:"Healthcare Staff Essentials",tag:"14 products",img:img("healthcare,staff",47)},
 ];
 
+// Default Purpose/Occasion lists — shown on the live site's filters and in
+// the admin product form's dropdowns. Admin can add more from the product
+// form (see admin.js "+ Add new purpose/occasion") — those get saved into
+// SETTINGS.purposes/occasions in Supabase and merged with these defaults.
+const DEFAULT_PURPOSES = [
+  "Client Gifts","Employee / Staff Gifts","Office & Workplace","Corporate Events",
+  "Awards & Recognition","Onboarding / Joining Kits","Marketing & Promotion",
+  "Branding & Corporate Identity","Conferences / Seminars / Workshops",
+  "Dealer / Distributor Gifts","Employee Appreciation","Welcome / Gift Kits",
+  "Festive Gifting","Travel / Utility Gifting","Team / Group Gifting"
+];
+const DEFAULT_OCCASIONS = [
+  "Diwali","New Year","Holi","Raksha Bandhan","Christmas","Eid","Independence Day",
+  "Republic Day","Company Anniversary","Annual Day","Product Launch","Corporate Events",
+  "Conferences & Exhibitions","Employee Joining / Onboarding","Employee Recognition & Awards",
+  "Employee Farewell","Client / Dealer Meets","Team Outings & Celebrations"
+];
+
 const DEFAULT_SETTINGS = {
   whatsappNumber: "919999999999",
   brandColor: "#c6f000",
   brandFont: "inter",
   animationLevel: "subtle",
+  purposes: DEFAULT_PURPOSES,
+  occasions: DEFAULT_OCCASIONS,
+  customProfessions: [],
   heroImages: [
     "https://picsum.photos/seed/bzv101/500/620",
     "https://picsum.photos/seed/bzv102/450/560",
@@ -116,11 +137,23 @@ let PRODUCTS = [];
 let COLLECTIONS = [];
 let SETTINGS = DEFAULT_SETTINGS;
 
-const PROFESSIONS = [
+// BASE_PROFESSIONS is the built-in preset list (with icons). Admin can add
+// further custom professions from the product form ("+ Add new profession")
+// — those are saved as plain names in SETTINGS.customProfessions and merged
+// in here with a generic icon. PROFESSIONS itself is a `let` (not `const`)
+// so refreshProfessionsList() can recompute it once SETTINGS has loaded.
+const BASE_PROFESSIONS = [
   {name:"Corporate",icon:"💼"},{name:"IT / Tech",icon:"💻"},{name:"Education",icon:"🎓"},
   {name:"Healthcare",icon:"🩺"},{name:"Retail",icon:"🛍️"},{name:"Hospitality",icon:"🏨"},
   {name:"Manufacturing",icon:"🏭"},{name:"Finance",icon:"📊"}
 ];
+let PROFESSIONS = BASE_PROFESSIONS.slice();
+function refreshProfessionsList(){
+  const custom = (SETTINGS.customProfessions || []).filter(name =>
+    name && !BASE_PROFESSIONS.some(p => p.name.toLowerCase() === name.toLowerCase())
+  );
+  PROFESSIONS = BASE_PROFESSIONS.concat(custom.map(name => ({name, icon:"🏷️"})));
+}
 
 // Admin can save a product as "draft" (e.g. mid-edit, not ready to show
 // customers). Draft/Publish only ever hides a product from PUBLIC listing
@@ -144,7 +177,6 @@ function productCard(p){
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy"></div></a>
     <div class="pbody">
-      <span class="pcat">${p.cat}</span>
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
       <div class="pprice">${money(t.price)} <small>/ pc starting</small></div>
       <div class="pfoot">
@@ -191,6 +223,28 @@ function renderCollections(target, list=COLLECTIONS){
 function initFilters(){
   const grid = document.querySelector("#productGrid");
   if(!grid) return;
+
+  // Build the Profession chips / Purpose / Occasion dropdowns from the live
+  // taxonomy (PROFESSIONS + SETTINGS.purposes/occasions) instead of the
+  // static placeholder options in products.html — so anything an admin adds
+  // from the product form ("+ Add new purpose/occasion/profession") shows up
+  // here automatically, with no HTML edits needed.
+  const chipRow = document.querySelector(".chiprow");
+  if(chipRow){
+    chipRow.innerHTML = `<span class="fchip active" data-profession="All">All</span>` +
+      PROFESSIONS.map(pr=>`<span class="fchip" data-profession="${pr.name}">${pr.name}</span>`).join("");
+  }
+  const purposeSelectEl = document.querySelector("#purposeSelect");
+  if(purposeSelectEl){
+    purposeSelectEl.innerHTML = `<option value="All">All purposes</option>` +
+      (SETTINGS.purposes||DEFAULT_PURPOSES).map(v=>`<option value="${v}">${v}</option>`).join("");
+  }
+  const occasionSelectEl = document.querySelector("#occasionSelect");
+  if(occasionSelectEl){
+    occasionSelectEl.innerHTML = `<option value="All">All occasions</option>` +
+      (SETTINGS.occasions||DEFAULT_OCCASIONS).map(v=>`<option value="${v}">${v}</option>`).join("");
+  }
+
   const state = {profession:"All",purpose:"All",occasion:"All",qty:1,sort:"relevance"};
   const params = new URLSearchParams(location.search);
   if(params.get("profession")) state.profession = params.get("profession");
@@ -273,6 +327,248 @@ function applyProductSeo(p){
   });
 }
 
+/* ---------- cart (localStorage — no backend needed until checkout) ---------- */
+const CART_KEY = "bzv_cart";
+function getCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY))||[]; }catch(e){ return []; } }
+function setCart(items){
+  try{ localStorage.setItem(CART_KEY, JSON.stringify(items)); }catch(e){ /* private browsing etc — cart just won't persist */ }
+  renderCartBadge();
+}
+function addToCart(item){
+  const cart = getCart();
+  const existing = cart.find(c=>c.productId===item.productId && c.color===item.color && c.size===item.size && c.printOption===item.printOption);
+  if(existing) existing.qty += item.qty; else cart.push(item);
+  setCart(cart);
+}
+function updateCartQty(idx, qty){ const cart=getCart(); if(cart[idx]){ cart[idx].qty = Math.max(1, qty); setCart(cart); } }
+function removeFromCart(idx){ const cart=getCart(); cart.splice(idx,1); setCart(cart); }
+function cartCount(){ return getCart().reduce((s,c)=>s+c.qty,0); }
+function cartSubtotal(){ return getCart().reduce((s,c)=>s+c.qty*c.price,0); }
+function renderCartBadge(){
+  document.querySelectorAll(".navactions").forEach(nav=>{
+    let cartEl = nav.querySelector(".cartbtn");
+    if(!cartEl){
+      cartEl = document.createElement("a");
+      cartEl.href = "cart.html"; cartEl.className = "cartbtn"; cartEl.title = "Cart";
+      cartEl.innerHTML = `🛒<span class="cart-count"></span>`;
+      nav.insertBefore(cartEl, nav.firstChild);
+    }
+    let acctEl = nav.querySelector(".accountbtn");
+    if(!acctEl){
+      acctEl = document.createElement("a");
+      acctEl.href = "account.html"; acctEl.className = "accountbtn"; acctEl.title = "My Account";
+      acctEl.textContent = "👤";
+      nav.insertBefore(acctEl, cartEl);
+    }
+    const count = cartCount();
+    const badge = cartEl.querySelector(".cart-count");
+    badge.textContent = count>0 ? count : "";
+    badge.style.display = count>0 ? "flex" : "none";
+  });
+}
+function initCartPage(){
+  const el = document.querySelector("#cart-root");
+  if(!el) return;
+  function render(){
+    const cart = getCart();
+    if(!cart.length){
+      el.innerHTML = `<div class="empty-cart"><p>Your cart is empty.</p><a class="btn btn-lime" href="products.html">Browse Catalogue</a></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="cart-rows">${cart.map((c,i)=>`
+        <div class="cart-row">
+          <img src="${c.img}" alt="${c.name}">
+          <div class="cart-row-info">
+            <b>${c.name}</b>
+            <span class="cart-row-meta">${[c.color,c.size,c.printOption].filter(Boolean).join(" • ")}</span>
+            <span class="cart-row-price">${money(c.price)} / pc</span>
+          </div>
+          <div class="qtybox"><button data-act="minus" data-i="${i}">−</button><input type="number" value="${c.qty}" data-i="${i}" min="1"><button data-act="plus" data-i="${i}">+</button></div>
+          <button class="ad-icon-btn danger cart-remove" data-i="${i}">✕</button>
+        </div>`).join("")}</div>
+      <div class="cart-summary">
+        <div class="cart-total-row"><span>Subtotal (${cartCount()} pcs)</span><b>${money(cartSubtotal())}</b></div>
+        <p class="ad-hint">Final pricing may adjust to quantity-tier rates at checkout.</p>
+        <a class="btn btn-lime" style="width:100%" href="checkout.html">Proceed to Checkout →</a>
+      </div>`;
+    el.querySelectorAll("[data-act='minus']").forEach(b=>b.addEventListener("click",()=>{ const i=+b.dataset.i; updateCartQty(i, getCart()[i].qty-1); render(); }));
+    el.querySelectorAll("[data-act='plus']").forEach(b=>b.addEventListener("click",()=>{ const i=+b.dataset.i; updateCartQty(i, getCart()[i].qty+1); render(); }));
+    el.querySelectorAll(".cart-row input[type=number]").forEach(inp=>inp.addEventListener("change",()=>{ updateCartQty(+inp.dataset.i, Number(inp.value)||1); render(); }));
+    el.querySelectorAll(".cart-remove").forEach(b=>b.addEventListener("click",()=>{ removeFromCart(+b.dataset.i); render(); }));
+  }
+  render();
+}
+function initCheckoutPage(){
+  const form = document.querySelector("#checkoutForm");
+  if(!form) return;
+  const cart = getCart();
+  const summaryEl = document.querySelector("#checkoutSummary");
+  if(!cart.length){
+    document.querySelector("#checkoutRoot").innerHTML = `<p>Your cart is empty. <a href="products.html">Browse the catalogue</a> first.</p>`;
+    return;
+  }
+  if(summaryEl) summaryEl.innerHTML = `
+    ${cart.map(c=>`<div class="checkout-line"><span>${c.name} × ${c.qty}</span><span>${money(c.qty*c.price)}</span></div>`).join("")}
+    <div class="checkout-line total"><span>Total</span><span>${money(cartSubtotal())}</span></div>`;
+
+  BazDS.getCurrentCustomer().then(cust=>{
+    if(cust){
+      document.querySelector("#co_name").value = cust.full_name || "";
+      document.querySelector("#co_phone").value = cust.phone || "";
+      document.querySelector("#co_email").value = cust.email || "";
+    }
+  }).catch(()=>{});
+
+  form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const btn = form.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = "Placing order…";
+    try{
+      const order = await BazDS.createOrder({
+        customerName: document.querySelector("#co_name").value.trim(),
+        customerPhone: document.querySelector("#co_phone").value.trim(),
+        customerEmail: document.querySelector("#co_email").value.trim(),
+        shippingAddress: document.querySelector("#co_address").value.trim(),
+        paymentMethod: document.querySelector("input[name=paymethod]:checked").value,
+        items: cart.map(c=>({productId:c.productId,name:c.name,qty:c.qty,price:c.price,color:c.color,size:c.size,printOption:c.printOption})),
+        subtotal: cartSubtotal()
+      });
+      setCart([]);
+      location.href = "order-confirmation.html?ref=" + encodeURIComponent(order.ref);
+    }catch(err){
+      alert("Could not place order: " + (err.message||"please try again."));
+      btn.disabled = false; btn.textContent = "Place Order";
+    }
+  });
+}
+function initOrderConfirmPage(){
+  const el = document.querySelector("#orderConfirmRoot");
+  if(!el) return;
+  const ref = new URLSearchParams(location.search).get("ref");
+  el.querySelector("#ocRef").textContent = ref || "—";
+}
+
+/* ---------- customer account: signup/login + order & quote history ---------- */
+function initAccountPage(){
+  const root = document.querySelector("#account-root");
+  if(!root) return;
+
+  async function renderLoggedIn(cust){
+    const [orders, allQuotes] = await Promise.all([
+      BazDS.getOrders().catch(()=>[]),
+      BazDS.getQuotes().catch(()=>[]) // RLS limits this to the customer's own quotes/orders automatically
+    ]);
+    root.innerHTML = `
+      <div class="acct-header"><div><h2>Hi, ${cust.full_name || cust.email}</h2><p class="ad-hint">${cust.company_name||"No company name on file"}</p></div>
+        <button class="btn btn-outline btn-sm" id="acctLogoutBtn">Log Out</button></div>
+      <div class="ad-panel"><h3>Your details</h3>
+        <div class="ad-form-grid">
+          <div class="ad-field"><label>Full name</label><input id="acct_name" value="${cust.full_name||''}"></div>
+          <div class="ad-field"><label>Company</label><input id="acct_company" value="${cust.company_name||''}"></div>
+          <div class="ad-field"><label>Phone</label><input id="acct_phone" value="${cust.phone||''}"></div>
+          <div class="ad-field"><label>GSTIN (optional)</label><input id="acct_gstin" value="${cust.gstin||''}"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="acctSaveBtn" style="margin-top:10px">Save</button>
+      </div>
+      <div class="ad-panel"><h3>Your orders</h3>
+        ${orders.length? `<div class="ad-table-wrap"><table class="ad-table"><tr><th>Ref</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr>
+          ${orders.map(o=>`<tr><td>${o.ref}</td><td>${(o.items||[]).length} item(s)</td><td>${money(o.subtotal)}</td><td><span class="ad-badge in">${o.status}</span></td><td>${new Date(o.created_at).toLocaleDateString()}</td></tr>`).join("")}
+        </table></div>` : `<p class="ad-hint">No orders yet.</p>`}
+      </div>
+      <div class="ad-panel"><h3>Quotes sent to you</h3>
+        ${allQuotes.length? `<div class="ad-table-wrap"><table class="ad-table"><tr><th>Ref</th><th>Total</th><th>Status</th><th>Valid until</th><th></th></tr>
+          ${allQuotes.map(q=>`<tr><td>${q.ref}</td><td>${money(q.subtotal)}</td><td><span class="ad-badge in">${q.status}</span></td><td>${q.valid_until||'—'}</td><td><a href="quote.html?ref=${q.ref}" target="_blank">View →</a></td></tr>`).join("")}
+        </table></div>` : `<p class="ad-hint">No quotes yet.</p>`}
+      </div>`;
+    root.querySelector("#acctLogoutBtn").addEventListener("click", async ()=>{ await BazDS.customerSignOut(); location.reload(); });
+    root.querySelector("#acctSaveBtn").addEventListener("click", async (e)=>{
+      const btn = e.target; btn.disabled = true; btn.textContent = "Saving…";
+      try{
+        await BazDS.updateCustomer(cust.id, {
+          fullName: root.querySelector("#acct_name").value.trim(),
+          companyName: root.querySelector("#acct_company").value.trim(),
+          phone: root.querySelector("#acct_phone").value.trim(),
+          gstin: root.querySelector("#acct_gstin").value.trim()
+        });
+        btn.textContent = "Saved ✓";
+      }catch(err){ alert("Could not save: "+err.message); btn.textContent = "Save"; }
+      finally{ btn.disabled = false; }
+    });
+  }
+
+  function renderLoggedOut(){
+    root.innerHTML = `
+      <div class="acct-tabs">
+        <button class="acct-tab active" data-tab="login">Log In</button>
+        <button class="acct-tab" data-tab="signup">Create Account</button>
+      </div>
+      <div class="acct-form" id="loginForm">
+        <div class="ad-field"><label>Email</label><input id="li_email" type="email"></div>
+        <div class="ad-field"><label>Password</label><input id="li_password" type="password"></div>
+        <button class="btn btn-lime" id="loginSubmit" style="width:100%">Log In</button>
+        <p class="ad-hint" id="loginError"></p>
+      </div>
+      <div class="acct-form" id="signupForm" style="display:none">
+        <div class="ad-field"><label>Full name</label><input id="su_name"></div>
+        <div class="ad-field"><label>Company name (optional)</label><input id="su_company"></div>
+        <div class="ad-field"><label>Phone</label><input id="su_phone"></div>
+        <div class="ad-field"><label>Email</label><input id="su_email" type="email"></div>
+        <div class="ad-field"><label>Password</label><input id="su_password" type="password"></div>
+        <button class="btn btn-lime" id="signupSubmit" style="width:100%">Create Account</button>
+        <p class="ad-hint" id="signupError"></p>
+      </div>`;
+    root.querySelectorAll(".acct-tab").forEach(tab=>tab.addEventListener("click",()=>{
+      root.querySelectorAll(".acct-tab").forEach(t=>t.classList.remove("active")); tab.classList.add("active");
+      root.querySelector("#loginForm").style.display = tab.dataset.tab==="login" ? "block" : "none";
+      root.querySelector("#signupForm").style.display = tab.dataset.tab==="signup" ? "block" : "none";
+    }));
+    root.querySelector("#loginSubmit").addEventListener("click", async ()=>{
+      const errEl = root.querySelector("#loginError");
+      try{
+        await BazDS.customerSignIn(root.querySelector("#li_email").value.trim(), root.querySelector("#li_password").value);
+        location.reload();
+      }catch(err){ errEl.textContent = err.message||"Could not log in."; }
+    });
+    root.querySelector("#signupSubmit").addEventListener("click", async ()=>{
+      const errEl = root.querySelector("#signupError");
+      try{
+        await BazDS.customerSignUp({
+          email: root.querySelector("#su_email").value.trim(),
+          password: root.querySelector("#su_password").value,
+          fullName: root.querySelector("#su_name").value.trim(),
+          companyName: root.querySelector("#su_company").value.trim(),
+          phone: root.querySelector("#su_phone").value.trim()
+        });
+        errEl.style.color = "#5b8a00";
+        errEl.textContent = "Account created — check your email to confirm, then log in.";
+      }catch(err){ errEl.textContent = err.message||"Could not create account."; }
+    });
+  }
+
+  BazDS.getCurrentCustomer().then(cust => cust ? renderLoggedIn(cust) : renderLoggedOut());
+}
+
+/* ---------- public quote view (quote.html?ref=...) ---------- */
+function initQuotePage(){
+  const el = document.querySelector("#quote-root");
+  if(!el) return;
+  const ref = new URLSearchParams(location.search).get("ref");
+  if(!ref){ el.innerHTML = `<p>No quote reference given.</p>`; return; }
+  BazDS.getQuoteByRef(ref).then(q=>{
+    if(!q){ el.innerHTML = `<p>Quote not found. Double-check the link, or contact Bazarville.</p>`; return; }
+    el.innerHTML = `
+      <div class="quote-head"><h2>Quotation ${q.ref}</h2><span class="ad-badge in">${q.status}</span></div>
+      <p class="ad-hint">Prepared for ${q.customer_name}${q.customer_company? ' • '+q.customer_company:''}${q.valid_until? ' • Valid until '+q.valid_until:''}</p>
+      <div class="ad-table-wrap"><table class="ad-table"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+        ${(q.items||[]).map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td>${money(i.price)}</td><td>${money(i.qty*i.price)}</td></tr>`).join("")}
+      </table></div>
+      <div class="quote-total">Subtotal: <b>${money(q.subtotal)}</b></div>
+      ${q.notes? `<p class="ad-hint">${q.notes}</p>`:""}
+      <a class="btn btn-wa" style="margin-top:16px" target="_blank" href="https://wa.me/${SETTINGS.whatsappNumber||'919999999999'}?text=${encodeURIComponent('Hi Bazarville! I accept Quote '+q.ref+' for '+money(q.subtotal)+'. Please proceed.')}">🟢 Accept via WhatsApp</a>`;
+  });
+}
+
 /* ---------- product detail page ---------- */
 function initProductPage(){
   const el = document.querySelector("#pd-root");
@@ -288,7 +584,7 @@ function initProductPage(){
         <div class="pd-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}">`).join("")}</div>
       </div>
       <div class="reveal-right">
-        <span class="pd-cat">${p.cat} • ${p.profession}</span>
+        <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating">★★★★★ 4.7 (${18+p.id} reviews) &nbsp;•&nbsp; ${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
         <div class="pd-price-box">
@@ -308,9 +604,10 @@ function initProductPage(){
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
         <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap">
+          <button id="addToCartBtn" class="btn btn-primary" type="button">🛒 Add to Cart</button>
           <a id="waBtn" class="btn btn-wa" target="_blank" href="#">🟢 Send WhatsApp Enquiry</a>
-          <span class="btn btn-outline" style="cursor:default">Ref will be generated on send</span>
         </div>
+        <p class="ad-hint" id="cartAddedMsg" style="display:none;color:#5b8a00;font-weight:700">✓ Added to cart</p>
         <div class="pd-specs">
           <div class="pd-spec"><span>Customization</span><span>Logo / Branding available</span></div>
           <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
@@ -358,6 +655,26 @@ function initProductPage(){
   document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+5; recalc(); });
   qtyInput.addEventListener("input", recalc);
   recalc();
+
+  document.querySelector("#addToCartBtn").addEventListener("click", ()=>{
+    const qty = Math.max(1, Number(qtyInput.value)||1);
+    const t = tierFor(p, qty);
+    const colorEl = document.querySelector(".swatches .swatch.active");
+    const sizeEl = document.querySelector(".sizerow:not(#printOptRow) .sizebtn.active");
+    const printEl = document.querySelector("#printOptRow .sizebtn.active");
+    // colorEl.dataset.c holds the swatch's INDEX into p.colors (see the swatches
+    // render above), not the hex value itself — look the real colour up by index
+    // so the cart stores/shows the actual colour, not a stray "0"/"1".
+    const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)] || "") : "";
+    addToCart({
+      productId: p.id, name: p.name, img: p.img[0], qty, price: t.price,
+      color: colorVal, size: sizeEl ? sizeEl.textContent : "",
+      printOption: printEl ? printEl.textContent : ""
+    });
+    const msg = document.querySelector("#cartAddedMsg");
+    msg.style.display = "block";
+    setTimeout(()=>{ msg.style.display = "none"; }, 2000);
+  });
 
   // similar products
   const similar = publishedProducts().filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,4);
@@ -760,6 +1077,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     console.error("Could not load live data from Supabase — showing built-in demo data instead.", err);
     PRODUCTS = DEFAULT_PRODUCTS; COLLECTIONS = DEFAULT_COLLECTIONS; SETTINGS = DEFAULT_SETTINGS;
   }
+  refreshProfessionsList(); // merge any admin-added custom professions into PROFESSIONS before initGalaxy/initFilters run
   applyBrandColor(SETTINGS.brandColor);
   applyBrandFont(SETTINGS.brandFont);
   applyAnimationLevel(SETTINGS.animationLevel);
@@ -767,9 +1085,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
   // and silently break unrelated features (reveal, menu) on the same page.
+  renderCartBadge();
   const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
-    initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters];
+    initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters,
+    initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });
 
   // fire-and-forget enquiry logging — never blocks the WhatsApp redirect itself
