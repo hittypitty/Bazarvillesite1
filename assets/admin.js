@@ -153,11 +153,27 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-field full">
         <label>Profession (select all that apply)</label>
         <div class="ad-chip-group" id="pf_professions">${professionCheckboxesHtml(p?p.professions:[])}</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_addProfessionInput" placeholder="e.g. Legal Firms" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addProfessionBtn">+ Add new profession</button>
+        </div>
       </div>
-      <div class="ad-field"><label>Purpose</label>
-        <select id="pf_purpose">${["Employee Gifting","Client Gifting","Event Merchandise","Promotional"].map(v=>`<option ${p&&p.purpose===v?'selected':''}>${v}</option>`).join("")}</select>
+      <div class="ad-field">
+        <label>Purpose</label>
+        <select id="pf_purpose">${purposeOptionsHtml(p?p.purpose:"")}</select>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_addPurposeInput" placeholder="e.g. Trade Show Giveaways" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addPurposeBtn">+ Add new</button>
+        </div>
       </div>
-      <div class="ad-field"><label>Occasion</label><input id="pf_occasion" value="${p?p.occasion:''}" placeholder="e.g. Diwali"></div>
+      <div class="ad-field">
+        <label>Occasion</label>
+        <select id="pf_occasion">${occasionOptionsHtml(p?p.occasion:"")}</select>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_addOccasionInput" placeholder="e.g. Women's Day" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addOccasionBtn">+ Add new</button>
+        </div>
+      </div>
       <div class="ad-field"><label>MOQ (pcs)</label><input id="pf_moq" type="number" value="${p?p.moq:10}"></div>
       <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
       <div class="ad-field full">
@@ -211,6 +227,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
     </div>`;
+  }
+
+  /* ---------- Purpose / Occasion dropdowns (product form) ----------
+     Options come from SETTINGS.purposes/occasions (editable — see the
+     "+ Add new" buttons wired in openProductModal below) rather than a
+     hardcoded list, so admin can grow these over time. If an existing
+     product has a value that isn't in the current list (e.g. saved before
+     a list was trimmed/renamed elsewhere), it's still shown as an extra
+     option so editing that product never silently loses/changes its data. */
+  function purposeOptionsHtml(current){
+    let list = (SETTINGS.purposes && SETTINGS.purposes.length) ? SETTINGS.purposes.slice() : [];
+    if(current && !list.includes(current)) list = [current, ...list];
+    return list.map(v=>`<option value="${v.replace(/"/g,'&quot;')}" ${current===v?'selected':''}>${v}</option>`).join("");
+  }
+  function occasionOptionsHtml(current){
+    let list = (SETTINGS.occasions && SETTINGS.occasions.length) ? SETTINGS.occasions.slice() : [];
+    if(current && !list.includes(current)) list = [current, ...list];
+    return `<option value="">— Select occasion —</option>` +
+      list.map(v=>`<option value="${v.replace(/"/g,'&quot;')}" ${current===v?'selected':''}>${v}</option>`).join("");
   }
 
   /* ---------- profession multi-select (product form) ---------- */
@@ -340,6 +375,73 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
     document.querySelector("#pf_printOptInput").addEventListener("keydown", (e)=>{
       if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addPrintOptBtn").click(); }
+    });
+    /* ---------- + Add new profession / purpose / occasion ----------
+       Each of these persists the new value into SETTINGS (via
+       BazDS.updateSettings) so it shows up for every future product too —
+       not just this one — and on the live site's filters. If the
+       add_taxonomies.sql migration hasn't been run yet, updateSettings()
+       throws a friendly "run this migration first" error (see data-store.js)
+       which we just show via alert() rather than losing the typed value. */
+    document.querySelector("#pf_addProfessionBtn").addEventListener("click", async ()=>{
+      const input = document.querySelector("#pf_addProfessionInput");
+      const val = input.value.trim();
+      if(!val) return;
+      if(PROFESSIONS.some(pr=>pr.name.toLowerCase()===val.toLowerCase())){
+        input.value = ""; return; // already exists — just clear the box, nothing to add
+      }
+      const btn = document.querySelector("#pf_addProfessionBtn");
+      busy(btn, true, "Adding…");
+      try{
+        SETTINGS.customProfessions = (SETTINGS.customProfessions||[]).concat([val]);
+        await BazDS.updateSettings(SETTINGS);
+        refreshProfessionsList();
+        const checked = [...document.querySelectorAll("#pf_professions input:checked")].map(i=>i.value).concat([val]);
+        document.querySelector("#pf_professions").innerHTML = professionCheckboxesHtml(checked);
+        input.value = "";
+      }catch(err){ alert(err.message || "Could not add profession."); }
+      finally{ busy(btn, false); }
+    });
+    document.querySelector("#pf_addProfessionInput").addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addProfessionBtn").click(); }
+    });
+    document.querySelector("#pf_addPurposeBtn").addEventListener("click", async ()=>{
+      const input = document.querySelector("#pf_addPurposeInput");
+      const val = input.value.trim();
+      if(!val) return;
+      const list = SETTINGS.purposes || [];
+      if(list.some(v=>v.toLowerCase()===val.toLowerCase())){ input.value = ""; return; }
+      const btn = document.querySelector("#pf_addPurposeBtn");
+      busy(btn, true, "Adding…");
+      try{
+        SETTINGS.purposes = list.concat([val]);
+        await BazDS.updateSettings(SETTINGS);
+        document.querySelector("#pf_purpose").innerHTML = purposeOptionsHtml(val);
+        input.value = "";
+      }catch(err){ alert(err.message || "Could not add purpose."); }
+      finally{ busy(btn, false); }
+    });
+    document.querySelector("#pf_addPurposeInput").addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addPurposeBtn").click(); }
+    });
+    document.querySelector("#pf_addOccasionBtn").addEventListener("click", async ()=>{
+      const input = document.querySelector("#pf_addOccasionInput");
+      const val = input.value.trim();
+      if(!val) return;
+      const list = SETTINGS.occasions || [];
+      if(list.some(v=>v.toLowerCase()===val.toLowerCase())){ input.value = ""; return; }
+      const btn = document.querySelector("#pf_addOccasionBtn");
+      busy(btn, true, "Adding…");
+      try{
+        SETTINGS.occasions = list.concat([val]);
+        await BazDS.updateSettings(SETTINGS);
+        document.querySelector("#pf_occasion").innerHTML = occasionOptionsHtml(val);
+        input.value = "";
+      }catch(err){ alert(err.message || "Could not add occasion."); }
+      finally{ busy(btn, false); }
+    });
+    document.querySelector("#pf_addOccasionInput").addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addOccasionBtn").click(); }
     });
     document.querySelector("#pf_addColorBtn").addEventListener("click", ()=>{
       const hex = document.querySelector("#pf_colorPicker").value;
