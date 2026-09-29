@@ -107,7 +107,28 @@ const BazDS = (function(){
     return true;
   }
 
-  const SETTINGS_FALLBACK = { whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle" };
+  // Default Purpose/Occasion lists — kept here too (duplicated from script.js's
+  // DEFAULT_PURPOSES/DEFAULT_OCCASIONS) so getSettings() always returns a full,
+  // usable list even before the add_taxonomies.sql migration has been run
+  // (i.e. the settings row's purposes/occasions/custom_professions columns
+  // don't exist yet, or exist but are still empty on a fresh row).
+  const DEFAULT_PURPOSES_FALLBACK = [
+    "Client Gifts","Employee / Staff Gifts","Office & Workplace","Corporate Events",
+    "Awards & Recognition","Onboarding / Joining Kits","Marketing & Promotion",
+    "Branding & Corporate Identity","Conferences / Seminars / Workshops",
+    "Dealer / Distributor Gifts","Employee Appreciation","Welcome / Gift Kits",
+    "Festive Gifting","Travel / Utility Gifting","Team / Group Gifting"
+  ];
+  const DEFAULT_OCCASIONS_FALLBACK = [
+    "Diwali","New Year","Holi","Raksha Bandhan","Christmas","Eid","Independence Day",
+    "Republic Day","Company Anniversary","Annual Day","Product Launch","Corporate Events",
+    "Conferences & Exhibitions","Employee Joining / Onboarding","Employee Recognition & Awards",
+    "Employee Farewell","Client / Dealer Meets","Team Outings & Celebrations"
+  ];
+  const SETTINGS_FALLBACK = {
+    whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle",
+    purposes: DEFAULT_PURPOSES_FALLBACK, occasions: DEFAULT_OCCASIONS_FALLBACK, customProfessions: []
+  };
 
   async function getSettings(){
     const sb = getClient(); if(!sb) return SETTINGS_FALLBACK;
@@ -118,19 +139,40 @@ const BazDS = (function(){
       heroImages: data.hero_images || [],
       brandColor: data.brand_color || "#c6f000",
       brandFont: data.brand_font || "inter",
-      animationLevel: data.animation_level || "subtle"
+      animationLevel: data.animation_level || "subtle",
+      // these three columns only exist after add_taxonomies.sql is run —
+      // fall back to the defaults so the site/admin still work either way
+      purposes: (data.purposes && data.purposes.length) ? data.purposes : DEFAULT_PURPOSES_FALLBACK,
+      occasions: (data.occasions && data.occasions.length) ? data.occasions : DEFAULT_OCCASIONS_FALLBACK,
+      customProfessions: data.custom_professions || []
     };
   }
 
   async function updateSettings(settings){
     const sb = getClient(); if(!sb) return false;
-    const { error } = await sb.from("settings").update({
+    const fullRow = {
       whatsapp_number: settings.whatsappNumber,
       hero_images: settings.heroImages,
       brand_color: settings.brandColor,
       brand_font: settings.brandFont,
-      animation_level: settings.animationLevel
-    }).eq("id",1);
+      animation_level: settings.animationLevel,
+      purposes: settings.purposes || DEFAULT_PURPOSES_FALLBACK,
+      occasions: settings.occasions || DEFAULT_OCCASIONS_FALLBACK,
+      custom_professions: settings.customProfessions || []
+    };
+    let { error } = await sb.from("settings").update(fullRow).eq("id",1);
+    if(error && /column .*(purposes|occasions|custom_professions)/i.test(error.message)){
+      // The add_taxonomies.sql migration hasn't been run on this database yet
+      // (those 3 columns don't exist). Retry without them so brand colour/font/
+      // WhatsApp-number/hero-image saves still work — then surface a clear,
+      // actionable error instead of a cryptic "column not found" one.
+      const { purposes, occasions, custom_professions, ...safeRow } = fullRow;
+      const retry = await sb.from("settings").update(safeRow).eq("id",1);
+      if(retry.error){ console.error("updateSettings:", retry.error.message); throw retry.error; }
+      const migrationErr = new Error("Baaki settings save ho gayi, lekin naya Purpose/Occasion/Profession add karne ke liye pehle 'add_taxonomies.sql' migration Supabase SQL Editor me run karna hoga.");
+      migrationErr.migrationNeeded = true;
+      throw migrationErr;
+    }
     if(error){ console.error("updateSettings:", error.message); throw error; }
     return true;
   }
@@ -232,8 +274,126 @@ const BazDS = (function(){
     if("status" in fields) row.status = fields.status;
     if("notes" in fields) row.notes = fields.notes;
     if("followupAt" in fields) row.followup_at = fields.followupAt;
+    if("companyName" in fields) row.company_name = fields.companyName;
     const { error } = await sb.from("enquiries").update(row).eq("id", id);
     if(error){ console.error("updateEnquiry:", error.message); throw error; }
+    return true;
+  }
+
+  /** Admin CRM: manually add a lead that didn't come through the website
+   *  (a phone call, a walk-in, an email) — same table as website enquiries,
+   *  just flagged source:'manual' so it's easy to tell apart in reports. */
+  async function addManualLead({productName, companyName, quantity, notes}){
+    const sb = getClient(); if(!sb) return null;
+    const ref = "BZV-" + Math.random().toString(36).slice(2,8).toUpperCase();
+    const { data, error } = await sb.from("enquiries").insert({
+      ref, product_name: productName || "", company_name: companyName || "",
+      quantity: quantity || null, notes: notes || "", source: "manual", status: "new"
+    }).select().single();
+    if(error){ console.error("addManualLead:", error.message); throw error; }
+    return data;
+  }
+
+  /* ---------- customer accounts (separate from admin auth above) ---------- */
+  async function customerSignUp({email, password, fullName, companyName, phone}){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const { data, error } = await sb.auth.signUp({
+      email, password,
+      options: { data: { account_type: "customer", full_name: fullName, company_name: companyName, phone } }
+    });
+    if(error) throw error;
+    return data.user;
+  }
+  async function customerSignIn(email, password){ return signIn(email, password); }
+  async function customerSignOut(){ return signOut(); }
+  /** Returns the logged-in customer's profile row, or null if not signed in
+   *  as a customer (an admin session correctly returns null here too). */
+  async function getCurrentCustomer(){
+    const sb = getClient(); if(!sb) return null;
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return null;
+    const { data, error } = await sb.from("customers").select("*").eq("id", session.user.id).single();
+    if(error) return null; // not a customer account (e.g. an admin is signed in) — not an error
+    return data;
+  }
+  async function updateCustomer(id, fields){
+    const sb = getClient(); if(!sb) return false;
+    const row = {};
+    if("fullName" in fields) row.full_name = fields.fullName;
+    if("companyName" in fields) row.company_name = fields.companyName;
+    if("gstin" in fields) row.gstin = fields.gstin;
+    if("phone" in fields) row.phone = fields.phone;
+    const { error } = await sb.from("customers").update(row).eq("id", id);
+    if(error){ console.error("updateCustomer:", error.message); throw error; }
+    return true;
+  }
+
+  /* ---------- orders (cart → checkout) ---------- */
+  async function createOrder(order){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const { data: { session } } = await sb.auth.getSession();
+    const ref = "BZO-" + Math.random().toString(36).slice(2,8).toUpperCase();
+    const row = {
+      ref,
+      customer_id: session ? session.user.id : null,
+      customer_name: order.customerName, customer_phone: order.customerPhone,
+      customer_email: order.customerEmail || "", shipping_address: order.shippingAddress,
+      items: order.items, subtotal: order.subtotal,
+      payment_method: order.paymentMethod || "cod", notes: order.notes || ""
+    };
+    const { data, error } = await sb.from("orders").insert(row).select().single();
+    if(error){ console.error("createOrder:", error.message); throw error; }
+    return data;
+  }
+  /** No args (admin, sees all) or {mine:true} (logged-in customer, sees own). */
+  async function getOrders(opts){
+    const sb = getClient(); if(!sb) return [];
+    let q = sb.from("orders").select("*").order("created_at",{ascending:false});
+    const { data, error } = await q;
+    if(error){ console.error("getOrders:", error.message); return []; }
+    return data;
+  }
+  async function updateOrderStatus(id, fields){
+    const sb = getClient(); if(!sb) return false;
+    const row = { updated_at: new Date().toISOString() };
+    if("status" in fields) row.status = fields.status;
+    if("paymentStatus" in fields) row.payment_status = fields.paymentStatus;
+    if("notes" in fields) row.notes = fields.notes;
+    const { error } = await sb.from("orders").update(row).eq("id", id);
+    if(error){ console.error("updateOrderStatus:", error.message); throw error; }
+    return true;
+  }
+
+  /* ---------- quotes (CPQ) ---------- */
+  async function createQuote(quote){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const ref = "BZQ-" + Math.random().toString(36).slice(2,8).toUpperCase();
+    const row = {
+      ref, customer_name: quote.customerName, customer_company: quote.customerCompany,
+      customer_phone: quote.customerPhone, customer_email: quote.customerEmail || "",
+      items: quote.items, subtotal: quote.subtotal, valid_until: quote.validUntil || null,
+      notes: quote.notes || "", status: "draft"
+    };
+    const { data, error } = await sb.from("quotes").insert(row).select().single();
+    if(error){ console.error("createQuote:", error.message); throw error; }
+    return data;
+  }
+  async function getQuotes(){
+    const sb = getClient(); if(!sb) return [];
+    const { data, error } = await sb.from("quotes").select("*").order("created_at",{ascending:false});
+    if(error){ console.error("getQuotes:", error.message); return []; }
+    return data;
+  }
+  async function getQuoteByRef(ref){
+    const sb = getClient(); if(!sb) return null;
+    const { data, error } = await sb.from("quotes").select("*").eq("ref", ref).single();
+    if(error){ console.error("getQuoteByRef:", error.message); return null; }
+    return data;
+  }
+  async function updateQuoteStatus(id, status){
+    const sb = getClient(); if(!sb) return false;
+    const { error } = await sb.from("quotes").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+    if(error){ console.error("updateQuoteStatus:", error.message); throw error; }
     return true;
   }
 
@@ -241,7 +401,10 @@ const BazDS = (function(){
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings,
-    logEnquiry, getEnquiries, updateEnquiry, uploadImage,
-    signIn, signOut, getCurrentAdmin
+    logEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
+    signIn, signOut, getCurrentAdmin,
+    customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
+    createOrder, getOrders, updateOrderStatus,
+    createQuote, getQuotes, getQuoteByRef, updateQuoteStatus
   };
 })();
