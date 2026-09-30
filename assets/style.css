@@ -265,6 +265,15 @@ img{max-width:100%;display:block}
 .pd-spec{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #f0f1ea;font-size:14px}
 .pd-spec span:last-child{font-weight:700}
 
+/* "You may also like" — related-products section on product.html, injected
+   by initProductPage() in script.js. Mirrors the .title heading pattern used
+   elsewhere on the site, scoped to this section so it doesn't affect any
+   other page. */
+.pd-related{margin-top:56px;border-top:1px solid var(--line);padding-top:36px}
+.pd-related-head{margin-bottom:24px}
+.pd-related-head h2{font-size:26px;font-weight:700}
+.pd-related-head p{margin:6px 0 0;color:var(--muted)}
+
 /* ================= GALAXY (Shop by Profession) ================= */
 .galaxy-hero{background:linear-gradient(180deg,#f2ffcf,var(--soft) 60%);color:var(--text);padding:56px 0 20px;text-align:center;overflow:hidden}
 .galaxy-hero .tag{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--lime-deep);border:1px solid var(--line);padding:8px 16px;border-radius:30px;font-size:12.5px;font-weight:700}
