@@ -251,11 +251,57 @@ function imgFallback(el){
 }
 window.imgFallback = imgFallback;
 
+/* ---------- card badges (computed from real product data, never fabricated) ----------
+   Rule (documented per client ask — simple & defensible):
+   - "Best Value" = within products sharing this product's profession, this
+     product has the lowest per-unit price at its top (largest-quantity)
+     pricing tier — the cheapest a buyer can land per piece in that bucket.
+   - "Popular" = this product has the most pricing tiers of any product in the
+     catalogue (ties → whichever is encountered first) — more tiers means the
+     catalogue team modelled demand across more quantity ranges, a proxy for
+     it being a frequently-quoted SKU.
+   - "Trending" = among in-stock products, this one has the steepest bulk
+     discount (% drop from its first tier price to its last tier price) — a
+     real, computable pricing-curve signal, not a random flag.
+   Priority when a product qualifies for more than one: Best Value > Popular
+   > Trending. At most one badge shows per card. */
+function computeCardBadge(p){
+  if(!PRODUCTS.length) return null;
+  const group = PRODUCTS.filter(x=>x.profession===p.profession);
+  const unitPriceAt = x=> x.tiers[x.tiers.length-1].price;
+  const bestValue = group.reduce((best,x)=> unitPriceAt(x) < unitPriceAt(best) ? x : best, group[0]);
+  if(p.id === bestValue.id) return {emoji:"💰", label:"Best Value"};
+
+  const maxTiers = Math.max(...PRODUCTS.map(x=>x.tiers.length));
+  const popular = PRODUCTS.find(x=>x.tiers.length===maxTiers);
+  if(popular && p.id === popular.id) return {emoji:"⭐", label:"Popular"};
+
+  const discountPct = x=>{
+    const first = x.tiers[0].price, last = x.tiers[x.tiers.length-1].price;
+    return first>0 ? (first-last)/first : 0;
+  };
+  const inStock = PRODUCTS.filter(x=>x.stock);
+  if(inStock.length){
+    const trending = inStock.reduce((best,x)=> discountPct(x) > discountPct(best) ? x : best, inStock[0]);
+    if(p.id === trending.id) return {emoji:"🔥", label:"Trending"};
+  }
+  return null;
+}
+
 /* ---------- product card ---------- */
 function productCard(p){
   const t = tierFor(p, p.moq);
-  return `<div class="pcard-wrap"><div class="pcard tilt">
+  const wished = isWishlisted(p.id);
+  const badge = computeCardBadge(p);
+  const compared = inCompare(p.id);
+  return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
+    ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
+    <div class="pcard-actions">
+      <button type="button" class="wish-btn ${wished?'active':''}" data-wish-id="${p.id}" title="${wished?'Remove from wishlist':'Add to wishlist'}" aria-label="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
+      <button type="button" class="qv-btn" data-qv-id="${p.id}" title="Quick View" aria-label="Quick View">👁</button>
+    </div>
+    <label class="cmp-check" title="Add to compare"><input type="checkbox" data-cmp-id="${p.id}" ${compared?'checked':''}><span>Compare</span></label>
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
@@ -288,7 +334,7 @@ function attachTilt(nodes){
       const x = (e.clientX - r.left)/r.width - .5;
       const y = (e.clientY - r.top)/r.height - .5;
       const m = getTiltMult();
-      card.style.transform = `rotateY(${x*4*m}deg) rotateX(${-y*4*m}deg) translateZ(4px)`;
+      card.style.transform = `translateY(-6px) rotateY(${x*4*m}deg) rotateX(${-y*4*m}deg) translateZ(4px)`;
     });
     card.addEventListener("mouseleave", ()=>{ card.style.transform = "rotateY(0) rotateX(0) translateZ(0)"; });
   });
@@ -517,6 +563,275 @@ function updateCartQty(idx, qty){ const cart=getCart(); if(cart[idx]){ cart[idx]
 function removeFromCart(idx){ const cart=getCart(); cart.splice(idx,1); setCart(cart); }
 function cartCount(){ return getCart().reduce((s,c)=>s+c.qty,0); }
 function cartSubtotal(){ return getCart().reduce((s,c)=>s+c.qty*c.price,0); }
+
+/* ---------- wishlist (localStorage — guest-friendly, no login needed) ----------
+   Feature #2 "Phase 1 — UX" wishlist. A plain array of product ids in
+   localStorage, mirroring the existing cart pattern above, so it works for
+   guests too and needs zero backend changes. */
+const WISHLIST_KEY = "bazarville_wishlist";
+function getWishlist(){ try{ return JSON.parse(localStorage.getItem(WISHLIST_KEY))||[]; }catch(e){ return []; } }
+function setWishlist(ids){
+  try{ localStorage.setItem(WISHLIST_KEY, JSON.stringify(ids)); }catch(e){ /* private browsing etc — wishlist just won't persist */ }
+  renderWishBadge();
+  // keep every heart icon currently on screen (card, product page, quick view) in sync
+  document.querySelectorAll("[data-wish-id]").forEach(btn=>{
+    const id = Number(btn.dataset.wishId);
+    const on = ids.includes(id);
+    btn.classList.toggle("active", on);
+    const icon = btn.querySelector(".wish-icon"); if(icon) icon.textContent = on ? "❤️" : "🤍";
+    const label = btn.querySelector(".wish-label"); if(label) label.textContent = on ? "Wishlisted" : "Add to Wishlist";
+    btn.title = on ? "Remove from wishlist" : "Add to wishlist";
+  });
+}
+function isWishlisted(id){ return getWishlist().includes(id); }
+function toggleWishlist(id){
+  const list = getWishlist();
+  const idx = list.indexOf(id);
+  if(idx>-1) list.splice(idx,1); else list.push(id);
+  setWishlist(list);
+  return list.includes(id);
+}
+function renderWishBadge(){
+  document.querySelectorAll(".navactions").forEach(nav=>{
+    let el = nav.querySelector(".wishbtn");
+    if(!el){
+      el = document.createElement("a");
+      el.href = "wishlist.html"; el.className = "wishbtn"; el.title = "My Wishlist";
+      el.innerHTML = `❤️<span class="wish-count"></span>`;
+      const cartEl = nav.querySelector(".cartbtn");
+      nav.insertBefore(el, cartEl || nav.firstChild);
+    }
+    const count = getWishlist().length;
+    const badge = el.querySelector(".wish-count");
+    badge.textContent = count>0 ? count : "";
+    badge.style.display = count>0 ? "flex" : "none";
+  });
+}
+
+/* ---------- compare (sessionStorage — a "currently comparing" set, not meant
+   to persist across sessions, per the wishlist item's own spec) ---------- */
+const COMPARE_KEY = "bazarville_compare";
+const COMPARE_MAX = 4;
+function getCompare(){ try{ return JSON.parse(sessionStorage.getItem(COMPARE_KEY))||[]; }catch(e){ return []; } }
+function setCompare(ids){
+  try{ sessionStorage.setItem(COMPARE_KEY, JSON.stringify(ids)); }catch(e){ /* private browsing etc */ }
+  renderCompareBar();
+  document.querySelectorAll("[data-cmp-id]").forEach(inp=>{ inp.checked = ids.includes(Number(inp.dataset.cmpId)); });
+}
+function inCompare(id){ return getCompare().includes(id); }
+/** Returns true if the id ended up added/removed as asked; false (and leaves
+ *  the set unchanged) if adding would exceed COMPARE_MAX — the caller can use
+ *  this to revert a checkbox's checked state. */
+function toggleCompare(id){
+  const list = getCompare();
+  const idx = list.indexOf(id);
+  if(idx>-1){ list.splice(idx,1); setCompare(list); return true; }
+  if(list.length >= COMPARE_MAX){ alert(`You can compare up to ${COMPARE_MAX} products at a time.`); return false; }
+  list.push(id);
+  setCompare(list);
+  return true;
+}
+function renderCompareBar(){
+  const ids = getCompare();
+  let bar = document.querySelector("#compareBar");
+  if(ids.length < 2){ if(bar) bar.classList.remove("show"); return; }
+  if(!bar){
+    bar = document.createElement("div");
+    bar.id = "compareBar";
+    bar.className = "compare-bar";
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `<span>${ids.length} product${ids.length>1?'s':''} selected</span>
+    <a class="btn btn-lime btn-sm" href="compare.html?ids=${ids.join(',')}">Compare (${ids.length}) →</a>
+    <button type="button" class="compare-clear" id="compareClearBtn" title="Clear compare">✕</button>`;
+  bar.classList.add("show");
+  bar.querySelector("#compareClearBtn").addEventListener("click", ()=>setCompare([]));
+}
+
+/* ---------- recently viewed (localStorage, capped at 10, most-recent-first) ---------- */
+const RECENTLY_VIEWED_KEY = "bazarville_recently_viewed";
+function pushRecentlyViewed(id){
+  try{
+    let list = JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY))||[];
+    list = list.filter(x=>x!==id);
+    list.unshift(id);
+    list = list.slice(0,10);
+    localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(list));
+  }catch(e){ /* private browsing etc */ }
+}
+function getRecentlyViewed(){ try{ return JSON.parse(localStorage.getItem(RECENTLY_VIEWED_KEY))||[]; }catch(e){ return []; } }
+function initRecentlyViewedSection(){
+  const grid = document.querySelector("#recentlyViewedGrid");
+  const section = document.querySelector("#recentlyViewedSection");
+  if(!grid || !section) return;
+  // On product.html itself, never show the product currently being viewed in its own row.
+  const currentId = Number(new URLSearchParams(location.search).get("id")) || null;
+  const ids = getRecentlyViewed().filter(id=>id!==currentId);
+  const list = ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean).slice(0,8);
+  if(!list.length){ section.style.display = "none"; return; }
+  section.style.display = "";
+  renderGrid("#recentlyViewedGrid", list);
+}
+
+/* ---------- quick view modal (shared rendering, no product.html duplication) ---------- */
+function buildQuickViewModal(){
+  if(document.querySelector("#quickViewModal")) return;
+  const modal = document.createElement("div");
+  modal.id = "quickViewModal";
+  modal.className = "qv-modal";
+  modal.innerHTML = `<div class="qv-backdrop"></div><div class="qv-box" role="dialog" aria-modal="true"><button type="button" class="qv-close" aria-label="Close quick view">✕</button><div class="qv-body"></div></div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".qv-backdrop").addEventListener("click", closeQuickView);
+  modal.querySelector(".qv-close").addEventListener("click", closeQuickView);
+  document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeQuickView(); });
+}
+function closeQuickView(){
+  const modal = document.querySelector("#quickViewModal");
+  if(modal) modal.classList.remove("show");
+  document.body.classList.remove("qv-open");
+}
+function openQuickView(id){
+  const p = PRODUCTS.find(x=>x.id===id);
+  if(!p) return;
+  buildQuickViewModal();
+  const modal = document.querySelector("#quickViewModal");
+  const body = modal.querySelector(".qv-body");
+  const t = tierFor(p, p.moq);
+  const wished = isWishlisted(p.id);
+  body.innerHTML = `
+    <div class="qv-grid">
+      <div class="qv-gallery">
+        <div class="qv-gallery-main"><img id="qvMainImg" src="${p.img[0]}" alt="${p.name}" onerror="imgFallback(this)"></div>
+        <div class="qv-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
+      </div>
+      <div class="qv-info">
+        <span class="pd-cat">${p.profession}</span>
+        <h2>${p.name}</h2>
+        <div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
+        <table class="tier-table">${p.tiers.map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
+        <div class="opt-title">Colour</div>
+        <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
+        ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
+        <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn btn-primary btn-sm" id="qvAddToCart">🛒 Add to Cart</button>
+          <button type="button" class="wish-btn qv-wish ${wished?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
+          <a class="btn btn-outline btn-sm" href="product.html?id=${p.id}">View full details →</a>
+        </div>
+      </div>
+    </div>`;
+  body.querySelectorAll(".qv-thumbs img").forEach(th=>th.addEventListener("click",()=>{
+    body.querySelectorAll(".qv-thumbs img").forEach(x=>x.classList.remove("active"));
+    th.classList.add("active"); body.querySelector("#qvMainImg").src = th.dataset.src;
+  }));
+  body.querySelectorAll("#qvSwatches .swatch").forEach(s=>s.addEventListener("click",()=>{
+    body.querySelectorAll("#qvSwatches .swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+  }));
+  body.querySelectorAll("#qvSizes .sizebtn").forEach(s=>s.addEventListener("click",()=>{
+    body.querySelectorAll("#qvSizes .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+  }));
+  body.querySelector("#qvAddToCart").addEventListener("click", ()=>{
+    const colorEl = body.querySelector("#qvSwatches .swatch.active");
+    const sizeEl = body.querySelector("#qvSizes .sizebtn.active");
+    const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)]||"") : "";
+    addToCart({ productId:p.id, name:p.name, img:p.img[0], qty:p.moq, price:t.price, color:colorVal, size: sizeEl?sizeEl.textContent:"", printOption:"" });
+    const btn = body.querySelector("#qvAddToCart");
+    btn.textContent = "✓ Added"; setTimeout(()=>{ if(document.body.contains(btn)) btn.textContent = "🛒 Add to Cart"; }, 1600);
+  });
+  modal.classList.add("show");
+  document.body.classList.add("qv-open");
+}
+
+/* ---------- mobile nav (hamburger slide-out drawer) ----------
+   Built once via JS so every page (whose header markup is identical) gets it
+   with no per-page HTML edits — replaces the old bare .links toggle. */
+function initMobileNav(){
+  const menuBtn = document.querySelector(".menu-btn");
+  if(!menuBtn || document.querySelector("#mobileNavDrawer")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "mobileNavOverlay"; overlay.className = "mnav-overlay";
+  const drawer = document.createElement("nav");
+  drawer.id = "mobileNavDrawer"; drawer.className = "mnav-drawer";
+  drawer.innerHTML = `
+    <div class="mnav-head"><a class="brand" href="index.html"><img src="assets/logo.png" alt="Bazarville"><b>Bazarville</b></a><button type="button" class="mnav-close" aria-label="Close menu">✕</button></div>
+    <div class="mnav-links">
+      <a href="products.html">Shop Products</a>
+      <a href="galaxy.html">Shop by Profession</a>
+      <a href="products.html?purpose=Corporate%20Events">Shop by Purpose</a>
+      <a href="index.html#collections">Collections</a>
+      <a href="index.html#footer">Contact</a>
+    </div>
+    <div class="mnav-icons">
+      <a href="wishlist.html">❤️ My Wishlist</a>
+      <a href="cart.html">🛒 Cart</a>
+      <a href="account.html">👤 My Account</a>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.appendChild(drawer);
+  function closeDrawer(){ drawer.classList.remove("open"); overlay.classList.remove("show"); document.body.classList.remove("mnav-lock"); }
+  function openDrawer(){ drawer.classList.add("open"); overlay.classList.add("show"); document.body.classList.add("mnav-lock"); }
+  overlay.addEventListener("click", closeDrawer);
+  drawer.querySelector(".mnav-close").addEventListener("click", closeDrawer);
+  drawer.querySelectorAll("a").forEach(a=>a.addEventListener("click", closeDrawer));
+  document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeDrawer(); });
+  menuBtn.addEventListener("click", ()=> drawer.classList.contains("open") ? closeDrawer() : openDrawer());
+}
+
+/* ---------- wishlist page (wishlist.html) ---------- */
+function initWishlistPage(){
+  const grid = document.querySelector("#wishlistGrid");
+  if(!grid) return;
+  function render(){
+    const ids = getWishlist();
+    const list = ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+    const countEl = document.querySelector("#wishlistCount");
+    if(countEl) countEl.textContent = list.length + (list.length===1? " product" : " products");
+    const emptyEl = document.querySelector("#wishlistEmpty");
+    if(emptyEl) emptyEl.style.display = list.length ? "none" : "block";
+    grid.style.display = list.length ? "" : "none";
+    renderGrid("#wishlistGrid", list);
+  }
+  render();
+  grid.addEventListener("click", (e)=>{ if(e.target.closest("[data-wish-id]")) render(); });
+}
+
+/* ---------- compare page (compare.html) ---------- */
+function initComparePage(){
+  const root = document.querySelector("#compareRoot");
+  if(!root) return;
+  const params = new URLSearchParams(location.search);
+  let ids = (params.get("ids")||"").split(",").map(Number).filter(Boolean);
+  if(!ids.length) ids = getCompare();
+  const list = ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean).slice(0,COMPARE_MAX);
+  if(!list.length){
+    root.innerHTML = `<div class="empty-cart"><p>No products selected to compare yet — add 2–4 from the catalogue using their "Compare" checkbox.</p><a class="btn btn-lime" href="products.html">Browse Catalogue</a></div>`;
+    return;
+  }
+  const rows = [
+    {label:"", render:p=>`<img src="${p.img[0]}" alt="${p.name}" style="width:90px;height:90px;object-fit:contain;border-radius:10px;background:var(--soft)" onerror="imgFallback(this)">`},
+    {label:"Product", render:p=>`<a href="product.html?id=${p.id}"><b>${p.name}</b></a>`},
+    {label:"Price", render:p=>money(tierFor(p,p.moq).price)+" / pc"},
+    {label:"MOQ", render:p=>p.moq+" pcs"},
+    {label:"Material / Brand", render:p=>p.brand||"—"},
+    {label:"Customization", render:p=>(p.printOptions&&p.printOptions.length)? p.printOptions.join(", ") : "Logo / Branding available"},
+    {label:"Colours", render:p=>`<div class="swatches">${p.colors.map(c=>`<span class="swatch" style="background:${c}"></span>`).join("")}</div>`},
+    {label:"Stock", render:p=>p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'},
+    {label:"", render:p=>`<button type="button" class="btn btn-outline btn-sm cmp-remove" data-remove-id="${p.id}">Remove</button>`}
+  ];
+  root.innerHTML = `<div class="ad-table-wrap compare-table-wrap"><table class="ad-table compare-table">
+      ${rows.map(r=>`<tr><th>${r.label}</th>${list.map(p=>`<td>${r.render(p)}</td>`).join("")}</tr>`).join("")}
+    </table></div>
+    <button type="button" class="btn btn-outline btn-sm" id="compareClearAll" style="margin-top:20px">Clear all</button>`;
+  root.querySelectorAll(".cmp-remove").forEach(btn=>btn.addEventListener("click", ()=>{
+    const id = Number(btn.dataset.removeId);
+    const newIds = getCompare().filter(x=>x!==id);
+    setCompare(newIds);
+    location.href = "compare.html" + (newIds.length? "?ids="+newIds.join(","):"");
+  }));
+  const clearBtn = root.querySelector("#compareClearAll");
+  if(clearBtn) clearBtn.addEventListener("click", ()=>{ setCompare([]); location.href = "compare.html"; });
+}
+
 function renderCartBadge(){
   document.querySelectorAll(".navactions").forEach(nav=>{
     let cartEl = nav.querySelector(".cartbtn");
@@ -562,7 +877,10 @@ function initCartPage(){
         </div>`).join("")}</div>
       <div class="cart-summary">
         <div class="cart-total-row"><span>Subtotal (${cartCount()} pcs)</span><b>${money(cartSubtotal())}</b></div>
-        <p class="ad-hint">Final pricing may adjust to quantity-tier rates at checkout.</p>
+        <div class="cart-total-row sub"><span>GST (18%) — estimated</span><span>${money(Math.round(cartSubtotal()*0.18))}</span></div>
+        <div class="cart-total-row sub"><span>Shipping</span><span>Calculated at enquiry</span></div>
+        <div class="cart-total-row grand"><span>Estimated Total</span><b>${money(Math.round(cartSubtotal()*1.18))}</b></div>
+        <p class="ad-hint">GST and shipping shown above are estimates only, not a final/legal figure — exact totals are confirmed over WhatsApp/checkout. Final pricing may also adjust to quantity-tier rates at checkout.</p>
         <a class="btn btn-lime" style="width:100%" href="checkout.html">Proceed to Checkout →</a>
       </div>`;
     el.querySelectorAll("[data-act='minus']").forEach(b=>b.addEventListener("click",()=>{ const i=+b.dataset.i; updateCartQty(i, getCart()[i].qty-1); render(); }));
@@ -776,6 +1094,7 @@ function initProductPage(){
   const id = Number(new URLSearchParams(location.search).get("id")) || PRODUCTS[0].id;
   const p = PRODUCTS.find(x=>x.id===id) || PRODUCTS[0];
   applyProductSeo(p);
+  pushRecentlyViewed(p.id);
 
   el.innerHTML = `
     <div class="pd-layout">
@@ -801,10 +1120,12 @@ function initProductPage(){
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
+        <input type="range" id="qtySlider" class="qty-slider" min="${p.moq}" max="${Math.max(p.tiers[p.tiers.length-1].min*2, p.moq*10)}" step="1" value="${p.moq}" aria-label="Quantity slider">
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
-        <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap">
+        <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
           <button id="addToCartBtn" class="btn btn-primary" type="button">🛒 Add to Cart</button>
+          <button type="button" class="wish-btn pd-wish ${isWishlisted(p.id)?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${isWishlisted(p.id)?'❤️':'🤍'}</span><span class="wish-label">${isWishlisted(p.id)?'Wishlisted':'Add to Wishlist'}</span></button>
           <a id="waBtn" class="btn btn-wa" target="_blank" href="#">🟢 Send WhatsApp Enquiry</a>
         </div>
         <p class="ad-hint" id="cartAddedMsg" style="display:none;color:#5b8a00;font-weight:700">✓ Added to cart</p>
@@ -820,7 +1141,11 @@ function initProductPage(){
     <div class="pd-related" id="relatedSection" style="display:none">
       <div class="pd-related-head"><h2>You may also like</h2><p>Matched by profession, purpose or occasion.</p></div>
       <div class="grid4" id="relatedGrid"></div>
-    </div>`;
+    </div>
+    <section class="pd-related" id="recentlyViewedSection" style="display:none">
+      <div class="pd-related-head"><h2>Recently Viewed</h2><p>Pick up where you left off.</p></div>
+      <div class="grid4" id="recentlyViewedGrid"></div>
+    </section>`;
 
   document.querySelectorAll(".pd-thumbs img").forEach(t=>t.addEventListener("click",()=>{
     document.querySelectorAll(".pd-thumbs img").forEach(x=>x.classList.remove("active"));
@@ -837,9 +1162,16 @@ function initProductPage(){
   }));
 
   const qtyInput = document.querySelector("#qtyInput");
-  function recalc(){
+  const qtySlider = document.querySelector("#qtySlider");
+  function recalc(source){
     let qty = Math.max(1, Number(qtyInput.value)||1);
     qtyInput.value = qty;
+    // keep the slider in sync both ways — clamp to its range so an out-of-range
+    // typed/stepped value doesn't throw the slider's thumb off its track.
+    if(qtySlider && source !== "slider"){
+      const max = Number(qtySlider.max)||qty;
+      qtySlider.value = Math.min(Math.max(qty, Number(qtySlider.min)||1), max);
+    }
     const t = tierFor(p, qty);
     document.querySelector("#livePrice").innerHTML = `${money(t.price)} <span>/ piece</span>`;
     document.querySelector("#liveCalc").innerHTML = `${qty} pcs × ${money(t.price)} = <b>${money(qty*t.price)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
@@ -857,7 +1189,8 @@ function initProductPage(){
   }
   document.querySelector("#qMinus").addEventListener("click",()=>{ qtyInput.value = Math.max(1,(Number(qtyInput.value)||1)-5); recalc(); });
   document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+5; recalc(); });
-  qtyInput.addEventListener("input", recalc);
+  qtyInput.addEventListener("input", ()=>recalc());
+  if(qtySlider) qtySlider.addEventListener("input", ()=>{ qtyInput.value = qtySlider.value; recalc("slider"); });
   recalc();
 
   document.querySelector("#addToCartBtn").addEventListener("click", ()=>{
@@ -1289,13 +1622,6 @@ function getTiltMult(){
 document.addEventListener("DOMContentLoaded", async ()=>{
   document.querySelectorAll(".ticker").forEach(t=>{ if(!t.dataset.doubled){ t.innerHTML += t.innerHTML; t.dataset.doubled = "1"; } });
 
-  const menuBtn = document.querySelector(".menu-btn");
-  const links = document.querySelector(".links");
-  if(menuBtn && links) menuBtn.addEventListener("click", ()=>{
-    const open = links.style.display === "flex";
-    links.style.cssText = open ? "" : "display:flex;flex-direction:column;position:absolute;top:82px;left:0;right:0;background:var(--surface);padding:18px 6%;gap:16px;border-bottom:1px solid var(--line);box-shadow:0 14px 24px rgba(0,0,0,.08);z-index:59";
-  });
-
   // Load the live catalogue from Supabase. If it's not configured yet (fresh
   // clone of this project) or the network call fails, fall back to the
   // built-in demo data so the site never shows up blank.
@@ -1321,10 +1647,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // run every init in its own try/catch too, so one page's issue can never cascade
   // and silently break unrelated features (reveal, menu) on the same page.
   renderCartBadge();
+  renderWishBadge();
+  renderCompareBar();
   const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters,
-    initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch];
+    initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
+    initMobileNav, initWishlistPage, initComparePage, initRecentlyViewedSection];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });
 
   // fire-and-forget enquiry logging — never blocks the WhatsApp redirect itself
@@ -1339,6 +1668,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const nameMatch = text.match(/\*(.+?)\*/);
       if(refMatch) BazDS.logEnquiry({ ref:refMatch[1], productName:nameMatch?nameMatch[1]:"", quantity:qtyMatch?Number(qtyMatch[1]):null });
     }catch(err){ /* non-fatal — logging must never break the enquiry link itself */ }
+  });
+
+  // Quick View + wishlist heart delegation — works for cards rendered/re-rendered
+  // anywhere on the page (grids, quick view modal itself, product page).
+  document.addEventListener("click", (e)=>{
+    const wishBtn = e.target.closest(".wish-btn");
+    if(wishBtn){ e.preventDefault(); toggleWishlist(Number(wishBtn.dataset.wishId)); return; }
+    const qvBtn = e.target.closest(".qv-btn");
+    if(qvBtn){ e.preventDefault(); openQuickView(Number(qvBtn.dataset.qvId)); return; }
+  });
+  // Compare checkbox delegation — revert the checkbox if the COMPARE_MAX cap blocked it.
+  document.addEventListener("change", (e)=>{
+    const cmp = e.target.closest("[data-cmp-id]");
+    if(!cmp) return;
+    const id = Number(cmp.dataset.cmpId);
+    const ok = toggleCompare(id);
+    if(!ok) cmp.checked = inCompare(id);
   });
 
   const searchForm = document.querySelector("#heroSearch");
