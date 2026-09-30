@@ -115,8 +115,55 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   });
 
   /* ---------- dashboard ---------- */
+  // One-line, rule-based insight for the top of the dashboard — plain JS
+  // logic over the already-loaded PRODUCTS/allOrdersCache/allEnquiriesCache
+  // arrays, no AI call and no extra Supabase query. Prefers a week-over-week
+  // orders trend when there's enough order history to make that meaningful;
+  // otherwise falls back to whichever of "pending enquiries" / "most
+  // in-demand profession" is actually computable from the data in memory.
+  function computeDashboardInsight(){
+    const oneDay = 24*60*60*1000;
+    const now = Date.now();
+    const thisWeekStart = now - 7*oneDay;
+    const prevWeekStart = now - 14*oneDay;
+    const timeOf = o => new Date(o.created_at).getTime();
+    const thisWeekOrders = allOrdersCache.filter(o=>o.created_at && timeOf(o) >= thisWeekStart);
+    const prevWeekOrders = allOrdersCache.filter(o=>o.created_at && timeOf(o) >= prevWeekStart && timeOf(o) < thisWeekStart);
+
+    // Only trust a week-over-week comparison once there's a reasonable spread
+    // of order history to compare — otherwise a single day's orders (or all
+    // orders sharing one timestamp, as in a fresh demo dataset) would produce
+    // a misleading "up/down" swing.
+    if(prevWeekOrders.length >= 2 && (thisWeekOrders.length + prevWeekOrders.length) >= 4){
+      const diff = thisWeekOrders.length - prevWeekOrders.length;
+      const pct = Math.round(Math.abs(diff)/prevWeekOrders.length*100);
+      if(diff > 0) return `📈 Orders are up ${pct}% this week — ${thisWeekOrders.length} vs ${prevWeekOrders.length} last week.`;
+      if(diff < 0) return `📉 Orders are down ${pct}% this week — ${thisWeekOrders.length} vs ${prevWeekOrders.length} last week.`;
+      return `➡️ Orders are about the same this week as last week (${thisWeekOrders.length}).`;
+    }
+
+    const pendingEnquiries = allEnquiriesCache.filter(e=>(e.status||"new")==="new").length;
+    if(pendingEnquiries > 0){
+      return `📬 ${pendingEnquiries} enquir${pendingEnquiries===1?'y is':'ies are'} still pending a reply.`;
+    }
+
+    const profCounts = {};
+    PRODUCTS.filter(p=>(p.status||"published")==="published").forEach(p=>{
+      const k = p.profession || "Unspecified";
+      profCounts[k] = (profCounts[k]||0) + 1;
+    });
+    const ranked = Object.entries(profCounts).sort((a,b)=>b[1]-a[1]);
+    if(ranked.length){
+      const [name,count] = ranked[0];
+      return `🏷️ Most in-demand profession: ${name} (${count} product${count===1?'':'s'}).`;
+    }
+    return `👋 Add your first product to start seeing catalogue insights here.`;
+  }
+
   function renderDashboard(){
     const el = document.querySelector("#adStats"); if(!el) return;
+    const insightEl = document.querySelector("#adInsight");
+    if(insightEl) insightEl.innerHTML = `<div class="ad-insight-strip">${computeDashboardInsight()}</div>`;
     const out = PRODUCTS.filter(p=>!p.stock).length;
     const drafts = PRODUCTS.filter(p=>(p.status||"published")==="draft").length;
     const published = PRODUCTS.length - drafts;
