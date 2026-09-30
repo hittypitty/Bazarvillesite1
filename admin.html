@@ -55,6 +55,7 @@
     <section class="ad-view" id="view-dashboard">
       <div class="ad-header"><h1>Dashboard</h1><p>Quick overview of your catalogue.</p></div>
       <div class="ad-stats" id="adStats"></div>
+      <div id="adBreakdown"></div>
       <div class="ad-panel">
         <h3>What you can manage here</h3>
         <ul class="ad-checklist">
@@ -73,10 +74,12 @@
     <section class="ad-view" id="view-products" style="display:none">
       <div class="ad-header"><h1>Products</h1><p>Everything shown in the public catalogue.</p>
         <div style="display:flex;gap:10px">
+          <button class="btn btn-outline" id="recheckImagesBtn" title="Diagnostic only — does not change any saved data">🔍 Recheck image links</button>
           <button class="btn btn-outline" id="bulkUploadBtn">⬆ Bulk Upload (CSV)</button>
           <button class="btn btn-primary" id="addProductBtn">+ Add Product</button>
         </div>
       </div>
+      <div id="imageCheckResults"></div>
       <div class="ad-table-wrap">
         <table class="ad-table" id="productsTable"></table>
       </div>
@@ -195,6 +198,7 @@
     <div class="ad-modal-head"><h2>Bulk Upload Products (CSV)</h2><span class="ad-modal-close" id="closeBulkModal">✕</span></div>
     <div class="ad-modal-body">
       <p class="ad-hint">Upload a CSV to add or update many products at once. Rows with an existing product name are updated in place; new names create new products. <a href="#" id="bulkTemplateLink">Download a starter template</a> to see the exact column format.</p>
+      <p class="ad-hint">Note: the <code>images</code> column is only used when creating a brand-new product; updating an existing product (matched by name) never changes its photos via CSV — edit photos from that product's own Edit screen.</p>
       <input type="file" id="bulkFileInput" accept=".csv">
       <div id="bulkResults" style="margin-top:16px"></div>
     </div>
