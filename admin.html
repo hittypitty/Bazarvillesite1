@@ -36,7 +36,9 @@
       <a href="#dashboard" data-view="dashboard" class="active">📊 Dashboard</a>
       <a href="#products" data-view="products">📦 Products</a>
       <a href="#collections" data-view="collections">🗂️ Collections</a>
-      <a href="#enquiries" data-view="enquiries">💬 Enquiries</a>
+      <a href="#enquiries" data-view="enquiries">💬 Enquiries / CRM</a>
+      <a href="#orders" data-view="orders">📦 Orders</a>
+      <a href="#quotes" data-view="quotes">📝 Quotes</a>
       <a href="#settings" data-view="settings" class="ad-super-only">⚙️ Site Settings</a>
       <a href="#roles" data-view="roles" class="ad-super-only">👥 Users &amp; Roles</a>
       <a href="dashboard.html" target="_blank">📈 Enquiry Reports ↗</a>
@@ -90,18 +92,42 @@
 
     <!-- Enquiries -->
     <section class="ad-view" id="view-enquiries" style="display:none">
-      <div class="ad-header"><h1>Enquiries</h1><p>Every WhatsApp enquiry raised from the live site — track follow-ups here.</p></div>
+      <div class="ad-header"><h1>Enquiries / CRM</h1><p>Every WhatsApp enquiry raised from the live site, plus leads you add manually — track the full pipeline here.</p>
+        <button class="btn btn-primary" id="addLeadBtn">+ Add Lead</button>
+      </div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">
         <select id="enqStatusFilter">
           <option value="all">All statuses</option>
           <option value="new">New</option>
           <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="quoted">Quoted</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
           <option value="closed">Closed</option>
         </select>
         <button class="btn btn-outline btn-sm" id="enqExportBtn" type="button">⬇ Export CSV</button>
       </div>
       <div class="ad-table-wrap">
         <table class="ad-table" id="enquiriesTable"></table>
+      </div>
+    </section>
+
+    <!-- Orders -->
+    <section class="ad-view" id="view-orders" style="display:none">
+      <div class="ad-header"><h1>Orders</h1><p>Orders placed via the live-site cart &amp; checkout (Cash on Delivery / Bank Transfer — no payment gateway yet).</p></div>
+      <div class="ad-table-wrap">
+        <table class="ad-table" id="ordersTable"></table>
+      </div>
+    </section>
+
+    <!-- Quotes -->
+    <section class="ad-view" id="view-quotes" style="display:none">
+      <div class="ad-header"><h1>Quotes</h1><p>Build a shareable price quote for a customer — they view and accept it at a public link.</p>
+        <button class="btn btn-primary" id="addQuoteBtn">+ New Quote</button>
+      </div>
+      <div class="ad-table-wrap">
+        <table class="ad-table" id="quotesTable"></table>
       </div>
     </section>
 
@@ -199,6 +225,47 @@
     <div class="ad-modal-foot">
       <button class="btn btn-outline btn-sm" id="cancelCollectionBtn">Cancel</button>
       <button class="btn btn-primary btn-sm" id="saveCollectionBtn">Save Collection</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ADD LEAD MODAL ===================== -->
+<div class="ad-modal-backdrop" id="leadModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2>Add Lead</h2><span class="ad-modal-close" id="closeLeadModal">✕</span></div>
+    <div class="ad-modal-body">
+      <div class="ad-field"><label>Product / interest</label><input id="lf_product" placeholder="e.g. Steel Water Bottle 750ml"></div>
+      <div class="ad-field"><label>Company / contact name</label><input id="lf_company" placeholder="e.g. Acme Pvt Ltd — Rakesh"></div>
+      <div class="ad-field"><label>Quantity</label><input id="lf_qty" type="number" placeholder="e.g. 100"></div>
+      <div class="ad-field full"><label>Notes</label><input id="lf_notes" placeholder="How this lead came in — call, walk-in, referral, etc."></div>
+    </div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelLeadBtn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveLeadBtn">Add Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ORDER DETAIL MODAL ===================== -->
+<div class="ad-modal-backdrop" id="orderModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2>Order Detail</h2><span class="ad-modal-close" id="closeOrderModal">✕</span></div>
+    <div class="ad-modal-body" id="orderModalBody"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelOrderBtn">Close</button>
+      <button class="btn btn-primary btn-sm" id="saveOrderBtn">Save Status</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== QUOTE BUILDER MODAL ===================== -->
+<div class="ad-modal-backdrop" id="quoteModalBackdrop">
+  <div class="ad-modal ad-modal-lg">
+    <div class="ad-modal-head"><h2>New Quote</h2><span class="ad-modal-close" id="closeQuoteModal">✕</span></div>
+    <div class="ad-modal-body" id="quoteForm"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelQuoteBtn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveQuoteBtn">Create Quote</button>
     </div>
   </div>
 </div>
