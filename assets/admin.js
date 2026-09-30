@@ -25,6 +25,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     {id:"subtle", label:"Subtle (Default)", desc:"Gentle hover-tilt and fade-in, as originally designed."},
     {id:"full",   label:"Full 3D",          desc:"Deeper hover-tilt, plus an idle 3D floating effect on product cards."}
   ];
+  // Same timing trap as the presets above: renderDashboard() (below) reads
+  // the orders/quotes/enquiries caches, and showShell() can call it before
+  // the `let` declarations that used to live further down this file would
+  // otherwise have run yet — so they're declared here, up front, instead.
+  let allOrdersCache = [];
+  let allQuotesCache = [];
+  let allEnquiriesCache = [];
 
   /* ---------- real Supabase Auth ---------- */
   const loginBtn = document.querySelector("#loginBtn");
@@ -73,6 +80,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     PRODUCTS = await BazDS.getProducts();
     COLLECTIONS = await BazDS.getCollections();
     SETTINGS = await BazDS.getSettings();
+    // Same BazDS calls already used by the Orders/Quotes/Enquiries views
+    // (renderOrdersTable/renderQuotesTable/renderEnquiriesTable) — reused here
+    // (not a new query) so the dashboard's counts are correct as soon as it
+    // opens, not just after the admin has visited those tabs once.
+    try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); allOrdersCache = []; }
+    try{ allQuotesCache = await BazDS.getQuotes(); }catch(err){ console.error(err); allQuotesCache = []; }
+    try{ allEnquiriesCache = await BazDS.getEnquiries(); }catch(err){ console.error(err); allEnquiriesCache = []; }
 
     renderDashboard();
     renderProductsTable();
@@ -104,11 +118,48 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function renderDashboard(){
     const el = document.querySelector("#adStats"); if(!el) return;
     const out = PRODUCTS.filter(p=>!p.stock).length;
+    const drafts = PRODUCTS.filter(p=>(p.status||"published")==="draft").length;
+    const published = PRODUCTS.length - drafts;
     el.innerHTML = `
-      <div class="ad-stat"><b>${PRODUCTS.length}</b><span>Total products</span></div>
+      <div class="ad-stat"><b>${PRODUCTS.length}</b><span>Total products (${published} published, ${drafts} draft)</span></div>
       <div class="ad-stat"><b>${out}</b><span>Out of stock</span></div>
-      <div class="ad-stat"><b>${COLLECTIONS.length}</b><span>Featured collections</span></div>
-      <div class="ad-stat"><b>${new Set(PRODUCTS.map(p=>p.cat)).size}</b><span>Categories in use</span></div>`;
+      <div class="ad-stat"><b>${allOrdersCache.length}</b><span><a href="#orders" onclick="event.stopPropagation()">Total orders</a></span></div>
+      <div class="ad-stat"><b>${allQuotesCache.length}</b><span><a href="#quotes" onclick="event.stopPropagation()">Total quotes</a></span></div>`;
+
+    const breakdownEl = document.querySelector("#adBreakdown");
+    if(breakdownEl){
+      const orderStatusCounts = {};
+      allOrdersCache.forEach(o=>{ const s = o.status||"pending"; orderStatusCounts[s] = (orderStatusCounts[s]||0)+1; });
+      const orderBreakdownHtml = Object.keys(orderStatusCounts).length
+        ? Object.entries(orderStatusCounts).map(([s,n])=>`<span class="ad-badge ${s==='delivered'?'in':(s==='cancelled'?'out':'in')}" style="margin:0 6px 6px 0">${s}: ${n}</span>`).join("")
+        : `<span class="ad-hint" style="margin:0">No orders yet.</span>`;
+
+      const recentEnquiries = allEnquiriesCache.slice(0,5);
+      const recentEnquiriesHtml = recentEnquiries.length
+        ? `<ul class="ad-checklist">${recentEnquiries.map(e=>`<li>${e.company_name||e.ref||"—"} — ${e.product_name||"General enquiry"} <span class="ad-badge in" style="margin-left:6px">${e.status||"new"}</span></li>`).join("")}</ul>`
+        : `<p class="ad-hint">No enquiries yet.</p>`;
+
+      const recentOrders = allOrdersCache.slice(0,5);
+      const recentOrdersHtml = recentOrders.length
+        ? `<ul class="ad-checklist">${recentOrders.map(o=>`<li><b>${o.ref}</b> — ${o.customer_name||"—"} <span class="ad-badge in" style="margin-left:6px">${o.status||"pending"}</span></li>`).join("")}</ul>`
+        : `<p class="ad-hint">No orders yet.</p>`;
+
+      breakdownEl.innerHTML = `
+        <div class="ad-dash-grid">
+          <div class="ad-panel">
+            <h3>Orders by status</h3>
+            <div>${orderBreakdownHtml}</div>
+          </div>
+          <div class="ad-panel">
+            <h3>Recent enquiries <a href="#enquiries" class="btn btn-outline btn-sm" style="float:right">View all</a></h3>
+            ${recentEnquiriesHtml}
+          </div>
+          <div class="ad-panel">
+            <h3>Recent orders <a href="#orders" class="btn btn-outline btn-sm" style="float:right">View all</a></h3>
+            ${recentOrdersHtml}
+          </div>
+        </div>`;
+    }
   }
 
   function busy(btn, isBusy, labelWhenBusy){
@@ -349,7 +400,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       + `<div class="ad-img-add" id="pf_addImgBtn">+</div>`;
     document.querySelector("#pf_addImgBtn").addEventListener("click", ()=>document.querySelector("#pf_imgInput").click());
   }
-  AdminUI.removeImg = (i)=>{ productImages.splice(i,1); renderImgGrid(); };
+  AdminUI.removeImg = (i)=>{
+    if(!confirm("Remove this photo from the product? This can't be undone unless you re-add the image link/file, and it won't take effect until you click Save.")) return;
+    productImages.splice(i,1); renderImgGrid();
+  };
 
   function openProductModal(p){
     editingProductId = p ? p.id : null;
@@ -792,7 +846,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
 
   /* ================= ENQUIRIES (mini-CRM: status + notes + follow-up) ================= */
-  let allEnquiriesCache = [];
 
   function enqRowHtml(e){
     return `
@@ -911,7 +964,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   /* ================= ORDERS ================= */
   const ORDER_STATUSES = ["pending","confirmed","dispatched","delivered","cancelled"];
-  let allOrdersCache = [];
   let editingOrderId = null;
 
   function orderRowHtml(o){
@@ -974,7 +1026,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   });
 
   /* ================= QUOTES (CPQ) ================= */
-  let allQuotesCache = [];
   let quoteLineItems = [];
 
   function quoteRowHtml(q){
@@ -1129,7 +1180,11 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
     const errors = rows.map((r,i)=>{
       const problems = [];
       if(!r.name) problems.push("missing name");
-      if(!r.images) problems.push("missing images");
+      // Images are only required for brand-new products (no existing match by
+      // name). Updating an existing product via CSV never touches its photos,
+      // so a missing/blank images column there is fine — see runBulkUpload().
+      const isExisting = r.name && PRODUCTS.some(p=>p.name.toLowerCase()===r.name.toLowerCase());
+      if(!isExisting && !r.images) problems.push("missing images (required for new products only)");
       if(!r.professions) problems.push("missing professions");
       return {i, problems};
     }).filter(r=>r.problems.length);
@@ -1149,11 +1204,14 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
     runBtn.disabled = true; runBtn.textContent = "Uploading…";
     let ok = 0, fail = 0; const failMsgs = [];
     for(const r of rows){
-      if(!r.name || !r.images || !r.professions) continue;
+      const existing = r.name ? PRODUCTS.find(p=>p.name.toLowerCase()===r.name.toLowerCase()) : null;
+      // Images are required only when creating a brand-new product — an
+      // existing product's photos are never touched by CSV (see below), so a
+      // missing images column must not skip an otherwise-valid update row.
+      if(!r.name || !r.professions || (!existing && !r.images)) continue;
       const tiers = (r.price_tiers||"").split("|").filter(Boolean).map(t=>{
         const [min,price] = t.split(":"); return {min:Number(min)||1, price:Number(price)||0};
       });
-      const existing = PRODUCTS.find(p=>p.name.toLowerCase()===r.name.toLowerCase());
       const data = {
         id: existing ? existing.id : undefined,
         name: r.name,
@@ -1170,7 +1228,13 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
         colors: (r.colors||"#1a1a1a").split("|").map(s=>s.trim()).filter(Boolean),
         sizes: (r.sizes||"Standard").split("|").map(s=>s.trim()).filter(Boolean),
         tiers: tiers.length ? tiers : [{min:Number(r.moq)||1, price:0}],
-        img: r.images.split("|").map(s=>s.trim()).filter(Boolean)
+        // IMPORTANT (client requirement): bulk CSV must never be able to wipe
+        // out a real product's photos. When updating an EXISTING product we
+        // always keep its current images no matter what the CSV's `images`
+        // column says (stale/placeholder/blank values are common on re-upload
+        // for something like a price change). Only a brand-new product (no
+        // existing match by name) takes its images from the CSV.
+        img: existing ? existing.img : r.images.split("|").map(s=>s.trim()).filter(Boolean)
       };
       try{
         const saved = await BazDS.upsertProduct(data);
@@ -1184,6 +1248,52 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
     el.innerHTML = `<p class="ad-hint"><b>${ok}</b> product(s) saved.${fail?` <b style="color:#c0392b">${fail} failed</b>: ${failMsgs.join("; ")}`:""}</p>`;
     bulkParsedRows = [];
   }
+
+  /* ---------- Recheck image links (read-only diagnostic) ----------
+     Goes through every current product's images and tries loading each one
+     right now, reusing the same resolveWorkingImageUrl()/testImageLoads()
+     logic used when a photo is pasted in. This NEVER writes anything back to
+     a product or to Supabase — it's purely a report so the admin can catch a
+     stale link (e.g. an expired Dropbox ?st= token) and fix it proactively
+     via the normal Edit-product flow. */
+  const recheckImagesBtn = document.querySelector("#recheckImagesBtn");
+  if(recheckImagesBtn) recheckImagesBtn.addEventListener("click", async ()=>{
+    const resultsEl = document.querySelector("#imageCheckResults");
+    busy(recheckImagesBtn, true, "Checking…");
+    if(resultsEl) resultsEl.innerHTML = `<p class="ad-hint">Checking ${PRODUCTS.length} product(s)' image links — this only reads, nothing is changed…</p>`;
+    const broken = [];
+    let checked = 0;
+    for(const p of PRODUCTS){
+      const imgs = p.img || [];
+      const badForThisProduct = [];
+      for(const url of imgs){
+        if(!url) continue;
+        const working = await resolveWorkingImageUrl(url);
+        if(!working) badForThisProduct.push(url);
+      }
+      checked++;
+      if(badForThisProduct.length) broken.push({product: p, urls: badForThisProduct});
+    }
+    busy(recheckImagesBtn, false);
+    if(!resultsEl){
+      alert(broken.length
+        ? `${broken.length} product(s) have a broken image link:\n` + broken.map(b=>`- ${b.product.name}`).join("\n")
+        : `All ${checked} product(s) checked — every image link loaded fine right now.`);
+      return;
+    }
+    if(!broken.length){
+      resultsEl.innerHTML = `<p class="ad-hint" style="color:#1a7a1a">✅ Checked ${checked} product(s) — every image link loaded fine right now.</p>`;
+      return;
+    }
+    resultsEl.innerHTML = `
+      <div class="ad-panel" style="border-color:#f3c6c6;margin-bottom:16px">
+        <h3 style="color:#c0392b">⚠ ${broken.length} of ${checked} product(s) have a broken/unreachable image link right now</h3>
+        <p class="ad-hint">Nothing has been changed — this is a diagnostic only. Fix these from each product's own Edit screen.</p>
+        <ul class="ad-checklist">
+          ${broken.map(b=>`<li><b>${b.product.name}</b> — ${b.urls.length} broken link(s): ${b.urls.map(u=>`<code style="word-break:break-all">${u}</code>`).join(", ")} <button class="ad-icon-btn" title="Edit product" onclick="AdminUI.editProduct(${b.product.id})">✏️</button></li>`).join("")}
+        </ul>
+      </div>`;
+  });
 
   const bulkFileInput = document.querySelector("#bulkFileInput");
   if(bulkFileInput) bulkFileInput.addEventListener("change", (e)=>{
