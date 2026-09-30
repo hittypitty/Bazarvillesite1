@@ -170,12 +170,37 @@ function tierFor(p, qty){
 }
 function ref(){ return "BZV-" + Math.random().toString(36).slice(2,6).toUpperCase() + Date.now().toString().slice(-4); }
 
+/* ---------- broken image fallback ----------
+   If a product's image link ever goes stale (expired Dropbox token, deleted
+   file, etc.) a plain <img> just shows a blank/broken gap that's easy for a
+   site visitor to miss. This swaps a failed image for a neutral inline-SVG
+   "photo unavailable" placeholder so the gap is immediately visible instead
+   of silently invisible — read-only, it never touches any stored data. */
+const IMG_FALLBACK_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+    <rect width="400" height="400" fill="#f1f1ee"/>
+    <g fill="none" stroke="#c7c7bd" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="70" y="110" width="260" height="190" rx="14"/>
+      <circle cx="150" cy="170" r="22"/>
+      <path d="M70 265l70-70 55 55 45-40 90 85"/>
+    </g>
+    <text x="200" y="335" font-family="Arial, sans-serif" font-size="20" fill="#9a9a90" text-anchor="middle">Photo unavailable</text>
+  </svg>`
+);
+function imgFallback(el){
+  if(!el || el.src === IMG_FALLBACK_SVG) return;
+  el.src = IMG_FALLBACK_SVG;
+  el.classList.add("img-fallback");
+  el.alt = "Photo unavailable";
+}
+window.imgFallback = imgFallback;
+
 /* ---------- product card ---------- */
 function productCard(p){
   const t = tierFor(p, p.moq);
   return `<div class="pcard-wrap"><div class="pcard tilt">
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
-    <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy"></div></a>
+    <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
       <div class="pprice">${money(t.price)} <small>/ pc starting</small></div>
@@ -245,12 +270,13 @@ function initFilters(){
       (SETTINGS.occasions||DEFAULT_OCCASIONS).map(v=>`<option value="${v}">${v}</option>`).join("");
   }
 
-  const state = {profession:"All",purpose:"All",occasion:"All",qty:1,sort:"relevance"};
+  const state = {profession:"All",purpose:"All",occasion:"All",qty:1,sort:"relevance",q:""};
   const params = new URLSearchParams(location.search);
   if(params.get("profession")) state.profession = params.get("profession");
   if(params.get("cat")) state.cat = params.get("cat");
   if(params.get("purpose")) state.purpose = params.get("purpose");
   if(params.get("occasion")) state.occasion = params.get("occasion");
+  if(params.get("q")) state.q = params.get("q").trim();
 
   function apply(){
     let list = publishedProducts();
@@ -258,6 +284,13 @@ function initFilters(){
     if(state.profession && state.profession!=="All") list = list.filter(p=>p.profession===state.profession);
     if(state.purpose && state.purpose!=="All") list = list.filter(p=>p.purpose===state.purpose);
     if(state.occasion && state.occasion!=="All") list = list.filter(p=>p.occasion===state.occasion);
+    if(state.q){
+      const needle = state.q.toLowerCase();
+      list = list.filter(p=>{
+        const haystacks = [p.name, p.cat, p.profession, ...(p.professions||[])];
+        return haystacks.some(h=>h && h.toLowerCase().includes(needle));
+      });
+    }
     if(state.qty>1){
       list = list.filter(p=> tierFor(p, state.qty).price*state.qty <= (state.budget||999999));
     }
@@ -295,6 +328,53 @@ function initFilters(){
   const filterToggle = document.querySelector(".filter-toggle");
   const filtersPanel = document.querySelector(".filters");
   if(filterToggle && filtersPanel) filterToggle.addEventListener("click",()=>filtersPanel.classList.toggle("open"));
+}
+
+/* ---------- navbar search (present on every page's header) ----------
+   Clicking the ⌕ button reveals an inline search input; Enter (or blur with
+   text still in it) sends the visitor to products.html?q=... which
+   initFilters() above reads and filters by on name/category/profession. On
+   products.html itself it just re-runs the filter in place instead of
+   reloading the page. */
+function initNavSearch(){
+  const btn = document.querySelector("#navSearchBtn");
+  const input = document.querySelector("#navSearchInput");
+  if(!btn || !input) return;
+
+  const onProductsPage = /products\.html$/.test(location.pathname) || document.querySelector("#productGrid");
+  const params = new URLSearchParams(location.search);
+  const qParam = params.get("q");
+  if(qParam){ input.value = qParam; input.classList.add("open"); }
+
+  function openAndFocus(){
+    input.classList.add("open");
+    input.focus();
+  }
+  function runSearch(){
+    const q = input.value.trim();
+    if(!q) return;
+    if(onProductsPage){
+      // Already on the products listing — update the URL in place and reload
+      // it so initFilters() re-runs and picks the new ?q= term up.
+      const url = new URL(location.href);
+      url.searchParams.set("q", q);
+      location.href = url.toString();
+    }else{
+      location.href = "products.html?q=" + encodeURIComponent(q);
+    }
+  }
+
+  btn.addEventListener("click", ()=>{
+    if(!input.classList.contains("open")) openAndFocus();
+    else runSearch();
+  });
+  input.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){ e.preventDefault(); runSearch(); }
+    else if(e.key === "Escape"){ input.value=""; input.classList.remove("open"); input.blur(); }
+  });
+  input.addEventListener("blur", ()=>{
+    if(!input.value.trim()) input.classList.remove("open");
+  });
 }
 
 /* ---------- per-product SEO: <title>/meta description + JSON-LD Product schema.
@@ -454,6 +534,19 @@ function initAccountPage(){
   const root = document.querySelector("#account-root");
   if(!root) return;
 
+  // Small inline SVGs for the redesigned auth form's input icons — no
+  // external requests, purely decorative (aria-hidden).
+  const ACCT_ICONS = {
+    user: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 19.5c1.6-3.4 4.4-5 7.5-5s5.9 1.6 7.5 5"/></svg>',
+    building: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="3" width="11" height="18"/><path d="M9 21v-4h2v4M8 7h1M8 11h1M11 7h1M11 11h1M15 10h5v11h-5"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3.5h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5l1.5-2 4 1.5v3c0 1-.9 1.8-1.9 1.6C11.7 18.7 5.3 12.3 4.4 5.4 4.2 4.4 5 3.5 6 3.5Z"/></svg>',
+    email: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4.5 7l7.5 6 7.5-6"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>'
+  };
+  function acctField(label, icon, inputHtml){
+    return `<div class="ad-field acct-input-group"><label>${label}</label><div class="acct-input-wrap">${ACCT_ICONS[icon]}${inputHtml}</div></div>`;
+  }
+
   async function renderLoggedIn(cust){
     const [orders, allQuotes] = await Promise.all([
       BazDS.getOrders().catch(()=>[]),
@@ -499,24 +592,38 @@ function initAccountPage(){
 
   function renderLoggedOut(){
     root.innerHTML = `
-      <div class="acct-tabs">
-        <button class="acct-tab active" data-tab="login">Log In</button>
-        <button class="acct-tab" data-tab="signup">Create Account</button>
-      </div>
-      <div class="acct-form" id="loginForm">
-        <div class="ad-field"><label>Email</label><input id="li_email" type="email"></div>
-        <div class="ad-field"><label>Password</label><input id="li_password" type="password"></div>
-        <button class="btn btn-lime" id="loginSubmit" style="width:100%">Log In</button>
-        <p class="ad-hint" id="loginError"></p>
-      </div>
-      <div class="acct-form" id="signupForm" style="display:none">
-        <div class="ad-field"><label>Full name</label><input id="su_name"></div>
-        <div class="ad-field"><label>Company name (optional)</label><input id="su_company"></div>
-        <div class="ad-field"><label>Phone</label><input id="su_phone"></div>
-        <div class="ad-field"><label>Email</label><input id="su_email" type="email"></div>
-        <div class="ad-field"><label>Password</label><input id="su_password" type="password"></div>
-        <button class="btn btn-lime" id="signupSubmit" style="width:100%">Create Account</button>
-        <p class="ad-hint" id="signupError"></p>
+      <div class="acct-card">
+        <div class="acct-visual">
+          <div class="acct-visual-badge"><img src="assets/logo.png" alt=""></div>
+          <h3>Welcome to Bazarville</h3>
+          <p>Track orders, revisit quotes and check out faster next time — all in one place.</p>
+          <ul class="acct-visual-points">
+            <li>Order history &amp; live status</li>
+            <li>Quotes sent straight to you</li>
+            <li>Faster checkout, saved details</li>
+          </ul>
+        </div>
+        <div class="acct-panel">
+          <div class="acct-tabs">
+            <button class="acct-tab active" data-tab="login">Log In</button>
+            <button class="acct-tab" data-tab="signup">Create Account</button>
+          </div>
+          <div class="acct-form" id="loginForm">
+            ${acctField("Email", "email", `<input id="li_email" type="email" placeholder="you@company.com">`)}
+            ${acctField("Password", "lock", `<input id="li_password" type="password" placeholder="••••••••">`)}
+            <button class="btn btn-lime" id="loginSubmit" style="width:100%">Log In</button>
+            <p class="ad-hint" id="loginError"></p>
+          </div>
+          <div class="acct-form" id="signupForm" style="display:none">
+            ${acctField("Full name", "user", `<input id="su_name" placeholder="Your name">`)}
+            ${acctField("Company name (optional)", "building", `<input id="su_company" placeholder="Company / organisation">`)}
+            ${acctField("Phone", "phone", `<input id="su_phone" placeholder="10-digit mobile">`)}
+            ${acctField("Email", "email", `<input id="su_email" type="email" placeholder="you@company.com">`)}
+            ${acctField("Password", "lock", `<input id="su_password" type="password" placeholder="Create a password">`)}
+            <button class="btn btn-lime" id="signupSubmit" style="width:100%">Create Account</button>
+            <p class="ad-hint" id="signupError"></p>
+          </div>
+        </div>
       </div>`;
     root.querySelectorAll(".acct-tab").forEach(tab=>tab.addEventListener("click",()=>{
       root.querySelectorAll(".acct-tab").forEach(t=>t.classList.remove("active")); tab.classList.add("active");
@@ -580,8 +687,8 @@ function initProductPage(){
   el.innerHTML = `
     <div class="pd-layout">
       <div class="reveal-left">
-        <div class="pd-gallery-main"><img id="mainImg" src="${p.img[0]}" alt="${p.name}"></div>
-        <div class="pd-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}">`).join("")}</div>
+        <div class="pd-gallery-main"><img id="mainImg" src="${p.img[0]}" alt="${p.name}" onerror="imgFallback(this)"></div>
+        <div class="pd-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
       </div>
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
@@ -1081,6 +1188,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyBrandColor(SETTINGS.brandColor);
   applyBrandFont(SETTINGS.brandFont);
   applyAnimationLevel(SETTINGS.animationLevel);
+  const footerWaLink = document.querySelector("#footerWaLink");
+  if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
@@ -1089,7 +1198,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters,
-    initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage];
+    initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });
 
   // fire-and-forget enquiry logging — never blocks the WhatsApp redirect itself
