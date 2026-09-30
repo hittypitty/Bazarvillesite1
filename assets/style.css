@@ -46,6 +46,10 @@ img{max-width:100%;display:block}
 .navactions{display:flex;align-items:center;gap:14px}
 .searchbtn{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:17px;cursor:pointer;transition:.2s}
 .searchbtn:hover{background:var(--ink);color:var(--lime);border-color:var(--ink)}
+.nav-search-input{display:none;width:0;border:1.5px solid var(--line);border-radius:20px;padding:9px 14px;font:inherit;font-size:13.5px;color:var(--text);background:var(--surface);outline:none;transition:width .25s ease,border-color .2s ease}
+.nav-search-input.open{display:inline-block;width:190px}
+.nav-search-input:focus{border-color:var(--ink)}
+@media(max-width:640px){.nav-search-input.open{width:130px}}
 .menu-btn{display:none;font-size:22px;cursor:pointer}
 .cartbtn{position:relative;width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:17px;cursor:pointer;transition:.2s;text-decoration:none;color:inherit}
 .cartbtn:hover{background:var(--ink);color:var(--lime);border-color:var(--ink)}
@@ -190,7 +194,7 @@ img{max-width:100%;display:block}
 .cta-banner p{color:#bdbdbd;margin-top:8px;position:relative}
 
 /* ---- footer ---- */
-.footer{background:#101010;color:#c9c9c4;margin-top:0;padding:60px 0 24px}
+.footer{background:#101010;color:#c9c9c4;margin-top:0;padding:60px 0 24px;border-top:3px solid var(--lime)}
 .footgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:30px}
 .footer h4{color:#fff;font-size:14.5px;margin-bottom:14px}
 .footer a,.footer p{font-size:13.5px;line-height:2;color:#9d9d97}
@@ -198,6 +202,14 @@ img{max-width:100%;display:block}
 .fbrand{display:flex;align-items:center;gap:9px;margin-bottom:14px}
 .fbrand img{width:34px}
 .fbrand b{color:#fff;font-family:"Plus Jakarta Sans";font-size:18px}
+.ffirst p{max-width:280px}
+.fsocial{display:flex;gap:10px;margin-top:16px}
+.fsocial-ic{width:36px;height:36px;border-radius:50%;border:1.5px solid #2c2c2a;display:grid;place-items:center;color:#c9c9c4;transition:.2s}
+.fsocial-ic:hover{background:var(--lime);border-color:var(--lime);color:var(--ink)}
+#footerWaLink{color:#25D366}
+#footerWaLink:hover{color:var(--lime)}
+.footmini{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px}
+.footmini .fsocial{justify-content:center}
 .copyright{border-top:1px solid #262626;margin-top:40px;padding-top:18px;text-align:center;font-size:12px;color:#7a7a74}
 
 /* ================= PRODUCTS / FILTER PAGE ================= */
@@ -484,4 +496,42 @@ body.anim-full .pcard.tilt:hover{animation-play-state:paused}
 @keyframes pcard-float3d{
   0%,100%{transform:perspective(700px) translateY(0) rotateX(0deg) rotateY(0deg)}
   50%{transform:perspective(700px) translateY(-7px) rotateX(3deg) rotateY(-3deg)}
+}
+
+/* ---------- broken image fallback (Task: image safety) ----------
+   Applied by imgFallback() in script.js when a product image URL fails to
+   load. Keeps the placeholder visually calm/neutral but still legible so a
+   stale link is obvious rather than an invisible blank gap. */
+.img-fallback{object-fit:contain!important;background:var(--soft);padding:14%;opacity:.85}
+
+/* ===== Account page (redesigned) =====
+   Pure visual upgrade for account.html / initAccountPage() in script.js —
+   every element ID the JS binds to (li_email, li_password, loginSubmit,
+   loginError, su_name, su_company, su_phone, su_email, su_password,
+   signupSubmit, signupError) is unchanged, along with the .acct-tab /
+   .acct-form tab-switching structure. */
+.acct-page{padding-top:44px;padding-bottom:70px}
+.acct-card{display:grid;grid-template-columns:1fr 1.25fr;background:var(--card);border-radius:var(--r-lg);overflow:hidden;box-shadow:0 30px 60px -30px rgba(26,26,26,.28);border:1px solid var(--line)}
+.acct-visual{background:var(--ink);color:#fff;padding:44px 38px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden}
+.acct-visual:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% -10%, rgba(198,240,0,.28), transparent 55%)}
+.acct-visual-badge{width:56px;height:56px;border-radius:16px;background:var(--lime);display:grid;place-items:center;margin-bottom:22px;position:relative}
+.acct-visual-badge img{width:32px;height:32px}
+.acct-visual h3{font-size:24px;margin-bottom:10px;position:relative}
+.acct-visual p{color:#c9c9c4;font-size:14px;line-height:1.6;margin-bottom:22px;position:relative}
+.acct-visual-points{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;position:relative}
+.acct-visual-points li{font-size:13.5px;color:#e6e6e2;padding-left:26px;position:relative}
+.acct-visual-points li:before{content:"✓";position:absolute;left:0;top:0;color:var(--lime);font-weight:800}
+.acct-panel{padding:44px 42px}
+.acct-tabs{display:flex;gap:6px;background:var(--soft);border-radius:14px;padding:5px;margin-bottom:26px}
+.acct-tab{flex:1;border:none;background:transparent;padding:11px 14px;border-radius:10px;font:inherit;font-weight:700;font-size:13.5px;color:var(--muted);cursor:pointer;transition:background .25s ease,color .25s ease,box-shadow .25s ease}
+.acct-tab.active{background:#fff;color:var(--ink);box-shadow:0 6px 16px -8px rgba(26,26,26,.25)}
+.acct-form{animation:acctFadeIn .35s ease}
+@keyframes acctFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.acct-input-group .acct-input-wrap{position:relative}
+.acct-input-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.acct-input-wrap input{padding-left:38px!important}
+@media(max-width:820px){
+  .acct-card{grid-template-columns:1fr}
+  .acct-visual{padding:34px 30px}
+  .acct-panel{padding:34px 26px}
 }
