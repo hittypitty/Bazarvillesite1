@@ -101,6 +101,62 @@ const DEFAULT_OCCASIONS = [
   "Employee Farewell","Client / Dealer Meets","Team Outings & Celebrations"
 ];
 
+// Hand-built keyword/phrase → taxonomy map for "smart" search (no AI, plain
+// JS lookups only). Keys are common everyday phrases an Indian B2B-gifting
+// buyer might type into the nav search box; values are the exact
+// profession/purpose/occasion strings already used across PROFESSIONS /
+// SETTINGS.purposes / SETTINGS.occasions. initFilters() below uses this to
+// widen search results to taxonomy matches, in addition to (not instead of)
+// the existing literal name/cat/profession substring match.
+const SEARCH_SYNONYMS = {
+  "office gift": ["Corporate", "Office & Workplace"],
+  "office": ["Corporate", "Office & Workplace"],
+  "corporate gift": ["Corporate", "Corporate Events"],
+  "corporate gifting": ["Corporate", "Corporate Events", "Client Gifts"],
+  "employee gift": ["Employee / Staff Gifts", "Employee Appreciation"],
+  "employee gifting": ["Employee / Staff Gifts", "Employee Appreciation"],
+  "staff gift": ["Employee / Staff Gifts"],
+  "diwali gift": ["Diwali", "Festive Gifting"],
+  "diwali gifting": ["Diwali", "Festive Gifting"],
+  "festive gift": ["Festive Gifting", "Diwali", "New Year", "Holi"],
+  "wedding gift": ["Wedding"],
+  "new joinee": ["Onboarding / Joining Kits", "Employee Joining / Onboarding"],
+  "new joiner": ["Onboarding / Joining Kits", "Employee Joining / Onboarding"],
+  "joining kit": ["Onboarding / Joining Kits", "Employee Joining / Onboarding"],
+  "onboarding": ["Onboarding / Joining Kits", "Employee Joining / Onboarding"],
+  "welcome kit": ["Onboarding / Joining Kits", "Welcome / Gift Kits"],
+  "client gift": ["Client Gifts", "Client / Dealer Meets"],
+  "client gifting": ["Client Gifts", "Client / Dealer Meets"],
+  "dealer gift": ["Dealer / Distributor Gifts", "Client / Dealer Meets"],
+  "distributor gift": ["Dealer / Distributor Gifts"],
+  "award": ["Awards & Recognition", "Employee Recognition & Awards"],
+  "recognition": ["Awards & Recognition", "Employee Recognition & Awards"],
+  "conference": ["Conferences / Seminars / Workshops", "Conferences & Exhibitions"],
+  "seminar": ["Conferences / Seminars / Workshops"],
+  "workshop": ["Conferences / Seminars / Workshops"],
+  "promotional": ["Marketing & Promotion", "Product Launch"],
+  "promotion": ["Marketing & Promotion", "Product Launch"],
+  "marketing": ["Marketing & Promotion", "Branding & Corporate Identity"],
+  "branding": ["Branding & Corporate Identity"],
+  "product launch": ["Product Launch"],
+  "store launch": ["Product Launch", "Retail"],
+  "anniversary": ["Company Anniversary"],
+  "farewell": ["Employee Farewell"],
+  "team outing": ["Team Outings & Celebrations", "Team / Group Gifting"],
+  "team gift": ["Team / Group Gifting"],
+  "group gift": ["Team / Group Gifting"],
+  "travel gift": ["Travel / Utility Gifting"],
+  "it gift": ["IT / Tech"],
+  "tech gift": ["IT / Tech"],
+  "college gift": ["Education"],
+  "school gift": ["Education"],
+  "hospital gift": ["Healthcare"],
+  "hotel gift": ["Hospitality"],
+  "shop gift": ["Retail"],
+  "factory gift": ["Manufacturing"],
+  "bank gift": ["Finance"]
+};
+
 const DEFAULT_SETTINGS = {
   whatsappNumber: "919999999999",
   brandColor: "#c6f000",
@@ -286,10 +342,47 @@ function initFilters(){
     if(state.occasion && state.occasion!=="All") list = list.filter(p=>p.occasion===state.occasion);
     if(state.q){
       const needle = state.q.toLowerCase();
-      list = list.filter(p=>{
+
+      // 1) Literal match — unchanged from before: name/category/profession
+      // substring match.
+      const literalMatch = p=>{
         const haystacks = [p.name, p.cat, p.profession, ...(p.professions||[])];
         return haystacks.some(h=>h && h.toLowerCase().includes(needle));
+      };
+
+      // 2) "Smart" taxonomy match (no AI — plain lookups against
+      // SEARCH_SYNONYMS plus the profession/purpose/occasion values
+      // themselves) — widens results to products whose profession/purpose/
+      // occasion matches taxonomy values implied by the search phrase, in
+      // ADDITION to the literal match above (union, not replacement).
+      const taxonomyValues = new Set();
+      Object.keys(SEARCH_SYNONYMS).forEach(key=>{
+        if(needle.includes(key) || key.includes(needle)){
+          SEARCH_SYNONYMS[key].forEach(v=>taxonomyValues.add(v));
+        }
       });
+      PROFESSIONS.forEach(pr=>{
+        if(pr.name.toLowerCase().includes(needle) || needle.includes(pr.name.toLowerCase())) taxonomyValues.add(pr.name);
+      });
+      (SETTINGS.purposes||DEFAULT_PURPOSES).forEach(v=>{
+        if(v.toLowerCase().includes(needle) || needle.includes(v.toLowerCase())) taxonomyValues.add(v);
+      });
+      (SETTINGS.occasions||DEFAULT_OCCASIONS).forEach(v=>{
+        if(v.toLowerCase().includes(needle) || needle.includes(v.toLowerCase())) taxonomyValues.add(v);
+      });
+      const taxonomyMatch = p=>{
+        if(!taxonomyValues.size) return false;
+        return [p.profession, p.purpose, p.occasion, ...(p.professions||[])]
+          .some(v=>v && taxonomyValues.has(v));
+      };
+
+      // Union of both passes, with literal matches ranked ahead of
+      // taxonomy-only matches (a later overall sort — price/moq/newest — can
+      // still reorder within/after this, same as before).
+      const literalHits = list.filter(literalMatch);
+      const literalIds = new Set(literalHits.map(p=>p.id));
+      const taxonomyHits = list.filter(p=>!literalIds.has(p.id) && taxonomyMatch(p));
+      list = literalHits.concat(taxonomyHits);
     }
     if(state.qty>1){
       list = list.filter(p=> tierFor(p, state.qty).price*state.qty <= (state.budget||999999));
@@ -723,6 +816,10 @@ function initProductPage(){
           <div class="pd-spec"><span>Suitable for</span><span>${p.purpose} • ${p.occasion}</span></div>
         </div>
       </div>
+    </div>
+    <div class="pd-related" id="relatedSection" style="display:none">
+      <div class="pd-related-head"><h2>You may also like</h2><p>Matched by profession, purpose or occasion.</p></div>
+      <div class="grid4" id="relatedGrid"></div>
     </div>`;
 
   document.querySelectorAll(".pd-thumbs img").forEach(t=>t.addEventListener("click",()=>{
@@ -787,6 +884,35 @@ function initProductPage(){
   const similar = publishedProducts().filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,4);
   const simEl = document.querySelector("#similarGrid");
   if(simEl) renderGrid("#similarGrid", similar.length? similar : publishedProducts().filter(x=>x.id!==p.id).slice(0,4));
+
+  // "You may also like" — plain rule-based match (no AI): score every other
+  // published product by how many of profession/purpose/occasion it shares
+  // with this one, keep the top 4 with at least one shared attribute, and
+  // hide the whole section when nothing matches.
+  const relatedScored = publishedProducts()
+    .filter(x=>x.id!==p.id)
+    .map(x=>{
+      let score = 0;
+      if(x.profession && x.profession===p.profession) score++;
+      if(x.purpose && x.purpose===p.purpose) score++;
+      if(x.occasion && x.occasion===p.occasion) score++;
+      return {product:x, score};
+    })
+    .filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,4)
+    .map(x=>x.product);
+  const relatedSection = document.querySelector("#relatedSection");
+  const relatedGrid = document.querySelector("#relatedGrid");
+  if(relatedSection && relatedGrid){
+    if(relatedScored.length){
+      relatedGrid.innerHTML = relatedScored.map(productCard).join("");
+      attachTilt(relatedGrid.querySelectorAll(".tilt"));
+      relatedSection.style.display = "";
+    } else {
+      relatedSection.style.display = "none";
+    }
+  }
 }
 
 /* ---------- galaxy page ---------- */
