@@ -245,12 +245,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function productFormHtml(p){
     return `
     <div class="ad-form-grid">
-      <div class="ad-field"><label>Status</label>
-        <select id="pf_status">
-          <option value="published" ${(!p||(p.status||'published')==='published')?'selected':''}>Published (visible on live site)</option>
-          <option value="draft" ${p&&p.status==='draft'?'selected':''}>Draft (hidden from customers)</option>
-        </select>
-      </div>
       <div class="ad-field full"><label>Product name</label><input id="pf_name" value="${p?p.name.replace(/"/g,'&quot;'):''}"></div>
       <div class="ad-field"><label>Category</label><input id="pf_cat" value="${p?p.cat:''}" placeholder="e.g. T-Shirts"></div>
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
@@ -465,6 +459,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     workingSizes = p ? p.sizes.slice() : ["Standard"];
     workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
+    // Status lives in the modal's header line (next to the title), not in the
+    // scrollable form body, so it's visible immediately without scrolling —
+    // set its value here since the header markup is static (not rebuilt per-open).
+    document.querySelector("#pf_status").value = (p && p.status === "draft") ? "draft" : "published";
     document.querySelector("#productForm").innerHTML = productFormHtml(p);
     renderTierRows(workingTiers);
     renderImgGrid();

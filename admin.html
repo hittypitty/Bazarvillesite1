@@ -213,7 +213,16 @@
 <!-- ===================== PRODUCT MODAL ===================== -->
 <div class="ad-modal-backdrop" id="productModalBackdrop">
   <div class="ad-modal ad-modal-lg">
-    <div class="ad-modal-head"><h2 id="productModalTitle">Add Product</h2><span class="ad-modal-close" id="closeProductModal">✕</span></div>
+    <div class="ad-modal-head">
+      <h2 id="productModalTitle">Add Product</h2>
+      <div class="ad-modal-head-right">
+        <select id="pf_status" class="ad-modal-status">
+          <option value="published">Published (visible on live site)</option>
+          <option value="draft">Draft (hidden from customers)</option>
+        </select>
+        <span class="ad-modal-close" id="closeProductModal">✕</span>
+      </div>
+    </div>
     <div class="ad-modal-body" id="productForm"></div>
     <div class="ad-modal-foot">
       <button class="btn btn-outline btn-sm" id="cancelProductBtn">Cancel</button>
