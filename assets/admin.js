@@ -317,8 +317,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="ad-img-grid" id="pf_imgGrid"></div>
         <input type="file" id="pf_imgInput" accept="image/*" multiple style="display:none">
         <p class="ad-hint" id="pf_uploadStatus" style="margin-top:8px"></p>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="url" id="pf_imgUrlInput" placeholder="Or paste an image link (e.g. Dropbox direct link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+        <p class="ad-link-toggle" id="pf_imgLinkToggle" style="margin-top:10px;font-size:12.5px;color:var(--muted);cursor:pointer;text-decoration:underline">Paste a link instead (not recommended — links can stop working later; uploading here is permanent)</p>
+        <div id="pf_imgLinkRow" style="display:none;gap:8px;margin-top:10px">
+          <input type="url" id="pf_imgUrlInput" placeholder="Paste a direct image link (e.g. Dropbox link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
           <button class="btn btn-outline btn-sm" type="button" id="pf_addImgUrlBtn">Add link</button>
         </div>
       </div>
@@ -388,9 +389,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           ${imgs.map((src,i)=>`<div class="ad-img-thumb"><img src="${src}" onerror="this.closest('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeColorImg(${ci},${i})">✕</span></div>`).join("")}
           <div class="ad-img-add" data-color-upload="${ci}">+</div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <p class="ad-link-toggle" style="margin-top:8px;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline" data-color-link-toggle="${ci}">Paste a link instead (not recommended — links can stop working later)</p>
+        <div style="display:none;gap:8px;margin-top:8px" data-color-link-row="${ci}">
           <input type="file" accept="image/*" multiple style="display:none" data-color-file-input="${ci}">
-          <input type="url" placeholder="Or paste an image link for this colour" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px" data-color-url-input="${ci}">
+          <input type="url" placeholder="Paste a direct image link for this colour" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px" data-color-url-input="${ci}">
           <button class="btn btn-outline btn-sm" type="button" data-color-add-link="${ci}">Add link</button>
         </div>
       </div>`;
@@ -400,6 +402,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const fileInput = el.querySelector(`[data-color-file-input="${ci}"]`);
       const addBtn = el.querySelector(`[data-color-upload="${ci}"]`);
       addBtn.addEventListener("click", ()=>fileInput.click());
+      const linkToggle = el.querySelector(`[data-color-link-toggle="${ci}"]`);
+      const linkRow = el.querySelector(`[data-color-link-row="${ci}"]`);
+      linkToggle.addEventListener("click", ()=>{ linkRow.style.display = "flex"; linkToggle.style.display = "none"; });
       fileInput.addEventListener("change", async (e)=>{
         const files = [...e.target.files];
         for(const file of files){
@@ -659,6 +664,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       }
       status.textContent = "";
     });
+    document.querySelector("#pf_imgLinkToggle").addEventListener("click", ()=>{
+      document.querySelector("#pf_imgLinkRow").style.display = "flex";
+      document.querySelector("#pf_imgLinkToggle").style.display = "none";
+    });
     // Paste a direct image link (Dropbox, Google Drive direct link, etc.)
     // instead of uploading — the file then lives wherever that link points,
     // not in Supabase Storage, so it doesn't count against its free quota.
@@ -792,8 +801,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="ad-img-grid" id="cf_imgGrid"></div>
         <input type="file" id="cf_imgInput" accept="image/*" style="display:none">
         <p class="ad-hint" id="cf_uploadStatus" style="margin-top:8px"></p>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <input type="url" id="cf_imgUrlInput" placeholder="Or paste an image link (e.g. Dropbox direct link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+        <p class="ad-link-toggle" id="cf_imgLinkToggle" style="margin-top:10px;font-size:12.5px;color:var(--muted);cursor:pointer;text-decoration:underline">Paste a link instead (not recommended — links can stop working later; uploading here is permanent)</p>
+        <div id="cf_imgLinkRow" style="display:none;gap:8px;margin-top:10px">
+          <input type="url" id="cf_imgUrlInput" placeholder="Paste a direct image link (e.g. Dropbox link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
           <button class="btn btn-outline btn-sm" type="button" id="cf_addImgUrlBtn">Add link</button>
         </div>
       </div>`;
@@ -819,6 +829,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       status.textContent = "Uploading…";
       try{ collImage = await BazDS.uploadImage(file, "collections"); renderCollImgGrid(); status.textContent = ""; }
       catch(err){ status.textContent = "Upload failed: " + (err.message||""); }
+    });
+    document.querySelector("#cf_imgLinkToggle").addEventListener("click", ()=>{
+      document.querySelector("#cf_imgLinkRow").style.display = "flex";
+      document.querySelector("#cf_imgLinkToggle").style.display = "none";
     });
     // Paste a direct image link instead of uploading (see product form note above)
     document.querySelector("#cf_addImgUrlBtn").addEventListener("click", async ()=>{
