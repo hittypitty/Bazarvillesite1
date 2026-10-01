@@ -245,6 +245,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function productFormHtml(p){
     return `
     <div class="ad-form-grid">
+      <div class="ad-field"><label>Status</label>
+        <select id="pf_status">
+          <option value="published" ${(!p||(p.status||'published')==='published')?'selected':''}>Published (visible on live site)</option>
+          <option value="draft" ${p&&p.status==='draft'?'selected':''}>Draft (hidden from customers)</option>
+        </select>
+      </div>
       <div class="ad-field full"><label>Product name</label><input id="pf_name" value="${p?p.name.replace(/"/g,'&quot;'):''}"></div>
       <div class="ad-field"><label>Category</label><input id="pf_cat" value="${p?p.cat:''}" placeholder="e.g. T-Shirts"></div>
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
@@ -256,17 +262,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <button class="btn btn-outline btn-sm" type="button" id="pf_addProfessionBtn">+ Add new profession</button>
         </div>
       </div>
-      <div class="ad-field">
-        <label>Purpose</label>
-        <select id="pf_purpose">${purposeOptionsHtml(p?p.purpose:"")}</select>
+      <div class="ad-field full">
+        <label>Purpose (select all that apply)</label>
+        <div class="ad-chip-group" id="pf_purposes">${purposeCheckboxesHtml(p?p.purposes:[])}</div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <input type="text" id="pf_addPurposeInput" placeholder="e.g. Trade Show Giveaways" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px">
           <button class="btn btn-outline btn-sm" type="button" id="pf_addPurposeBtn">+ Add new</button>
         </div>
       </div>
-      <div class="ad-field">
-        <label>Occasion</label>
-        <select id="pf_occasion">${occasionOptionsHtml(p?p.occasion:"")}</select>
+      <div class="ad-field full">
+        <label>Occasion (select all that apply)</label>
+        <div class="ad-chip-group" id="pf_occasions">${occasionCheckboxesHtml(p?p.occasions:[])}</div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <input type="text" id="pf_addOccasionInput" placeholder="e.g. Women's Day" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px">
           <button class="btn btn-outline btn-sm" type="button" id="pf_addOccasionBtn">+ Add new</button>
@@ -298,12 +304,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <button class="btn btn-outline btn-sm" type="button" id="pf_addPrintOptBtn">+ Add option</button>
         </div>
       </div>
-      <div class="ad-field"><label>Status</label>
-        <select id="pf_status">
-          <option value="published" ${(!p||(p.status||'published')==='published')?'selected':''}>Published (visible on live site)</option>
-          <option value="draft" ${p&&p.status==='draft'?'selected':''}>Draft (hidden from customers)</option>
-        </select>
-      </div>
       <div class="ad-field full"><h4 style="margin:6px 0 -4px">SEO (optional — shown in Google search results and the browser tab)</h4></div>
       <div class="ad-field full"><label>Meta title</label><input id="pf_metaTitle" value="${p&&p.metaTitle?p.metaTitle.replace(/"/g,'&quot;'):''}" placeholder="Defaults to the product name if left blank" maxlength="70"></div>
       <div class="ad-field full"><label>Meta description</label><input id="pf_metaDesc" value="${p&&p.metaDescription?p.metaDescription.replace(/"/g,'&quot;'):''}" placeholder="1-2 line summary shown under the title in Google" maxlength="160"></div>
@@ -334,16 +334,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
      product has a value that isn't in the current list (e.g. saved before
      a list was trimmed/renamed elsewhere), it's still shown as an extra
      option so editing that product never silently loses/changes its data. */
-  function purposeOptionsHtml(current){
+  function purposeCheckboxesHtml(selected){
+    const sel = selected && selected.length ? selected : [];
     let list = (SETTINGS.purposes && SETTINGS.purposes.length) ? SETTINGS.purposes.slice() : [];
-    if(current && !list.includes(current)) list = [current, ...list];
-    return list.map(v=>`<option value="${v.replace(/"/g,'&quot;')}" ${current===v?'selected':''}>${v}</option>`).join("");
+    // Keep any already-saved value visible even if it's since been removed
+    // from the admin-editable list, so editing never silently drops it.
+    sel.forEach(v=>{ if(!list.includes(v)) list.push(v); });
+    return list.map(v=>`
+      <label class="ad-chip-check"><input type="checkbox" value="${v.replace(/"/g,'&quot;')}" ${sel.includes(v)?'checked':''}><span>${v}</span></label>`).join("");
   }
-  function occasionOptionsHtml(current){
+  function occasionCheckboxesHtml(selected){
+    const sel = selected && selected.length ? selected : [];
     let list = (SETTINGS.occasions && SETTINGS.occasions.length) ? SETTINGS.occasions.slice() : [];
-    if(current && !list.includes(current)) list = [current, ...list];
-    return `<option value="">— Select occasion —</option>` +
-      list.map(v=>`<option value="${v.replace(/"/g,'&quot;')}" ${current===v?'selected':''}>${v}</option>`).join("");
+    sel.forEach(v=>{ if(!list.includes(v)) list.push(v); });
+    return list.map(v=>`
+      <label class="ad-chip-check"><input type="checkbox" value="${v.replace(/"/g,'&quot;')}" ${sel.includes(v)?'checked':''}><span>${v}</span></label>`).join("");
   }
 
   /* ---------- profession multi-select (product form) ---------- */
@@ -517,7 +522,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       try{
         SETTINGS.purposes = list.concat([val]);
         await BazDS.updateSettings(SETTINGS);
-        document.querySelector("#pf_purpose").innerHTML = purposeOptionsHtml(val);
+        const checked = [...document.querySelectorAll("#pf_purposes input:checked")].map(i=>i.value).concat([val]);
+        document.querySelector("#pf_purposes").innerHTML = purposeCheckboxesHtml(checked);
         input.value = "";
       }catch(err){ alert(err.message || "Could not add purpose."); }
       finally{ busy(btn, false); }
@@ -536,7 +542,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       try{
         SETTINGS.occasions = list.concat([val]);
         await BazDS.updateSettings(SETTINGS);
-        document.querySelector("#pf_occasion").innerHTML = occasionOptionsHtml(val);
+        const checked = [...document.querySelectorAll("#pf_occasions input:checked")].map(i=>i.value).concat([val]);
+        document.querySelector("#pf_occasions").innerHTML = occasionCheckboxesHtml(checked);
         input.value = "";
       }catch(err){ alert(err.message || "Could not add occasion."); }
       finally{ busy(btn, false); }
@@ -630,6 +637,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(!productImages.length){ alert("Add at least one product image."); return; }
     const professions = [...document.querySelectorAll("#pf_professions input:checked")].map(i=>i.value);
     if(!professions.length){ alert("Select at least one profession."); return; }
+    const purposes = [...document.querySelectorAll("#pf_purposes input:checked")].map(i=>i.value);
+    if(!purposes.length){ alert("Select at least one purpose."); return; }
+    const occasions = [...document.querySelectorAll("#pf_occasions input:checked")].map(i=>i.value);
     if(!workingColors.length){ alert("Add at least one colour."); return; }
     if(!workingSizes.length){ alert("Add at least one size."); return; }
     const data = {
@@ -638,8 +648,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       cat: document.querySelector("#pf_cat").value.trim() || "Uncategorised",
       professions,
       profession: professions[0],
-      purpose: document.querySelector("#pf_purpose").value,
-      occasion: document.querySelector("#pf_occasion").value.trim(),
+      purposes,
+      purpose: purposes[0],
+      occasions,
+      occasion: occasions[0] || "",
       brand: document.querySelector("#pf_brand").value.trim() || null,
       moq: Number(document.querySelector("#pf_moq").value)||1,
       bulk: Number(document.querySelector("#pf_bulk").value)||1,

@@ -31,6 +31,14 @@ const BazDS = (function(){
       ...rest,
       img: images || [],
       professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : []),
+      // Purpose/Occasion: same "array is the source of truth, singular kept for
+      // backward compatibility" pattern as profession/professions above. If a
+      // product predates the add_multi_purpose_occasion.sql migration (or that
+      // migration hasn't been run yet), row.purposes/occasions will be
+      // undefined/empty — fall back to the single legacy value so nothing
+      // appears to lose its purpose/occasion.
+      purposes: row.purposes && row.purposes.length ? row.purposes : (row.purpose ? [row.purpose] : []),
+      occasions: row.occasions && row.occasions.length ? row.occasions : (row.occasion ? [row.occasion] : []),
       printOptions: print_options || [],
       metaTitle: meta_title || "",
       metaDescription: meta_description || ""
@@ -43,6 +51,10 @@ const BazDS = (function(){
       images: img || [],
       profession: (p.professions && p.professions[0]) || p.profession || "",
       professions: p.professions || (p.profession ? [p.profession] : []),
+      purpose: (p.purposes && p.purposes[0]) || p.purpose || "",
+      occasion: (p.occasions && p.occasions[0]) || p.occasion || "",
+      purposes: p.purposes || (p.purpose ? [p.purpose] : []),
+      occasions: p.occasions || (p.occasion ? [p.occasion] : []),
       print_options: printOptions || [],
       meta_title: metaTitle || "",
       meta_description: metaDescription || ""
@@ -66,10 +78,23 @@ const BazDS = (function(){
                    // column id". Editing an existing product goes through
                    // .update().eq("id", id) instead, which targets the row by
                    // id without ever writing to that column.
-    const query = id
-      ? sb.from("products").update(row).eq("id", id)
-      : sb.from("products").insert(row);
-    const { data, error } = await query.select().single();
+    const runQuery = (r) => (id ? sb.from("products").update(r).eq("id", id) : sb.from("products").insert(r));
+    let { data, error } = await runQuery(row).select().single();
+    if(error && /column .*(purposes|occasions)/i.test(error.message)){
+      // The add_multi_purpose_occasion.sql migration hasn't been run on this
+      // database yet (those 2 columns don't exist). Retry without them so the
+      // rest of the product (including its single purpose/occasion value)
+      // still saves — then surface a clear, actionable error.
+      const { purposes, occasions, ...safeRow } = row;
+      const retry = await runQuery(safeRow).select().single();
+      if(retry.error){ console.error("upsertProduct:", retry.error.message); throw retry.error; }
+      // Saved fine (with the single purpose/occasion value) — just warn in the
+      // console rather than failing the save in the admin UI; only the
+      // multi-select part is unavailable until the migration is run.
+      console.warn("Product saved, but only with a single purpose/occasion — run 'add_multi_purpose_occasion.sql' in Supabase to enable multi-select for Purpose/Occasion.");
+      data = retry.data;
+      error = null;
+    }
     if(error){ console.error("upsertProduct:", error.message); throw error; }
     return dbToApp(data);
   }

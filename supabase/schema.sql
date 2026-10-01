@@ -53,8 +53,10 @@ create table if not exists public.products (
   cat text not null default 'Uncategorised',
   profession text,             -- primary profession (first entry of `professions`, kept for simple filtering)
   professions jsonb not null default '[]', -- ["Corporate","IT / Tech"] — admin form supports multi-select
-  purpose text,
-  occasion text,
+  purpose text,                 -- primary purpose (first entry of `purposes`, kept for backward compatibility)
+  occasion text,                -- primary occasion (first entry of `occasions`, kept for backward compatibility)
+  purposes jsonb not null default '[]',  -- ["Client Gifts","Corporate Events"] — admin form supports multi-select
+  occasions jsonb not null default '[]', -- ["Diwali","Annual Day"] — admin form supports multi-select
   brand text,
   moq int not null default 1,
   bulk int not null default 1,

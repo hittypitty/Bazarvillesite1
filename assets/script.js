@@ -384,15 +384,15 @@ function initFilters(){
     let list = publishedProducts();
     if(state.cat) list = list.filter(p=>p.cat===state.cat);
     if(state.profession && state.profession!=="All") list = list.filter(p=>p.profession===state.profession);
-    if(state.purpose && state.purpose!=="All") list = list.filter(p=>p.purpose===state.purpose);
-    if(state.occasion && state.occasion!=="All") list = list.filter(p=>p.occasion===state.occasion);
+    if(state.purpose && state.purpose!=="All") list = list.filter(p=>(p.purposes&&p.purposes.length?p.purposes:[p.purpose]).includes(state.purpose));
+    if(state.occasion && state.occasion!=="All") list = list.filter(p=>(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).includes(state.occasion));
     if(state.q){
       const needle = state.q.toLowerCase();
 
       // 1) Literal match — unchanged from before: name/category/profession
       // substring match.
       const literalMatch = p=>{
-        const haystacks = [p.name, p.cat, p.profession, ...(p.professions||[])];
+        const haystacks = [p.name, p.cat, p.profession, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])];
         return haystacks.some(h=>h && h.toLowerCase().includes(needle));
       };
 
@@ -418,7 +418,7 @@ function initFilters(){
       });
       const taxonomyMatch = p=>{
         if(!taxonomyValues.size) return false;
-        return [p.profession, p.purpose, p.occasion, ...(p.professions||[])]
+        return [p.profession, p.purpose, p.occasion, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])]
           .some(v=>v && taxonomyValues.has(v));
       };
 
@@ -1134,7 +1134,7 @@ function initProductPage(){
           <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
           <div class="pd-spec"><span>Bulk enquiry from</span><span>${p.bulk} pcs</span></div>
           <div class="pd-spec"><span>GST</span><span>Exclusive</span></div>
-          <div class="pd-spec"><span>Suitable for</span><span>${p.purpose} • ${p.occasion}</span></div>
+          <div class="pd-spec"><span>Suitable for</span><span>${(p.purposes&&p.purposes.length?p.purposes:[p.purpose]).filter(Boolean).join(", ")}${(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).filter(Boolean).length?" • "+(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).filter(Boolean).join(", "):""}</span></div>
         </div>
       </div>
     </div>
@@ -1226,9 +1226,15 @@ function initProductPage(){
     .filter(x=>x.id!==p.id)
     .map(x=>{
       let score = 0;
-      if(x.profession && x.profession===p.profession) score++;
-      if(x.purpose && x.purpose===p.purpose) score++;
-      if(x.occasion && x.occasion===p.occasion) score++;
+      const xProfessions = x.professions&&x.professions.length?x.professions:[x.profession];
+      const pProfessions = p.professions&&p.professions.length?p.professions:[p.profession];
+      if(xProfessions.some(v=>v && pProfessions.includes(v))) score++;
+      const xPurposes = x.purposes&&x.purposes.length?x.purposes:[x.purpose];
+      const pPurposes = p.purposes&&p.purposes.length?p.purposes:[p.purpose];
+      if(xPurposes.some(v=>v && pPurposes.includes(v))) score++;
+      const xOccasions = x.occasions&&x.occasions.length?x.occasions:[x.occasion];
+      const pOccasions = p.occasions&&p.occasions.length?p.occasions:[p.occasion];
+      if(xOccasions.some(v=>v && pOccasions.includes(v))) score++;
       return {product:x, score};
     })
     .filter(x=>x.score>0)
