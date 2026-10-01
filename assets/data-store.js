@@ -80,11 +80,14 @@ const BazDS = (function(){
                    // id without ever writing to that column.
     const runQuery = (r) => (id ? sb.from("products").update(r).eq("id", id) : sb.from("products").insert(r));
     let { data, error } = await runQuery(row).select().single();
-    if(error && /column .*(purposes|occasions)/i.test(error.message)){
+    if(error && /(purposes|occasions)['"]?\s*column|column.*(purposes|occasions)/i.test(error.message)){
       // The add_multi_purpose_occasion.sql migration hasn't been run on this
-      // database yet (those 2 columns don't exist). Retry without them so the
-      // rest of the product (including its single purpose/occasion value)
-      // still saves — then surface a clear, actionable error.
+      // database yet (those 2 columns don't exist — Supabase's actual error
+      // reads "Could not find the 'occasions' column of 'products' in the
+      // schema cache", column name BEFORE the word "column", so a pattern
+      // that only matched "column ... occasions" missed it). Retry without
+      // them so the rest of the product (including its single purpose/
+      // occasion value) still saves.
       const { purposes, occasions, ...safeRow } = row;
       const retry = await runQuery(safeRow).select().single();
       if(retry.error){ console.error("upsertProduct:", retry.error.message); throw retry.error; }
@@ -186,11 +189,15 @@ const BazDS = (function(){
       custom_professions: settings.customProfessions || []
     };
     let { error } = await sb.from("settings").update(fullRow).eq("id",1);
-    if(error && /column .*(purposes|occasions|custom_professions)/i.test(error.message)){
+    if(error && /(purposes|occasions|custom_professions)['"]?\s*column|column.*(purposes|occasions|custom_professions)/i.test(error.message)){
       // The add_taxonomies.sql migration hasn't been run on this database yet
-      // (those 3 columns don't exist). Retry without them so brand colour/font/
-      // WhatsApp-number/hero-image saves still work — then surface a clear,
-      // actionable error instead of a cryptic "column not found" one.
+      // (those 3 columns don't exist — Supabase's actual error reads "Could
+      // not find the 'occasions' column of 'settings' in the schema cache",
+      // column name BEFORE the word "column", so the original pattern that
+      // only matched "column ... occasions" never actually fired). Retry
+      // without them so brand colour/font/WhatsApp-number/hero-image saves
+      // still work — then surface a clear, actionable error instead of a
+      // cryptic "column not found" one.
       const { purposes, occasions, custom_professions, ...safeRow } = fullRow;
       const retry = await sb.from("settings").update(safeRow).eq("id",1);
       if(retry.error){ console.error("updateSettings:", retry.error.message); throw retry.error; }
