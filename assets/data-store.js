@@ -85,30 +85,32 @@ const BazDS = (function(){
                    // .update().eq("id", id) instead, which targets the row by
                    // id without ever writing to that column.
     const runQuery = (r) => (id ? sb.from("products").update(r).eq("id", id) : sb.from("products").insert(r));
-    let { data, error } = await runQuery(row).select().single();
-    if(error && /(purposes|occasions|color_images)['"]?\s*column|column.*(purposes|occasions|color_images)/i.test(error.message)){
-      // One of the newer optional columns hasn't been migrated on this
-      // database yet (purposes/occasions from add_multi_purpose_occasion.sql,
-      // or color_images from add_color_images.sql — Supabase's actual error
-      // reads e.g. "Could not find the 'occasions' column of 'products' in
-      // the schema cache", column name BEFORE the word "column", so a
-      // pattern that only matched "column ... occasions" missed it). Retry
-      // without whichever of them is actually missing (so a column that DOES
-      // exist, like purposes/occasions when only color_images needs its
-      // migration, still gets saved normally) — the rest of the product
-      // (including its single purpose/occasion value, and its main image
-      // gallery) still saves either way.
-      const safeRow = {...row};
-      ["purposes","occasions","color_images"].forEach(col=>{
-        if(new RegExp(`'${col}'|${col}\\b`, "i").test(error.message)) delete safeRow[col];
-      });
-      const retry = await runQuery(safeRow).select().single();
-      if(retry.error){ console.error("upsertProduct:", retry.error.message); throw retry.error; }
-      // Saved fine (minus whichever newer field needs its migration) — just
-      // warn in the console rather than failing the save in the admin UI.
-      console.warn("Product saved, but some newer fields (multi-select Purpose/Occasion and/or colour-specific images) couldn't be saved — run the matching migration(s) in Supabase SQL Editor: add_multi_purpose_occasion.sql and/or add_color_images.sql.");
-      data = retry.data;
-      error = null;
+    // Columns that only exist once their matching migration has been run —
+    // add_multi_purpose_occasion.sql (purposes/occasions) and
+    // add_color_images.sql (color_images). On a database where NONE of these
+    // migrations have been run yet, Supabase reports them missing ONE AT A
+    // TIME (one error per save attempt, naming only the first column it hit),
+    // so a single strip-and-retry isn't enough — it fixes the first missing
+    // column, then immediately fails again on the next one. Loop instead:
+    // keep stripping whichever migratable column the latest error names and
+    // retrying, until the save succeeds or the error is something else
+    // entirely (a real problem, not a missing-migration one).
+    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images"];
+    let safeRow = {...row};
+    let stripped = [];
+    let data, error;
+    for(let attempt = 0; attempt <= MIGRATABLE_COLUMNS.length; attempt++){
+      ({data, error} = await runQuery(safeRow).select().single());
+      if(!error) break;
+      const col = MIGRATABLE_COLUMNS.find(c => !stripped.includes(c) && new RegExp(`'${c}'|${c}\\b`, "i").test(error.message));
+      if(!col) break; // not a missing-migration error (or nothing left to strip) — surface it as-is
+      delete safeRow[col];
+      stripped.push(col);
+    }
+    if(stripped.length && !error){
+      // Saved fine (minus whichever newer field(s) need their migration) —
+      // just warn in the console rather than failing the save in the admin UI.
+      console.warn(`Product saved, but these newer fields couldn't be saved because their migration hasn't been run yet in Supabase: ${stripped.join(", ")}. Run the matching .sql file(s) from the supabase/ folder in the Supabase SQL Editor.`);
     }
     if(error){ console.error("upsertProduct:", error.message); throw error; }
     return dbToApp(data);
