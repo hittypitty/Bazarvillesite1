@@ -96,6 +96,13 @@ body{background:var(--soft)}
 .ad-img-add{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--line);display:grid;place-items:center;cursor:pointer;font-size:22px;color:var(--muted);transition:border-color .2s ease,color .2s ease,transform .2s ease}
 .ad-img-add:hover{border-color:var(--ink);color:var(--ink);transform:scale(1.05)}
 
+/* ---------- colour-specific image groups (product form) ---------- */
+.ad-color-img-group{border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--soft)}
+.ad-color-img-group-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+.ad-swatch-sm{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.15);display:inline-block;flex-shrink:0}
+.ad-img-grid-sm{display:flex;flex-wrap:wrap;gap:8px;margin-top:0}
+.ad-img-grid-sm .ad-img-thumb,.ad-img-grid-sm .ad-img-add{width:56px;height:56px;font-size:18px}
+
 /* ---------- tier rows ---------- */
 .ad-tier-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center}
 .ad-tier-row input{border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;transition:border-color .2s ease}

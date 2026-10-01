@@ -26,10 +26,15 @@ const BazDS = (function(){
   }
 
   function dbToApp(row){
-    const {images, print_options, meta_title, meta_description, ...rest} = row;
+    const {images, print_options, meta_title, meta_description, color_images, ...rest} = row;
     return {
       ...rest,
       img: images || [],
+      // Optional per-colour gallery override — e.g. {"#1a1a1a":["url1"]}. A
+      // colour missing here (or predating the add_color_images.sql migration)
+      // just falls back to `img` above, so nothing changes for any existing
+      // product until an admin deliberately assigns colour-specific photos.
+      colorImages: color_images || {},
       professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : []),
       // Purpose/Occasion: same "array is the source of truth, singular kept for
       // backward compatibility" pattern as profession/professions above. If a
@@ -45,10 +50,11 @@ const BazDS = (function(){
     };
   }
   function appToDb(p){
-    const {img, printOptions, metaTitle, metaDescription, ...rest} = p;
+    const {img, printOptions, metaTitle, metaDescription, colorImages, ...rest} = p;
     return {
       ...rest,
       images: img || [],
+      color_images: colorImages || {},
       profession: (p.professions && p.professions[0]) || p.profession || "",
       professions: p.professions || (p.profession ? [p.profession] : []),
       purpose: (p.purposes && p.purposes[0]) || p.purpose || "",
@@ -80,21 +86,27 @@ const BazDS = (function(){
                    // id without ever writing to that column.
     const runQuery = (r) => (id ? sb.from("products").update(r).eq("id", id) : sb.from("products").insert(r));
     let { data, error } = await runQuery(row).select().single();
-    if(error && /(purposes|occasions)['"]?\s*column|column.*(purposes|occasions)/i.test(error.message)){
-      // The add_multi_purpose_occasion.sql migration hasn't been run on this
-      // database yet (those 2 columns don't exist — Supabase's actual error
-      // reads "Could not find the 'occasions' column of 'products' in the
-      // schema cache", column name BEFORE the word "column", so a pattern
-      // that only matched "column ... occasions" missed it). Retry without
-      // them so the rest of the product (including its single purpose/
-      // occasion value) still saves.
-      const { purposes, occasions, ...safeRow } = row;
+    if(error && /(purposes|occasions|color_images)['"]?\s*column|column.*(purposes|occasions|color_images)/i.test(error.message)){
+      // One of the newer optional columns hasn't been migrated on this
+      // database yet (purposes/occasions from add_multi_purpose_occasion.sql,
+      // or color_images from add_color_images.sql — Supabase's actual error
+      // reads e.g. "Could not find the 'occasions' column of 'products' in
+      // the schema cache", column name BEFORE the word "column", so a
+      // pattern that only matched "column ... occasions" missed it). Retry
+      // without whichever of them is actually missing (so a column that DOES
+      // exist, like purposes/occasions when only color_images needs its
+      // migration, still gets saved normally) — the rest of the product
+      // (including its single purpose/occasion value, and its main image
+      // gallery) still saves either way.
+      const safeRow = {...row};
+      ["purposes","occasions","color_images"].forEach(col=>{
+        if(new RegExp(`'${col}'|${col}\\b`, "i").test(error.message)) delete safeRow[col];
+      });
       const retry = await runQuery(safeRow).select().single();
       if(retry.error){ console.error("upsertProduct:", retry.error.message); throw retry.error; }
-      // Saved fine (with the single purpose/occasion value) — just warn in the
-      // console rather than failing the save in the admin UI; only the
-      // multi-select part is unavailable until the migration is run.
-      console.warn("Product saved, but only with a single purpose/occasion — run 'add_multi_purpose_occasion.sql' in Supabase to enable multi-select for Purpose/Occasion.");
+      // Saved fine (minus whichever newer field needs its migration) — just
+      // warn in the console rather than failing the save in the admin UI.
+      console.warn("Product saved, but some newer fields (multi-select Purpose/Occasion and/or colour-specific images) couldn't be saved — run the matching migration(s) in Supabase SQL Editor: add_multi_purpose_occasion.sql and/or add_color_images.sql.");
       data = retry.data;
       error = null;
     }

@@ -1100,7 +1100,7 @@ function initProductPage(){
     <div class="pd-layout">
       <div class="reveal-left">
         <div class="pd-gallery-main"><img id="mainImg" src="${p.img[0]}" alt="${p.name}" onerror="imgFallback(this)"></div>
-        <div class="pd-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
+        <div class="pd-thumbs" id="pdThumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
       </div>
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
@@ -1147,12 +1147,28 @@ function initProductPage(){
       <div class="grid4" id="recentlyViewedGrid"></div>
     </section>`;
 
-  document.querySelectorAll(".pd-thumbs img").forEach(t=>t.addEventListener("click",()=>{
-    document.querySelectorAll(".pd-thumbs img").forEach(x=>x.classList.remove("active"));
-    t.classList.add("active"); document.querySelector("#mainImg").src = t.dataset.src;
-  }));
+  // Re-draws the main image + thumbnail strip for a given list of image URLs.
+  // Used both on page load and whenever a colour swatch with its own photos is clicked.
+  function renderPdGallery(images){
+    const imgs = (images && images.length) ? images : p.img;
+    document.querySelector("#mainImg").src = imgs[0];
+    document.querySelector("#pdThumbs").innerHTML = imgs.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("");
+    bindPdThumbClicks();
+  }
+  function bindPdThumbClicks(){
+    document.querySelectorAll("#pdThumbs img").forEach(t=>t.addEventListener("click",()=>{
+      document.querySelectorAll("#pdThumbs img").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active"); document.querySelector("#mainImg").src = t.dataset.src;
+    }));
+  }
+  bindPdThumbClicks();
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    // If this colour has its own photos saved (admin → Edit Product → Colour-specific
+    // images), swap the gallery to show them; otherwise keep showing the main photos.
+    const colorHex = p.colors[Number(s.dataset.c)];
+    const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
+    renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
   }));
   document.querySelectorAll("#printOptRow .sizebtn").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll("#printOptRow .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");

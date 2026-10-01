@@ -63,6 +63,7 @@ create table if not exists public.products (
   stock boolean not null default true,
   status text not null default 'published', -- 'draft' | 'published' — drafts are hidden from public listings
   colors jsonb not null default '[]',   -- ["#1a1a1a","#c6f000"]
+  color_images jsonb not null default '{}', -- {"#1a1a1a":["url1","url2"]} — optional per-colour gallery override; colours without an entry here just show the main `images` gallery
   sizes jsonb not null default '[]',    -- ["S","M","L"]
   print_options jsonb not null default '[]', -- ["Screen Print","Embroidery"] — shown as a variant selector on the product page
   tiers jsonb not null default '[]',    -- [{"min":20,"price":399}, ...]

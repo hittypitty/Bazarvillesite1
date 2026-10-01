@@ -283,6 +283,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
       <div class="ad-field full">
+        <label>Colour-specific images <span class="ad-hint" style="display:inline">(optional — when a customer clicks this colour on the product page, the photo gallery switches to these. A colour with none here just keeps showing the main product images above.)</span></label>
+        <div id="pf_colorImageGroups"></div>
+      </div>
+      <div class="ad-field full">
         <label>Sizes</label>
         <div class="ad-tag-group" id="pf_sizeChips"></div>
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -356,10 +360,71 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   let workingColors = [];
   let workingSizes = [];
   let workingPrintOpts = [];
+  let workingColorImages = {}; // {"#1a1a1a": ["url1","url2"]} — optional per-colour gallery override
   function renderColorChips(){
     const el = document.querySelector("#pf_colorChips"); if(!el) return;
     el.innerHTML = workingColors.map((c,i)=>`
       <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
+    renderColorImageGroups();
+  }
+  /* ---------- colour-specific images (optional, product form) ----------
+     One mini image-grid per working colour. A colour with no images here
+     just falls back to the product's main photos (see renderGallery() in
+     script.js on the customer side). Upload/link mechanics mirror the main
+     image grid's (BazDS.uploadImage / resolveWorkingImageUrl) but are scoped
+     per colour into workingColorImages. */
+  function renderColorImageGroups(){
+    const el = document.querySelector("#pf_colorImageGroups"); if(!el) return;
+    if(!workingColors.length){
+      el.innerHTML = `<span class="ad-hint" style="margin:0">Add at least one colour above first.</span>`;
+      return;
+    }
+    el.innerHTML = workingColors.map((c,ci)=>{
+      const imgs = workingColorImages[c] || [];
+      return `
+      <div class="ad-color-img-group">
+        <div class="ad-color-img-group-head"><span class="ad-swatch-sm" style="background:${c}"></span><b>${c}</b></div>
+        <div class="ad-img-grid ad-img-grid-sm">
+          ${imgs.map((src,i)=>`<div class="ad-img-thumb"><img src="${src}" onerror="this.closest('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeColorImg(${ci},${i})">✕</span></div>`).join("")}
+          <div class="ad-img-add" data-color-upload="${ci}">+</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="file" accept="image/*" multiple style="display:none" data-color-file-input="${ci}">
+          <input type="url" placeholder="Or paste an image link for this colour" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px" data-color-url-input="${ci}">
+          <button class="btn btn-outline btn-sm" type="button" data-color-add-link="${ci}">Add link</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    workingColors.forEach((c,ci)=>{
+      const fileInput = el.querySelector(`[data-color-file-input="${ci}"]`);
+      const addBtn = el.querySelector(`[data-color-upload="${ci}"]`);
+      addBtn.addEventListener("click", ()=>fileInput.click());
+      fileInput.addEventListener("change", async (e)=>{
+        const files = [...e.target.files];
+        for(const file of files){
+          try{
+            const url = await BazDS.uploadImage(file, "products");
+            workingColorImages[c] = (workingColorImages[c]||[]).concat([url]);
+            renderColorImageGroups();
+          }catch(err){ alert("Upload failed: " + (err.message||"check Supabase Storage bucket/policy.")); }
+        }
+      });
+      const urlInput = el.querySelector(`[data-color-url-input="${ci}"]`);
+      const linkBtn = el.querySelector(`[data-color-add-link="${ci}"]`);
+      linkBtn.addEventListener("click", async ()=>{
+        let url = urlInput.value.trim();
+        if(!url) return;
+        if(!/^https?:\/\//i.test(url)){ alert("Please paste a full link starting with http:// or https://"); return; }
+        linkBtn.disabled = true;
+        const working = await resolveWorkingImageUrl(url);
+        linkBtn.disabled = false;
+        if(!working){ alert(BROKEN_LINK_MSG); return; }
+        workingColorImages[c] = (workingColorImages[c]||[]).concat([working]);
+        urlInput.value = "";
+        renderColorImageGroups();
+      });
+    });
   }
   function renderSizeChips(){
     const el = document.querySelector("#pf_sizeChips"); if(!el) return;
@@ -372,7 +437,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removePrintOpt(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">None yet — leave empty if this product only has one printing method</span>`;
   }
   window.AdminUI = window.AdminUI || {};
-  AdminUI.removeColor = (i)=>{ workingColors.splice(i,1); renderColorChips(); };
+  AdminUI.removeColor = (i)=>{
+    const c = workingColors[i];
+    workingColors.splice(i,1);
+    delete workingColorImages[c]; // drop that colour's images too — nothing to show them for any more
+    renderColorChips();
+  };
+  AdminUI.removeColorImg = (ci, i)=>{
+    const c = workingColors[ci];
+    if(!confirm("Remove this photo from this colour? This can't be undone unless you re-add it, and it won't take effect until you click Save.")) return;
+    workingColorImages[c].splice(i,1);
+    renderColorImageGroups();
+  };
   AdminUI.removeSize = (i)=>{ workingSizes.splice(i,1); renderSizeChips(); };
   AdminUI.removePrintOpt = (i)=>{ workingPrintOpts.splice(i,1); renderPrintOptChips(); };
 
@@ -456,6 +532,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     productImages = p ? p.img.slice() : [];
     workingTiers = p ? p.tiers.map(t=>({...t})) : [{min:p?p.moq:10, price:0}];
     workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
+    workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
     workingSizes = p ? p.sizes.slice() : ["Standard"];
     workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
@@ -656,6 +733,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       stock: document.querySelector("#pf_stock").checked,
       status: document.querySelector("#pf_status").value,
       colors: workingColors.slice(),
+      // Only keep entries for colours that are still selected and that
+      // actually have at least one image — an empty/orphaned entry would
+      // otherwise linger and mean nothing (renderGallery falls back to the
+      // main images anyway when the array is empty).
+      colorImages: Object.fromEntries(
+        workingColors
+          .filter(c=>workingColorImages[c] && workingColorImages[c].length)
+          .map(c=>[c, workingColorImages[c].slice()])
+      ),
       sizes: workingSizes.slice(),
       printOptions: workingPrintOpts.slice(),
       tiers: workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min),
