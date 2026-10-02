@@ -647,7 +647,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.querySelector("#pf_sizeInput").addEventListener("keydown", (e)=>{
       if(e.key==="Enter"){ e.preventDefault(); document.querySelector("#pf_addSizeBtn").click(); }
     });
-    document.querySelector("#pf_addTier").addEventListener("click", ()=>{ workingTiers.push({min:1,price:0}); renderTierRows(workingTiers); });
+    document.querySelector("#pf_addTier").addEventListener("click", ()=>{
+      // Suggest the next Min qty instead of always defaulting to 1 — leaving
+      // every row at the same Min qty (all "1") was a real mistake admins
+      // made: the price for a quantity only ever comes from ONE row (the
+      // highest Min qty the customer's quantity qualifies for), so two rows
+      // with the same Min qty aren't two price bands, just one row silently
+      // overriding the other. Suggesting 1, then MOQ, then +10 each time
+      // after that nudges towards distinct bands without forcing a value.
+      const mins = workingTiers.map(t=>t.min);
+      const suggestedMin = mins.length ? Math.max(...mins) + 10 : 1;
+      workingTiers.push({min:suggestedMin, price:0});
+      renderTierRows(workingTiers);
+    });
     document.querySelector("#pf_imgInput").addEventListener("change", async (e)=>{
       const status = document.querySelector("#pf_uploadStatus");
       const files = [...e.target.files];
@@ -716,6 +728,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         price: Number(row.querySelector(".tier-price").value)||0
       };
     });
+    // Two (or more) tier rows with the SAME Min qty aren't two price bands —
+    // only the last one actually applies, and the earlier ones' prices are
+    // silently ignored. This has happened before (every row left at the
+    // default "1" instead of being changed to 1/10/20/...), so catch it here
+    // with the exact duplicate value(s) named, rather than let it quietly
+    // save a product whose displayed price ends up ₹0.
+    const minCounts = {};
+    workingTiers.forEach(t=>{ minCounts[t.min] = (minCounts[t.min]||0)+1; });
+    const dupeMins = Object.keys(minCounts).filter(m=>minCounts[m]>1);
+    if(dupeMins.length){
+      alert(`Quantity-tier pricing mein ${dupeMins.length>1?"ye Min qty values":"ye Min qty"} ek se zyada baar hai: ${dupeMins.join(", ")}. Har row ka Min qty alag hona chahiye (jaise 1, 10, 20) — warna sirf aakhri wali price hi count hogi aur baaki ignore ho jaayengi. Pehle inhe thik kar lo.`);
+      return;
+    }
     const name = document.querySelector("#pf_name").value.trim();
     if(!name){ alert("Product name is required."); return; }
     if(!productImages.length){ alert("Add at least one product image."); return; }
