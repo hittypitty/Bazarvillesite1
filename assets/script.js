@@ -1101,8 +1101,7 @@ function initProductPage(){
   el.innerHTML = `
     <div class="pd-layout">
       <div class="reveal-left">
-        <div class="pd-gallery-main"><img id="mainImg" src="${p.img[0]}" alt="${p.name}" onerror="imgFallback(this)"></div>
-        <div class="pd-thumbs" id="pdThumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
+        <div class="pd-gallery-grid" id="pdGalleryGrid"></div>
       </div>
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
@@ -1148,29 +1147,61 @@ function initProductPage(){
     <section class="pd-related" id="recentlyViewedSection" style="display:none">
       <div class="pd-related-head"><h2>Recently Viewed</h2><p>Pick up where you left off.</p></div>
       <div class="grid4" id="recentlyViewedGrid"></div>
-    </section>`;
+    </section>
+    <div class="pd-lightbox" id="pdLightbox">
+      <button class="pd-lightbox-close" id="pdLightboxClose" aria-label="Close" type="button">✕</button>
+      <button class="pd-lightbox-nav prev" id="pdLightboxPrev" aria-label="Previous image" type="button">‹</button>
+      <img id="pdLightboxImg" src="" alt="${p.name}" onerror="imgFallback(this)">
+      <button class="pd-lightbox-nav next" id="pdLightboxNext" aria-label="Next image" type="button">›</button>
+    </div>`;
 
-  // Re-draws the main image + thumbnail strip for a given list of image URLs.
-  // Used both on page load and whenever a colour swatch with its own photos is clicked.
-  // Also shows/hides the "View all photos" link — once a colour's own gallery
-  // replaces the main one, that link is the only way back to it besides
-  // hitting the browser's back button, which is what customers had to do before.
+  // Myntra-style gallery: every photo shown big in a 2-column grid (not one
+  // hero + a row of small thumbnails) — this is what Vikas asked to match.
+  // Clicking any photo opens it full-screen in a lightbox with prev/next.
+  let galleryImages = p.img;
   function renderPdGallery(images){
     const usingColorGallery = !!(images && images.length);
-    const imgs = usingColorGallery ? images : p.img;
-    document.querySelector("#mainImg").src = imgs[0];
-    document.querySelector("#pdThumbs").innerHTML = imgs.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("");
-    bindPdThumbClicks();
+    galleryImages = usingColorGallery ? images : p.img;
+    const grid = document.querySelector("#pdGalleryGrid");
+    grid.innerHTML = galleryImages.map((src,i)=>{
+      const spanFull = (galleryImages.length % 2 === 1) && (i === galleryImages.length - 1);
+      return `<div class="pd-gallery-cell${spanFull?' span2':''}" data-i="${i}">
+        <img src="${src}" alt="${p.name}" loading="${i<2?'eager':'lazy'}" onerror="imgFallback(this)">
+        <span class="pd-gallery-zoom">🔍</span>
+      </div>`;
+    }).join("");
+    grid.querySelectorAll(".pd-gallery-cell").forEach(cell=>{
+      cell.addEventListener("click", ()=>openLightbox(Number(cell.dataset.i)));
+    });
     const viewAllLink = document.querySelector("#viewAllPhotosLink");
     if(viewAllLink) viewAllLink.style.display = usingColorGallery ? "block" : "none";
   }
-  function bindPdThumbClicks(){
-    document.querySelectorAll("#pdThumbs img").forEach(t=>t.addEventListener("click",()=>{
-      document.querySelectorAll("#pdThumbs img").forEach(x=>x.classList.remove("active"));
-      t.classList.add("active"); document.querySelector("#mainImg").src = t.dataset.src;
-    }));
+  let lightboxIndex = 0;
+  function openLightbox(idx){
+    lightboxIndex = idx;
+    document.querySelector("#pdLightboxImg").src = galleryImages[lightboxIndex];
+    document.querySelector("#pdLightbox").classList.add("show");
+    document.body.style.overflow = "hidden";
   }
-  bindPdThumbClicks();
+  function closeLightbox(){
+    document.querySelector("#pdLightbox").classList.remove("show");
+    document.body.style.overflow = "";
+  }
+  function lightboxNav(dir){
+    lightboxIndex = (lightboxIndex + dir + galleryImages.length) % galleryImages.length;
+    document.querySelector("#pdLightboxImg").src = galleryImages[lightboxIndex];
+  }
+  document.querySelector("#pdLightboxClose").addEventListener("click", closeLightbox);
+  document.querySelector("#pdLightbox").addEventListener("click", (e)=>{ if(e.target.id==="pdLightbox") closeLightbox(); });
+  document.querySelector("#pdLightboxPrev").addEventListener("click", ()=>lightboxNav(-1));
+  document.querySelector("#pdLightboxNext").addEventListener("click", ()=>lightboxNav(1));
+  document.addEventListener("keydown", (e)=>{
+    if(!document.querySelector("#pdLightbox").classList.contains("show")) return;
+    if(e.key==="Escape") closeLightbox();
+    if(e.key==="ArrowLeft") lightboxNav(-1);
+    if(e.key==="ArrowRight") lightboxNav(1);
+  });
+  renderPdGallery(null);
   const viewAllPhotosLink = document.querySelector("#viewAllPhotosLink");
   if(viewAllPhotosLink) viewAllPhotosLink.addEventListener("click", ()=>renderPdGallery(null));
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
