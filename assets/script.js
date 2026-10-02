@@ -1399,7 +1399,12 @@ function initGalaxy(){
       planet.className = "planet";
       planet.style.background = colors[i%colors.length];
       planet.innerHTML = `<span>${prof.icon}</span><span class="planet-label">${prof.name}</span>`;
-      planet.addEventListener("click", ()=>showProfession(prof));
+      // Clicking a planet used to just show an info panel further down the
+      // page (easy to miss, since the stage fills the screen and the panel
+      // sits below it) — go straight to that profession's product list
+      // instead, same as the mobile list links already do.
+      planet.style.cursor = "pointer";
+      planet.addEventListener("click", ()=>{ location.href = `products.html?profession=${encodeURIComponent(prof.name)}`; });
       scene.appendChild(planet);
       placed.push({el:planet, ringEl, angle, speed:group.speed});
     });
