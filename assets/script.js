@@ -1128,23 +1128,21 @@ function initProductPage(){
         <div class="pd-rating">★★★★★ 4.7 (${18+p.id} reviews) &nbsp;•&nbsp; ${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
         <div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
-        <p class="ad-hint" id="viewAllPhotosLink" style="display:none;margin-top:6px;cursor:pointer;text-decoration:underline">↺ View all photos</p>
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
-        <!-- Price sits right next to Quantity now — Vikas's feedback was that
-             having the price box up top and quantity selector further down
-             made them feel disconnected from each other. -->
+        <!-- Just the quantity-tier table now, no separate standalone price
+             tag above it — Vikas's feedback was that having both up top felt
+             redundant; the tier table (with the active row highlighted) is
+             the real price. -->
         <div class="pd-price-box">
-          <div class="pd-price" id="livePrice">${money(tierFor(p,p.moq).price)} <span>/ piece</span></div>
           <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
           ${p.tiers.map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
           </table>
         </div>
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
-        <input type="range" id="qtySlider" class="qty-slider" min="0" max="1000" step="1" value="0" data-qty-min="${Math.max(1, Math.min(p.moq, p.tiers[0] ? p.tiers[0].min : p.moq))}" data-qty-max="${Math.max(p.tiers[p.tiers.length-1].min*3, p.moq*5)}" aria-label="Quantity slider">
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
         <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
@@ -1199,8 +1197,6 @@ function initProductPage(){
     grid.querySelectorAll(".pd-gallery-cell").forEach(cell=>{
       cell.addEventListener("click", ()=>openLightbox(Number(cell.dataset.i)));
     });
-    const viewAllLink = document.querySelector("#viewAllPhotosLink");
-    if(viewAllLink) viewAllLink.style.display = usingColorGallery ? "block" : "none";
   }
   let lightboxIndex = 0;
   function openLightbox(idx){
@@ -1234,8 +1230,6 @@ function initProductPage(){
   const firstColorHex = p.colors[0];
   const firstColorImgs = p.colorImages && firstColorHex ? p.colorImages[firstColorHex] : null;
   renderPdGallery(firstColorImgs && firstColorImgs.length ? firstColorImgs : null);
-  const viewAllPhotosLink = document.querySelector("#viewAllPhotosLink");
-  if(viewAllPhotosLink) viewAllPhotosLink.addEventListener("click", ()=>renderPdGallery(null));
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
@@ -1255,36 +1249,10 @@ function initProductPage(){
   }));
 
   const qtyInput = document.querySelector("#qtyInput");
-  const qtySlider = document.querySelector("#qtySlider");
-  // The slider's own min/max/value (0-1000) are just a drag "position" — the
-  // real quantity range (qtyMin..qtyMax, e.g. MOQ to a high bulk tier) is
-  // mapped onto it on a LOG scale rather than linearly. A linear slider across
-  // a wide range (say 20 to 1500 pcs) barely moves for realistic small
-  // quantities near the MOQ end, which is what made it feel broken/unusable —
-  // a log scale gives that low end plenty of draggable room while still
-  // reaching the high end.
-  const qtySliderMin = qtySlider ? Number(qtySlider.dataset.qtyMin)||1 : 1;
-  const qtySliderMax = qtySlider ? Math.max(Number(qtySlider.dataset.qtyMax)||qtySliderMin, qtySliderMin+1) : 1;
-  function posFromQty(qty){
-    const ratio = qtySliderMax/qtySliderMin;
-    if(ratio<=1) return 0;
-    return Math.round(1000 * Math.log(Math.max(qty,qtySliderMin)/qtySliderMin) / Math.log(ratio));
-  }
-  function qtyFromPos(pos){
-    const ratio = qtySliderMax/qtySliderMin;
-    if(ratio<=1) return qtySliderMin;
-    return Math.round(qtySliderMin * Math.pow(ratio, pos/1000));
-  }
-  function recalc(source){
+  function recalc(){
     let qty = Math.max(1, Number(qtyInput.value)||1);
     qtyInput.value = qty;
-    // keep the slider in sync both ways — clamp to its range so an out-of-range
-    // typed/stepped value doesn't throw the slider's thumb off its track.
-    if(qtySlider && source !== "slider"){
-      qtySlider.value = posFromQty(Math.min(Math.max(qty, qtySliderMin), qtySliderMax));
-    }
     const t = tierFor(p, qty);
-    document.querySelector("#livePrice").innerHTML = `${money(t.price)} <span>/ piece</span>`;
     document.querySelector("#liveCalc").innerHTML = `${qty} pcs × ${money(t.price)} = <b>${money(qty*t.price)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
     document.querySelectorAll("#tierTable tr[data-min]").forEach(row=>{
       row.classList.toggle("active-tier", Number(row.dataset.min)===t.min);
@@ -1304,10 +1272,12 @@ function initProductPage(){
     waBtn.href = waLink(p, qty, printOptEl ? printOptEl.textContent : "", colorVal, sizeEl ? sizeEl.textContent : "");
     waBtn.textContent = p.stock ? "🟢 Send WhatsApp Enquiry" : "🟢 Check Availability on WhatsApp";
   }
-  document.querySelector("#qMinus").addEventListener("click",()=>{ qtyInput.value = Math.max(1,(Number(qtyInput.value)||1)-5); recalc(); });
-  document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+5; recalc(); });
+  // +/- just nudge by 1 piece now — for a bigger jump, type the number
+  // straight into the box (no slider any more; it never read as precise for
+  // this kind of product-count entry).
+  document.querySelector("#qMinus").addEventListener("click",()=>{ qtyInput.value = Math.max(1,(Number(qtyInput.value)||1)-1); recalc(); });
+  document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+1; recalc(); });
   qtyInput.addEventListener("input", ()=>recalc());
-  if(qtySlider) qtySlider.addEventListener("input", ()=>{ qtyInput.value = qtyFromPos(Number(qtySlider.value)); recalc("slider"); });
   recalc();
 
   const suitableToggle = document.querySelector("#pdSuitableToggle");
