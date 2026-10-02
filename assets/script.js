@@ -472,25 +472,24 @@ function initFilters(){
 }
 
 /* ---------- navbar search (present on every page's header) ----------
-   Clicking the ⌕ button reveals an inline search input; Enter (or blur with
-   text still in it) sends the visitor to products.html?q=... which
-   initFilters() above reads and filters by on name/category/profession. On
-   products.html itself it just re-runs the filter in place instead of
-   reloading the page. */
+   A persistent rounded search bar from tablet width up; Enter (or the ⌕
+   button) sends the visitor to products.html?q=... which initFilters()
+   above reads and filters by on name/category/profession. On products.html
+   itself it just re-runs the filter in place instead of reloading the page.
+   Below 640px there isn't room for brand + nav links + a full bar + the
+   wishlist/account icons, so the bar stays collapsed to just the round ⌕
+   icon there (CSS) and expands in place on tap. */
 function initNavSearch(){
   const btn = document.querySelector("#navSearchBtn");
   const input = document.querySelector("#navSearchInput");
   if(!btn || !input) return;
+  const wrap = input.closest(".nav-search");
 
   const onProductsPage = /products\.html$/.test(location.pathname) || document.querySelector("#productGrid");
   const params = new URLSearchParams(location.search);
   const qParam = params.get("q");
-  if(qParam){ input.value = qParam; input.classList.add("open"); }
+  if(qParam){ input.value = qParam; if(wrap) wrap.classList.add("open"); }
 
-  function openAndFocus(){
-    input.classList.add("open");
-    input.focus();
-  }
   function runSearch(){
     const q = input.value.trim();
     if(!q) return;
@@ -506,15 +505,22 @@ function initNavSearch(){
   }
 
   btn.addEventListener("click", ()=>{
-    if(!input.classList.contains("open")) openAndFocus();
-    else runSearch();
+    // On a collapsed (mobile) bar, the first tap just expands it instead of
+    // submitting an empty search — harmless no-op on the desktop/tablet
+    // layout, where the bar is already open and this condition never holds.
+    if(wrap && !wrap.classList.contains("open") && !input.value.trim()){
+      wrap.classList.add("open");
+      input.focus();
+      return;
+    }
+    runSearch();
+  });
+  input.addEventListener("blur", ()=>{
+    if(wrap && !input.value.trim()) wrap.classList.remove("open");
   });
   input.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){ e.preventDefault(); runSearch(); }
-    else if(e.key === "Escape"){ input.value=""; input.classList.remove("open"); input.blur(); }
-  });
-  input.addEventListener("blur", ()=>{
-    if(!input.value.trim()) input.classList.remove("open");
+    else if(e.key === "Escape"){ input.value=""; input.blur(); }
   });
 }
 
@@ -553,7 +559,7 @@ const CART_KEY = "bzv_cart";
 function getCart(){ try{ return JSON.parse(localStorage.getItem(CART_KEY))||[]; }catch(e){ return []; } }
 function setCart(items){
   try{ localStorage.setItem(CART_KEY, JSON.stringify(items)); }catch(e){ /* private browsing etc — cart just won't persist */ }
-  renderCartBadge();
+  renderAccountBadge();
 }
 function addToCart(item){
   const cart = getCart();
@@ -600,8 +606,13 @@ function renderWishBadge(){
       el = document.createElement("a");
       el.href = "wishlist.html"; el.className = "wishbtn"; el.title = "My Wishlist";
       el.innerHTML = `❤️<span class="wish-count"></span>`;
-      const cartEl = nav.querySelector(".cartbtn");
-      nav.insertBefore(el, cartEl || nav.firstChild);
+      // Lands after the search bar, before the account icon (or before the
+      // hamburger if the account icon hasn't been added yet) — either render
+      // order (this vs renderAccountBadge) ends up with the same final
+      // left-to-right order: search, wishlist, account, menu.
+      const acctEl = nav.querySelector(".accountbtn");
+      const menuBtn = nav.querySelector(".menu-btn");
+      nav.insertBefore(el, acctEl || menuBtn || null);
     }
     const count = getWishlist().length;
     const badge = el.querySelector(".wish-count");
@@ -716,7 +727,7 @@ function openQuickView(id){
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
         <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
-          <button type="button" class="btn btn-primary btn-sm" id="qvAddToCart">🛒 Add to Cart</button>
+          <a class="btn btn-wa btn-sm" id="qvWaBtn" target="_blank" href="${waLink(p, p.moq)}">🟢 WhatsApp Enquiry</a>
           <button type="button" class="wish-btn qv-wish ${wished?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
           <a class="btn btn-outline btn-sm" href="product.html?id=${p.id}">View full details →</a>
         </div>
@@ -726,20 +737,22 @@ function openQuickView(id){
     body.querySelectorAll(".qv-thumbs img").forEach(x=>x.classList.remove("active"));
     th.classList.add("active"); body.querySelector("#qvMainImg").src = th.dataset.src;
   }));
-  body.querySelectorAll("#qvSwatches .swatch").forEach(s=>s.addEventListener("click",()=>{
-    body.querySelectorAll("#qvSwatches .swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
-  }));
-  body.querySelectorAll("#qvSizes .sizebtn").forEach(s=>s.addEventListener("click",()=>{
-    body.querySelectorAll("#qvSizes .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
-  }));
-  body.querySelector("#qvAddToCart").addEventListener("click", ()=>{
+  // Keep the WhatsApp enquiry link's message in sync with whichever colour/size
+  // is currently picked, so it reaches Vikas's team with the right details.
+  function updateQvWaLink(){
     const colorEl = body.querySelector("#qvSwatches .swatch.active");
     const sizeEl = body.querySelector("#qvSizes .sizebtn.active");
     const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)]||"") : "";
-    addToCart({ productId:p.id, name:p.name, img:p.img[0], qty:p.moq, price:t.price, color:colorVal, size: sizeEl?sizeEl.textContent:"", printOption:"" });
-    const btn = body.querySelector("#qvAddToCart");
-    btn.textContent = "✓ Added"; setTimeout(()=>{ if(document.body.contains(btn)) btn.textContent = "🛒 Add to Cart"; }, 1600);
-  });
+    body.querySelector("#qvWaBtn").href = waLink(p, p.moq, "", colorVal, sizeEl?sizeEl.textContent:"");
+  }
+  body.querySelectorAll("#qvSwatches .swatch").forEach(s=>s.addEventListener("click",()=>{
+    body.querySelectorAll("#qvSwatches .swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    updateQvWaLink();
+  }));
+  body.querySelectorAll("#qvSizes .sizebtn").forEach(s=>s.addEventListener("click",()=>{
+    body.querySelectorAll("#qvSizes .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    updateQvWaLink();
+  }));
   modal.classList.add("show");
   document.body.classList.add("qv-open");
 }
@@ -765,7 +778,6 @@ function initMobileNav(){
     </div>
     <div class="mnav-icons">
       <a href="wishlist.html">❤️ My Wishlist</a>
-      <a href="cart.html">🛒 Cart</a>
       <a href="account.html">👤 My Account</a>
     </div>`;
   document.body.appendChild(overlay);
@@ -834,26 +846,19 @@ function initComparePage(){
   if(clearBtn) clearBtn.addEventListener("click", ()=>{ setCompare([]); location.href = "compare.html"; });
 }
 
-function renderCartBadge(){
+// This is a B2B catalogue, not a cart-based store — enquiries/quotes happen
+// over WhatsApp instead, so there's no cart icon here (just the account
+// icon, which this function used to add alongside the now-removed cart).
+function renderAccountBadge(){
   document.querySelectorAll(".navactions").forEach(nav=>{
-    let cartEl = nav.querySelector(".cartbtn");
-    if(!cartEl){
-      cartEl = document.createElement("a");
-      cartEl.href = "cart.html"; cartEl.className = "cartbtn"; cartEl.title = "Cart";
-      cartEl.innerHTML = `🛒<span class="cart-count"></span>`;
-      nav.insertBefore(cartEl, nav.firstChild);
-    }
     let acctEl = nav.querySelector(".accountbtn");
     if(!acctEl){
       acctEl = document.createElement("a");
       acctEl.href = "account.html"; acctEl.className = "accountbtn"; acctEl.title = "My Account";
       acctEl.textContent = "👤";
-      nav.insertBefore(acctEl, cartEl);
+      const menuBtn = nav.querySelector(".menu-btn");
+      nav.insertBefore(acctEl, menuBtn || null);
     }
-    const count = cartCount();
-    const badge = cartEl.querySelector(".cart-count");
-    badge.textContent = count>0 ? count : "";
-    badge.style.display = count>0 ? "flex" : "none";
   });
 }
 function initCartPage(){
@@ -1143,11 +1148,9 @@ function initProductPage(){
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
         <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
-          <button id="addToCartBtn" class="btn btn-primary" type="button">🛒 Add to Cart</button>
           <button type="button" class="wish-btn pd-wish ${isWishlisted(p.id)?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${isWishlisted(p.id)?'❤️':'🤍'}</span><span class="wish-label">${isWishlisted(p.id)?'Wishlisted':'Add to Wishlist'}</span></button>
           <a id="waBtn" class="btn btn-wa" target="_blank" href="#">🟢 Send WhatsApp Enquiry</a>
         </div>
-        <p class="ad-hint" id="cartAddedMsg" style="display:none;color:#5b8a00;font-weight:700">✓ Added to cart</p>
         <div class="pd-specs">
           <div class="pd-spec"><span>Customization</span><span>Logo / Branding available</span></div>
           <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
@@ -1316,26 +1319,6 @@ function initProductPage(){
       suitableToggle.textContent = expanded ? `+${suitableTags.length - SUITABLE_PREVIEW_COUNT} more` : "Show less";
     });
   }
-
-  document.querySelector("#addToCartBtn").addEventListener("click", ()=>{
-    const qty = Math.max(1, Number(qtyInput.value)||1);
-    const t = tierFor(p, qty);
-    const colorEl = document.querySelector(".swatches .swatch.active");
-    const sizeEl = document.querySelector(".sizerow:not(#printOptRow) .sizebtn.active");
-    const printEl = document.querySelector("#printOptRow .sizebtn.active");
-    // colorEl.dataset.c holds the swatch's INDEX into p.colors (see the swatches
-    // render above), not the hex value itself — look the real colour up by index
-    // so the cart stores/shows the actual colour, not a stray "0"/"1".
-    const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)] || "") : "";
-    addToCart({
-      productId: p.id, name: p.name, img: p.img[0], qty, price: t.price,
-      color: colorVal, size: sizeEl ? sizeEl.textContent : "",
-      printOption: printEl ? printEl.textContent : ""
-    });
-    const msg = document.querySelector("#cartAddedMsg");
-    msg.style.display = "block";
-    setTimeout(()=>{ msg.style.display = "none"; }, 2000);
-  });
 
   // similar products
   const similar = publishedProducts().filter(x=>x.cat===p.cat && x.id!==p.id).slice(0,4);
@@ -1781,7 +1764,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
   // and silently break unrelated features (reveal, menu) on the same page.
-  renderCartBadge();
+  renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
   const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
