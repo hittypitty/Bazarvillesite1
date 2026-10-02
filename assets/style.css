@@ -589,8 +589,18 @@ body.mnav-lock{overflow:hidden}
 .cart-total-row.grand{border-top:1.5px dashed var(--line);margin-top:8px;padding-top:12px;font-size:16px}
 .cart-total-row.grand b{font-family:"Plus Jakarta Sans";font-size:19px}
 
-/* ---- quantity slider (product.html, alongside the existing +/- stepper) ---- */
-.qty-slider{width:100%;max-width:280px;margin-top:10px;accent-color:var(--ink);cursor:pointer;display:block}
+/* ---- quantity slider (product.html, alongside the existing +/- stepper) ----
+   A bigger thumb and taller track make this easy to grab and drag with a
+   trackpad or finger — the native default thumb is small enough that a
+   slightly-off click can miss it entirely and feel like the slider "doesn't
+   work". Sized up across all three browser engines (-webkit/-moz/default). */
+.qty-slider{width:100%;max-width:280px;margin-top:10px;accent-color:var(--ink);cursor:pointer;display:block;height:28px;padding:9px 0}
+.qty-slider::-webkit-slider-runnable-track{height:6px;border-radius:4px;background:var(--line)}
+.qty-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;background:var(--ink);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);margin-top:-9px;cursor:grab}
+.qty-slider::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.1)}
+.qty-slider::-moz-range-track{height:6px;border-radius:4px;background:var(--line)}
+.qty-slider::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--ink);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab}
+.qty-slider::-moz-range-thumb:active{cursor:grabbing;transform:scale(1.1)}
 
 /* ---- shared empty-state block (cart / wishlist / compare) ---- */
 .empty-cart{text-align:center;padding:60px 20px;background:var(--surface);border:1px dashed var(--line);border-radius:var(--r-md)}

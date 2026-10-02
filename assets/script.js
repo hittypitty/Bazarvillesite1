@@ -313,10 +313,12 @@ function productCard(p){
     </div>
   </div></div>`;
 }
-function waLink(p, qty, printOpt){
+function waLink(p, qty, printOpt, color, size){
   const t = tierFor(p, qty);
+  const colorLine = color ? `%0AColour: ${color}` : "";
+  const sizeLine = size ? `%0ASize: ${size}` : "";
   const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
-  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs%0AApplicable price: ${money(t.price)}/pc${printLine}%0APlease share more details.`;
+  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(t.price)}/pc%0APlease share more details.`;
   return `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${msg}`;
 }
 
@@ -1114,13 +1116,14 @@ function initProductPage(){
         </div>
         <div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
+        <p class="ad-hint" id="viewAllPhotosLink" style="display:none;margin-top:6px;cursor:pointer;text-decoration:underline">↺ View all photos</p>
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
-        <input type="range" id="qtySlider" class="qty-slider" min="${p.moq}" max="${Math.max(p.tiers[p.tiers.length-1].min*2, p.moq*10)}" step="1" value="${p.moq}" aria-label="Quantity slider">
+        <input type="range" id="qtySlider" class="qty-slider" min="0" max="1000" step="1" value="0" data-qty-min="${p.moq}" data-qty-max="${Math.max(p.tiers[p.tiers.length-1].min*3, p.moq*5)}" aria-label="Quantity slider">
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
         <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
@@ -1149,11 +1152,17 @@ function initProductPage(){
 
   // Re-draws the main image + thumbnail strip for a given list of image URLs.
   // Used both on page load and whenever a colour swatch with its own photos is clicked.
+  // Also shows/hides the "View all photos" link — once a colour's own gallery
+  // replaces the main one, that link is the only way back to it besides
+  // hitting the browser's back button, which is what customers had to do before.
   function renderPdGallery(images){
-    const imgs = (images && images.length) ? images : p.img;
+    const usingColorGallery = !!(images && images.length);
+    const imgs = usingColorGallery ? images : p.img;
     document.querySelector("#mainImg").src = imgs[0];
     document.querySelector("#pdThumbs").innerHTML = imgs.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("");
     bindPdThumbClicks();
+    const viewAllLink = document.querySelector("#viewAllPhotosLink");
+    if(viewAllLink) viewAllLink.style.display = usingColorGallery ? "block" : "none";
   }
   function bindPdThumbClicks(){
     document.querySelectorAll("#pdThumbs img").forEach(t=>t.addEventListener("click",()=>{
@@ -1162,6 +1171,8 @@ function initProductPage(){
     }));
   }
   bindPdThumbClicks();
+  const viewAllPhotosLink = document.querySelector("#viewAllPhotosLink");
+  if(viewAllPhotosLink) viewAllPhotosLink.addEventListener("click", ()=>renderPdGallery(null));
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
@@ -1169,24 +1180,45 @@ function initProductPage(){
     const colorHex = p.colors[Number(s.dataset.c)];
     const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
     renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
+    recalc(); // selected colour is part of the WhatsApp enquiry message — keep it in sync
   }));
   document.querySelectorAll("#printOptRow .sizebtn").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll("#printOptRow .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    recalc();
   }));
   document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    recalc();
   }));
 
   const qtyInput = document.querySelector("#qtyInput");
   const qtySlider = document.querySelector("#qtySlider");
+  // The slider's own min/max/value (0-1000) are just a drag "position" — the
+  // real quantity range (qtyMin..qtyMax, e.g. MOQ to a high bulk tier) is
+  // mapped onto it on a LOG scale rather than linearly. A linear slider across
+  // a wide range (say 20 to 1500 pcs) barely moves for realistic small
+  // quantities near the MOQ end, which is what made it feel broken/unusable —
+  // a log scale gives that low end plenty of draggable room while still
+  // reaching the high end.
+  const qtySliderMin = qtySlider ? Number(qtySlider.dataset.qtyMin)||1 : 1;
+  const qtySliderMax = qtySlider ? Math.max(Number(qtySlider.dataset.qtyMax)||qtySliderMin, qtySliderMin+1) : 1;
+  function posFromQty(qty){
+    const ratio = qtySliderMax/qtySliderMin;
+    if(ratio<=1) return 0;
+    return Math.round(1000 * Math.log(Math.max(qty,qtySliderMin)/qtySliderMin) / Math.log(ratio));
+  }
+  function qtyFromPos(pos){
+    const ratio = qtySliderMax/qtySliderMin;
+    if(ratio<=1) return qtySliderMin;
+    return Math.round(qtySliderMin * Math.pow(ratio, pos/1000));
+  }
   function recalc(source){
     let qty = Math.max(1, Number(qtyInput.value)||1);
     qtyInput.value = qty;
     // keep the slider in sync both ways — clamp to its range so an out-of-range
     // typed/stepped value doesn't throw the slider's thumb off its track.
     if(qtySlider && source !== "slider"){
-      const max = Number(qtySlider.max)||qty;
-      qtySlider.value = Math.min(Math.max(qty, Number(qtySlider.min)||1), max);
+      qtySlider.value = posFromQty(Math.min(Math.max(qty, qtySliderMin), qtySliderMax));
     }
     const t = tierFor(p, qty);
     document.querySelector("#livePrice").innerHTML = `${money(t.price)} <span>/ piece</span>`;
@@ -1200,13 +1232,19 @@ function initProductPage(){
       msgEl.textContent = `Bulk enquiries start from ${p.bulk} pieces — increase quantity to unlock bulk pricing support.`;
     } else { msgEl.textContent = `✓ Bulk enquiry unlocked for this quantity.`; }
     const printOptEl = document.querySelector("#printOptRow .sizebtn.active");
-    waBtn.href = waLink(p, qty, printOptEl ? printOptEl.textContent : "");
+    // Colour/size the customer picked should ride along in the WhatsApp message
+    // too, not just quantity/price/print — Vikas's feedback was that only a
+    // partial message was going through.
+    const colorEl = document.querySelector(".swatches .swatch.active");
+    const sizeEl = document.querySelector(".sizerow:not(#printOptRow) .sizebtn.active");
+    const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)] || "") : "";
+    waBtn.href = waLink(p, qty, printOptEl ? printOptEl.textContent : "", colorVal, sizeEl ? sizeEl.textContent : "");
     waBtn.textContent = p.stock ? "🟢 Send WhatsApp Enquiry" : "🟢 Check Availability on WhatsApp";
   }
   document.querySelector("#qMinus").addEventListener("click",()=>{ qtyInput.value = Math.max(1,(Number(qtyInput.value)||1)-5); recalc(); });
   document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+5; recalc(); });
   qtyInput.addEventListener("input", ()=>recalc());
-  if(qtySlider) qtySlider.addEventListener("input", ()=>{ qtyInput.value = qtySlider.value; recalc("slider"); });
+  if(qtySlider) qtySlider.addEventListener("input", ()=>{ qtyInput.value = qtyFromPos(Number(qtySlider.value)); recalc("slider"); });
   recalc();
 
   document.querySelector("#addToCartBtn").addEventListener("click", ()=>{
