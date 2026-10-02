@@ -1107,12 +1107,6 @@ function initProductPage(){
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating">★★★★★ 4.7 (${18+p.id} reviews) &nbsp;•&nbsp; ${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
-        <div class="pd-price-box">
-          <div class="pd-price" id="livePrice">${money(tierFor(p,p.moq).price)} <span>/ piece</span></div>
-          <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
-          ${p.tiers.map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
-          </table>
-        </div>
         <div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
         <p class="ad-hint" id="viewAllPhotosLink" style="display:none;margin-top:6px;cursor:pointer;text-decoration:underline">↺ View all photos</p>
@@ -1120,6 +1114,15 @@ function initProductPage(){
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
+        <!-- Price sits right next to Quantity now — Vikas's feedback was that
+             having the price box up top and quantity selector further down
+             made them feel disconnected from each other. -->
+        <div class="pd-price-box">
+          <div class="pd-price" id="livePrice">${money(tierFor(p,p.moq).price)} <span>/ piece</span></div>
+          <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
+          ${p.tiers.map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
+          </table>
+        </div>
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
         <input type="range" id="qtySlider" class="qty-slider" min="0" max="1000" step="1" value="0" data-qty-min="${Math.max(1, Math.min(p.moq, p.tiers[0] ? p.tiers[0].min : p.moq))}" data-qty-max="${Math.max(p.tiers[p.tiers.length-1].min*3, p.moq*5)}" aria-label="Quantity slider">
@@ -1201,7 +1204,13 @@ function initProductPage(){
     if(e.key==="ArrowLeft") lightboxNav(-1);
     if(e.key==="ArrowRight") lightboxNav(1);
   });
-  renderPdGallery(null);
+  // Default to the first colour's own gallery (if it has one) instead of the
+  // product's general/mixed photo set — Vikas's feedback was that opening a
+  // product should show one colour's photos by default, not everything at
+  // once, with the already-active first swatch deciding which.
+  const firstColorHex = p.colors[0];
+  const firstColorImgs = p.colorImages && firstColorHex ? p.colorImages[firstColorHex] : null;
+  renderPdGallery(firstColorImgs && firstColorImgs.length ? firstColorImgs : null);
   const viewAllPhotosLink = document.querySelector("#viewAllPhotosLink");
   if(viewAllPhotosLink) viewAllPhotosLink.addEventListener("click", ()=>renderPdGallery(null));
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
