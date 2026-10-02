@@ -234,6 +234,15 @@ img{max-width:100%;display:block}
 
 /* ================= PRODUCT DETAIL ================= */
 .pd-layout{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
+/* The gallery column is usually shorter than the options/description column
+   next to it, which with align-items:start just left a big empty gap below
+   the photos as the page scrolled past them. Making it sticky keeps the
+   photos in view alongside whatever the customer is reading/choosing on the
+   right instead of leaving that blank space. */
+.pd-layout .reveal-left{position:sticky;top:100px;align-self:start;max-height:calc(100vh - 120px);overflow-y:auto}
+@media (max-width:1000px){
+  .pd-layout .reveal-left{position:static;max-height:none;overflow-y:visible}
+}
 
 /* ---- Myntra-style photo grid: every image shown big, side by side, not a
    single hero + a row of small thumbnails. Odd one out (last image, when the
