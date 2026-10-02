@@ -1122,7 +1122,7 @@ function initProductPage(){
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
         <div class="opt-title">Quantity</div>
         <div class="qtybox"><button id="qMinus">−</button><input id="qtyInput" type="number" value="${p.moq}" min="1"><button id="qPlus">+</button></div>
-        <input type="range" id="qtySlider" class="qty-slider" min="0" max="1000" step="1" value="0" data-qty-min="${p.moq}" data-qty-max="${Math.max(p.tiers[p.tiers.length-1].min*3, p.moq*5)}" aria-label="Quantity slider">
+        <input type="range" id="qtySlider" class="qty-slider" min="0" max="1000" step="1" value="0" data-qty-min="${Math.max(1, Math.min(p.moq, p.tiers[0] ? p.tiers[0].min : p.moq))}" data-qty-max="${Math.max(p.tiers[p.tiers.length-1].min*3, p.moq*5)}" aria-label="Quantity slider">
         <div class="livecalc" id="liveCalc"></div>
         <div class="threshold-msg" id="thresholdMsg"></div>
         <div style="display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center">
