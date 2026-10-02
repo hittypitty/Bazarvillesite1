@@ -304,6 +304,19 @@ img{max-width:100%;display:block}
 .pd-spec{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid #f0f1ea;font-size:14px}
 .pd-spec span:last-child{font-weight:700}
 
+/* "Suitable for" — a long combined purposes+occasions list reads as a messy
+   wall of text as a plain comma-joined value, so it gets its own stacked
+   layout: label on top, wrapped tag chips below, collapsed to a preview
+   with a "+N more" toggle instead of dumping everything at once. */
+.pd-spec-tags{flex-direction:column;align-items:flex-start;gap:8px}
+.pd-spec-tags>span:first-child{font-weight:700;color:var(--muted);font-size:13px}
+.pd-tags-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.pd-tag-chip{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
+.pd-tags-wrap[data-expanded="1"] .pd-tag-chip{display:inline-block}
+.pd-tags-wrap:not([data-expanded="1"]) .pd-tag-chip:nth-child(n+7){display:none}
+.pd-tag-more{align-self:flex-start;background:none;border:none;padding:0;font:inherit;font-size:12.5px;font-weight:800;color:var(--lime-deep);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.pd-tag-more:hover{opacity:.75}
+
 /* "You may also like" — related-products section on product.html, injected
    by initProductPage() in script.js. Mirrors the .title heading pattern used
    elsewhere on the site, scoped to this section so it doesn't affect any

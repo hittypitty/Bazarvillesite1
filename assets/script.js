@@ -1098,6 +1098,20 @@ function initProductPage(){
   applyProductSeo(p);
   pushRecentlyViewed(p.id);
 
+  // "Suitable for" can combine many purposes + occasions — as a single
+  // comma-joined sentence that list reads as a messy wall of text, so it's
+  // shown as wrapped tag chips instead, collapsed to a handful with a
+  // "+N more" toggle rather than always dumping the whole list.
+  const suitableTags = [
+    ...(p.purposes&&p.purposes.length?p.purposes:[p.purpose]).filter(Boolean),
+    ...(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).filter(Boolean)
+  ];
+  const SUITABLE_PREVIEW_COUNT = 6;
+  const suitableTagsHtml = suitableTags.map(t=>`<span class="pd-tag-chip">${t}</span>`).join("");
+  const suitableMoreHtml = suitableTags.length > SUITABLE_PREVIEW_COUNT
+    ? `<button type="button" class="pd-tag-more" id="pdSuitableToggle">+${suitableTags.length - SUITABLE_PREVIEW_COUNT} more</button>`
+    : "";
+
   el.innerHTML = `
     <div class="pd-layout">
       <div class="reveal-left">
@@ -1139,7 +1153,13 @@ function initProductPage(){
           <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
           <div class="pd-spec"><span>Bulk enquiry from</span><span>${p.bulk} pcs</span></div>
           <div class="pd-spec"><span>GST</span><span>Exclusive</span></div>
-          <div class="pd-spec"><span>Suitable for</span><span>${(p.purposes&&p.purposes.length?p.purposes:[p.purpose]).filter(Boolean).join(", ")}${(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).filter(Boolean).length?" • "+(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).filter(Boolean).join(", "):""}</span></div>
+          <div class="pd-spec pd-spec-tags">
+            <span>Suitable for</span>
+            <div class="pd-tags-wrap" id="pdSuitableTags" data-expanded="0">
+              ${suitableTagsHtml}
+            </div>
+            ${suitableMoreHtml}
+          </div>
         </div>
       </div>
     </div>
@@ -1286,6 +1306,16 @@ function initProductPage(){
   qtyInput.addEventListener("input", ()=>recalc());
   if(qtySlider) qtySlider.addEventListener("input", ()=>{ qtyInput.value = qtyFromPos(Number(qtySlider.value)); recalc("slider"); });
   recalc();
+
+  const suitableToggle = document.querySelector("#pdSuitableToggle");
+  if(suitableToggle){
+    suitableToggle.addEventListener("click", ()=>{
+      const wrap = document.querySelector("#pdSuitableTags");
+      const expanded = wrap.dataset.expanded === "1";
+      wrap.dataset.expanded = expanded ? "0" : "1";
+      suitableToggle.textContent = expanded ? `+${suitableTags.length - SUITABLE_PREVIEW_COUNT} more` : "Show less";
+    });
+  }
 
   document.querySelector("#addToCartBtn").addEventListener("click", ()=>{
     const qty = Math.max(1, Number(qtyInput.value)||1);
