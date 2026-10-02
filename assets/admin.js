@@ -232,6 +232,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <td><span class="ad-badge ${p.stock?'in':'out'}">${p.stock?'In stock':'Out of stock'}</span></td>
           <td><span class="ad-badge ${isDraft?'out':'in'}">${isDraft?'Draft':'Published'}</span></td>
           <td><div class="ad-row-actions">
+            <a class="ad-icon-btn" title="View on site" href="product.html?id=${p.id}" target="_blank" rel="noopener">👁️</a>
             <button class="ad-icon-btn" title="Edit" onclick="AdminUI.editProduct(${p.id})">✏️</button>
             <button class="ad-icon-btn danger" title="Delete" onclick="AdminUI.deleteProduct(${p.id})">🗑️</button>
           </div></td>
