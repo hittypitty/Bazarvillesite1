@@ -241,6 +241,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   let editingProductId = null;
   let productImages = [];
+  // Parallel to productImages: "" (no colour tag — shows for every colour,
+  // same as before) or one of workingColors' hex values. Tagging an image
+  // here is a shortcut for the same thing the "Colour-specific images"
+  // section below does — it just saves re-uploading the same photo there
+  // when it's already sitting in the main gallery.
+  let productImageColors = [];
 
   function productFormHtml(p){
     return `
@@ -367,6 +373,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     el.innerHTML = workingColors.map((c,i)=>`
       <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
     renderColorImageGroups();
+    // The main Product images grid's per-photo colour-tag dropdown lists the
+    // current colours too, so it needs refreshing whenever the colour list
+    // changes (a newly-added colour wouldn't otherwise appear as an option).
+    if(document.querySelector("#pf_imgGrid")) renderImgGrid();
   }
   /* ---------- colour-specific images (optional, product form) ----------
      One mini image-grid per working colour. A colour with no images here
@@ -446,6 +456,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const c = workingColors[i];
     workingColors.splice(i,1);
     delete workingColorImages[c]; // drop that colour's images too — nothing to show them for any more
+    productImageColors = productImageColors.map(tag=>tag===c?"":tag); // untag any main-gallery photo tagged with it
     renderColorChips();
   };
   AdminUI.removeColorImg = (ci, i)=>{
@@ -523,18 +534,36 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function renderImgGrid(){
     const el = document.querySelector("#pf_imgGrid");
     el.innerHTML = productImages.map((src,i)=>`
-      <div class="ad-img-thumb"><img src="${src}" onerror="this.closest('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeImg(${i})">✕</span></div>`).join("")
+      <div class="ad-img-thumb-wrap">
+        <div class="ad-img-thumb"><img src="${src}" onerror="this.closest('.ad-img-thumb-wrap').querySelector('.ad-img-thumb').classList.add('broken')"><span class="rm" onclick="AdminUI.removeImg(${i})">✕</span></div>
+        ${workingColors.length ? `<select class="ad-img-color-tag" data-i="${i}" title="Tag this photo with a colour so it also shows in that colour's gallery">
+          <option value="">No colour tag</option>
+          ${workingColors.map(c=>`<option value="${c}" ${productImageColors[i]===c?"selected":""}>${c}</option>`).join("")}
+        </select>` : ""}
+      </div>`).join("")
       + `<div class="ad-img-add" id="pf_addImgBtn">+</div>`;
     document.querySelector("#pf_addImgBtn").addEventListener("click", ()=>document.querySelector("#pf_imgInput").click());
+    el.querySelectorAll(".ad-img-color-tag").forEach(sel=>{
+      sel.addEventListener("change", ()=>{ productImageColors[Number(sel.dataset.i)] = sel.value; });
+    });
   }
   AdminUI.removeImg = (i)=>{
     if(!confirm("Remove this photo from the product? This can't be undone unless you re-add the image link/file, and it won't take effect until you click Save.")) return;
-    productImages.splice(i,1); renderImgGrid();
+    productImages.splice(i,1); productImageColors.splice(i,1); renderImgGrid();
   };
 
   function openProductModal(p){
     editingProductId = p ? p.id : null;
     productImages = p ? p.img.slice() : [];
+    // If this product already has colour-specific images saved, and one of
+    // them happens to be a photo that's also sitting in the main gallery
+    // (same URL), pre-fill that photo's colour tag to match — so editing an
+    // existing product shows its current tagging instead of looking untagged.
+    productImageColors = productImages.map(src=>{
+      if(!p || !p.colorImages) return "";
+      const match = Object.entries(p.colorImages).find(([,imgs])=>imgs.includes(src));
+      return match ? match[0] : "";
+    });
     workingTiers = p ? p.tiers.map(t=>({...t})) : [{min:p?p.moq:10, price:0}];
     workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
     workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
@@ -668,6 +697,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         try{
           const url = await BazDS.uploadImage(file, "products");
           productImages.push(url);
+          productImageColors.push("");
           renderImgGrid();
         }catch(err){
           status.textContent = "Upload failed: " + (err.message||"check Supabase Storage bucket/policy.");
@@ -699,6 +729,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(!working){ status.textContent = ""; alert(BROKEN_LINK_MSG); return; }
       status.textContent = "";
       productImages.push(working);
+      productImageColors.push("");
       input.value = "";
       renderImgGrid();
     });
@@ -771,11 +802,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // actually have at least one image — an empty/orphaned entry would
       // otherwise linger and mean nothing (renderGallery falls back to the
       // main images anyway when the array is empty).
-      colorImages: Object.fromEntries(
-        workingColors
-          .filter(c=>workingColorImages[c] && workingColorImages[c].length)
-          .map(c=>[c, workingColorImages[c].slice()])
-      ),
+      // Merge in photos tagged with a colour right in the main "Product
+      // images" grid (productImageColors) with whatever the dedicated
+      // "Colour-specific images" section already has (workingColorImages),
+      // de-duplicating URLs so tagging a photo that's already listed there
+      // doesn't create a repeat.
+      colorImages: (()=>{
+        const merged = {};
+        workingColors.forEach(c=>{
+          const fromSection = (workingColorImages[c]||[]).slice();
+          const fromTags = productImages.filter((src,i)=>productImageColors[i]===c);
+          const combined = [...fromSection, ...fromTags.filter(u=>!fromSection.includes(u))];
+          if(combined.length) merged[c] = combined;
+        });
+        return merged;
+      })(),
       sizes: workingSizes.slice(),
       printOptions: workingPrintOpts.slice(),
       tiers: workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min),

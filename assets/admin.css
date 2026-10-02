@@ -95,6 +95,9 @@ body{background:var(--soft)}
 .ad-img-thumb .rm:hover{background:#c0392b;transform:scale(1.15)}
 .ad-img-add{width:76px;height:76px;border-radius:10px;border:1.5px dashed var(--line);display:grid;place-items:center;cursor:pointer;font-size:22px;color:var(--muted);transition:border-color .2s ease,color .2s ease,transform .2s ease}
 .ad-img-add:hover{border-color:var(--ink);color:var(--ink);transform:scale(1.05)}
+.ad-img-thumb-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.ad-img-color-tag{width:76px;max-width:76px;border:1.5px solid var(--line);border-radius:6px;padding:2px 3px;font-size:9.5px;font:inherit;background:var(--bg,#fff);color:var(--ink);transition:border-color .2s ease}
+.ad-img-color-tag:focus{border-color:var(--ink);outline:none}
 
 /* ---------- colour-specific image groups (product form) ---------- */
 .ad-color-img-group{border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--soft)}
