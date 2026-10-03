@@ -177,11 +177,10 @@ const DEFAULT_SETTINGS = {
   occasions: DEFAULT_OCCASIONS,
   customProfessions: [],
   homepageQuestions: DEFAULT_HOMEPAGE_QUESTIONS,
-  heroImages: [
-    "https://picsum.photos/seed/bzv101/500/620",
-    "https://picsum.photos/seed/bzv102/450/560",
-    "https://picsum.photos/seed/bzv103/400/500"
-  ]
+  // Empty by default — the homepage banner (.hq-banner) shows a clean
+  // on-brand gradient + tagline until an admin uploads a real photo from
+  // Site Settings, rather than a random stock placeholder.
+  heroImages: []
 };
 
 // Font presets for the admin "Site font" picker. Every family here is already
@@ -1767,12 +1766,23 @@ function initHeroSearch(){
   input.addEventListener("keydown", e=>{ if(e.key==="Enter") go(); });
 }
 
-/* ---------- hero banner images (admin-editable via Settings) ---------- */
+/* ---------- hero banner images (admin-editable via Settings) ----------
+   heroImg1 doubles as the homepage's big banner photo (see .hq-banner).
+   Until an admin actually uploads one from Site Settings, there's nothing
+   to show a random stock photo for, so the banner stays a clean on-brand
+   gradient with a tagline (set in index.html) instead — never a generic
+   picsum placeholder. The <img> only appears, and the gradient/text hides,
+   once a real image is on file. */
 function initHeroImages(){
   const map = {heroImg1:0, heroImg2:1, heroImg3:2};
   Object.keys(map).forEach(id=>{
     const el = document.querySelector("#"+id);
-    if(el && SETTINGS.heroImages && SETTINGS.heroImages[map[id]]) el.src = SETTINGS.heroImages[map[id]];
+    const url = SETTINGS.heroImages && SETTINGS.heroImages[map[id]];
+    if(!el || !url) return;
+    el.src = url;
+    el.style.display = "block";
+    const banner = document.querySelector("#hqBanner");
+    if(id==="heroImg1" && banner) banner.classList.add("has-photo");
   });
 }
 
