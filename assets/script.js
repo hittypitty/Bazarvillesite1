@@ -157,6 +157,17 @@ const SEARCH_SYNONYMS = {
   "bank gift": ["Finance"]
 };
 
+// Default chips for the homepage "Questions" ticker — admin can replace
+// these any time from Admin → Site Settings → Homepage quick questions.
+const DEFAULT_HOMEPAGE_QUESTIONS = [
+  "What can I get under ₹500?",
+  "What can I get under ₹5,000?",
+  "Best gifts for employee onboarding?",
+  "Diwali gifting ideas on a budget?",
+  "What's trending for client gifting?",
+  "How can we help you today?"
+];
+
 const DEFAULT_SETTINGS = {
   whatsappNumber: "919827869031",
   brandColor: "#c6f000",
@@ -165,6 +176,7 @@ const DEFAULT_SETTINGS = {
   purposes: DEFAULT_PURPOSES,
   occasions: DEFAULT_OCCASIONS,
   customProfessions: [],
+  homepageQuestions: DEFAULT_HOMEPAGE_QUESTIONS,
   heroImages: [
     "https://picsum.photos/seed/bzv101/500/620",
     "https://picsum.photos/seed/bzv102/450/560",
@@ -457,6 +469,16 @@ function initFilters(){
   const budgetInput = document.querySelector("#budgetFilter");
   if(qtyInput) qtyInput.addEventListener("input",()=>{ state.qty = Number(qtyInput.value)||1; apply(); });
   if(budgetInput) budgetInput.addEventListener("input",()=>{ state.budget = Number(budgetInput.value)||999999; apply(); });
+
+  // "Shop by Budget" nav link lands here as products.html?focus=budget — pop
+  // the filters panel open (it's collapsed by default on mobile) and draw
+  // attention straight to the budget field instead of making the visitor
+  // hunt for it.
+  if(params.get("focus")==="budget" && budgetInput){
+    const panel = document.querySelector(".filters");
+    if(panel) panel.classList.add("open");
+    setTimeout(()=>{ budgetInput.scrollIntoView({behavior:"smooth", block:"center"}); budgetInput.focus(); }, 150);
+  }
 
   if(state.profession!=="All"){
     const activeChip = document.querySelector(`[data-profession="${state.profession}"]`);
@@ -1716,6 +1738,35 @@ function initCollectionPage(){
   renderGrid("#collectionGrid", publishedProducts().slice(0, 8));
 }
 
+/* ---------- homepage "Questions" ticker + search bar (admin-editable via Settings) ----------
+   Replaces the old static hero banner. Chips scroll in an infinite marquee
+   (same .ticker technique used by the topbar strip) and, like the hero
+   search box below them, just hand the typed/tapped text to products.html's
+   existing ?q= search — there's no separate "AI" engine behind this, it's
+   the same smart keyword+taxonomy search products.html already does. */
+function renderHeroQuestions(){
+  const wrap = document.querySelector("#hqTicker");
+  if(!wrap) return;
+  const list = (SETTINGS.homepageQuestions && SETTINGS.homepageQuestions.length) ? SETTINGS.homepageQuestions : DEFAULT_HOMEPAGE_QUESTIONS;
+  const chips = list.map(q=>`<span class="hq-chip" data-q="${q.replace(/"/g,"&quot;")}">${q}</span>`).join("");
+  wrap.innerHTML = chips + chips; // doubled content → seamless loop, same trick as .topbar .ticker
+  wrap.querySelectorAll(".hq-chip").forEach(chip=>{
+    chip.addEventListener("click", ()=>{ location.href = "products.html?q=" + encodeURIComponent(chip.dataset.q); });
+  });
+}
+function initHeroSearch(){
+  const input = document.querySelector("#heroSearchInput");
+  const btn = document.querySelector("#heroSearchBtn");
+  if(!input || !btn) return;
+  function go(){
+    const q = input.value.trim();
+    if(!q) return;
+    location.href = "products.html?q=" + encodeURIComponent(q);
+  }
+  btn.addEventListener("click", go);
+  input.addEventListener("keydown", e=>{ if(e.key==="Enter") go(); });
+}
+
 /* ---------- hero banner images (admin-editable via Settings) ---------- */
 function initHeroImages(){
   const map = {heroImg1:0, heroImg2:1, heroImg3:2};
@@ -1813,7 +1864,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderCompareBar();
   const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
-    initFaq, initParallax, initHeroTilt, initHeroImages, initReveal, initCounters,
+    initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
     initMobileNav, initWishlistPage, initComparePage, initRecentlyViewedSection];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });

@@ -17,25 +17,22 @@
 
 <header class="nav"><div class="container navin">
 <a class="brand" href="index.html"><img src="assets/logo.png" alt="Bazarville"><b>Bazarville</b></a>
-<nav class="links"><a href="products.html">Shop Products</a><a href="galaxy.html">Shop by Profession</a><a href="index.html#collections">Collections</a><a href="index.html#footer">Contact</a></nav>
+<nav class="links"><a href="products.html">Shop by Product</a><a href="galaxy.html">Shop by Profession</a><a href="products.html?focus=budget">Shop by Budget</a></nav>
 <div class="navactions"><div class="nav-search"><input type="search" id="navSearchInput" class="nav-search-input" placeholder="Search products…" aria-label="Search products"><span class="searchbtn" id="navSearchBtn" title="Search products">⌕</span></div><span class="menu-btn">☰</span></div>
 </div></header>
 
 <main>
-<section class="hero hero-v2"><div class="container hero-grid">
-  <div>
-    <div class="eyebrow-plain">Custom Merchandise Solutions Partner</div>
-    <h1>Custom Merchandise<br>and Corporate<br>Gifts, Branded in<br><span class="hl">Days</span></h1>
-    <p>And when you're ready to raise a bulk order — with the right pricing, the right MOQ, before your event window closes — we're here for that too.</p>
-    <div class="hero-actions">
-      <a class="btn btn-lime" href="products.html">Browse Catalogue →</a>
-      <a class="btn btn-outline" href="galaxy.html">Shop by Profession</a>
-      <a class="btn btn-outline" href="track.html">Track an Enquiry</a>
-      <a class="btn btn-lime" href="index.html#footer">Raise Bulk Enquiry</a>
-    </div>
+<section class="section hq-section"><div class="container">
+  <div class="hq-head reveal">
+    <h1>What are you shopping for today?</h1>
+    <p>Tap a quick question or search below — we'll take you straight to the right products.</p>
   </div>
-  <div class="hero-photo">
-    <img id="heroImg1" src="https://picsum.photos/seed/bzv101/900/900" alt="Bazarville custom branded merchandise">
+  <div class="hq-tickerwrap reveal" id="hqTickerWrap">
+    <div class="ticker hq-ticker" id="hqTicker"></div>
+  </div>
+  <div class="hq-search reveal">
+    <input type="search" id="heroSearchInput" class="hq-search-input" placeholder="✨ Try: eco-friendly gifts under ₹500…" aria-label="Search products">
+    <button type="button" id="heroSearchBtn" class="btn btn-lime">Search</button>
   </div>
 </div></section>
 
@@ -49,6 +46,10 @@
     <div class="logochip"><span class="dot"></span>Summit Edu</div>
     <div class="logochip"><span class="dot"></span>Harbor Hotels</div>
   </div>
+</div></section>
+
+<section class="section"><div class="container">
+  <div class="hq-banner reveal-zoom"><img id="heroImg1" src="https://picsum.photos/seed/bzv101/1400/520" alt="Bazarville custom branded merchandise"></div>
 </div></section>
 
 <section class="section"><div class="container">
@@ -70,7 +71,7 @@
 </div></section>
 
 <section class="section alt" id="collections"><div class="container">
-  <div class="title reveal"><h2>Featured Collections</h2><p>Hand-picked by our catalogue team — updated regularly.</p></div>
+  <div class="title reveal"><h2>Trending Products</h2><p>Hand-picked by our catalogue team — updated regularly.</p></div>
   <div class="collections" id="collGrid"></div>
 </div></section>
 

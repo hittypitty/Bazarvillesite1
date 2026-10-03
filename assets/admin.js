@@ -962,6 +962,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function renderSettingsView(){
     const waInput = document.querySelector("#settingsWaNumber");
     if(waInput) waInput.value = SETTINGS.whatsappNumber || "";
+    const homeQInput = document.querySelector("#settingsHomeQuestions");
+    if(homeQInput) homeQInput.value = (SETTINGS.homepageQuestions || []).join("\n");
     const row = document.querySelector("#heroUploadRow"); if(!row) return;
     row.innerHTML = [0,1,2].map(i=>`
       <div class="ad-hero-slot">
@@ -993,6 +995,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try{ await BazDS.updateSettings(SETTINGS); alert("WhatsApp number saved."); }
     catch(err){ alert("Could not save: " + err.message); }
     finally{ busy(saveWaBtn, false); }
+  });
+
+  const saveHomeQuestionsBtn = document.querySelector("#saveHomeQuestionsBtn");
+  if(saveHomeQuestionsBtn) saveHomeQuestionsBtn.addEventListener("click", async ()=>{
+    const lines = document.querySelector("#settingsHomeQuestions").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    SETTINGS.homepageQuestions = lines;
+    busy(saveHomeQuestionsBtn, true, "Saving…");
+    try{ await BazDS.updateSettings(SETTINGS); alert("Homepage questions saved."); }
+    catch(err){ alert("Could not save: " + err.message); }
+    finally{ busy(saveHomeQuestionsBtn, false); }
   });
 
   /* ================= BRAND COLOUR THEME ================= */

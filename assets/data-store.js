@@ -167,9 +167,19 @@ const BazDS = (function(){
     "Conferences & Exhibitions","Employee Joining / Onboarding","Employee Recognition & Awards",
     "Employee Farewell","Client / Dealer Meets","Team Outings & Celebrations"
   ];
+  const DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK = [
+    "What can I get under ₹500?",
+    "What can I get under ₹5,000?",
+    "Best gifts for employee onboarding?",
+    "Diwali gifting ideas on a budget?",
+    "What's trending for client gifting?",
+    "How can we help you today?"
+  ];
+
   const SETTINGS_FALLBACK = {
     whatsappNumber:"919827869031", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle",
-    purposes: DEFAULT_PURPOSES_FALLBACK, occasions: DEFAULT_OCCASIONS_FALLBACK, customProfessions: []
+    purposes: DEFAULT_PURPOSES_FALLBACK, occasions: DEFAULT_OCCASIONS_FALLBACK, customProfessions: [],
+    homepageQuestions: DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK
   };
 
   async function getSettings(){
@@ -182,11 +192,12 @@ const BazDS = (function(){
       brandColor: data.brand_color || "#c6f000",
       brandFont: data.brand_font || "inter",
       animationLevel: data.animation_level || "subtle",
-      // these three columns only exist after add_taxonomies.sql is run —
-      // fall back to the defaults so the site/admin still work either way
+      // these columns only exist after their respective migration has been
+      // run — fall back to the defaults so the site/admin still work either way
       purposes: (data.purposes && data.purposes.length) ? data.purposes : DEFAULT_PURPOSES_FALLBACK,
       occasions: (data.occasions && data.occasions.length) ? data.occasions : DEFAULT_OCCASIONS_FALLBACK,
-      customProfessions: data.custom_professions || []
+      customProfessions: data.custom_professions || [],
+      homepageQuestions: (data.homepage_questions && data.homepage_questions.length) ? data.homepage_questions : DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK
     };
   }
 
@@ -200,22 +211,23 @@ const BazDS = (function(){
       animation_level: settings.animationLevel,
       purposes: settings.purposes || DEFAULT_PURPOSES_FALLBACK,
       occasions: settings.occasions || DEFAULT_OCCASIONS_FALLBACK,
-      custom_professions: settings.customProfessions || []
+      custom_professions: settings.customProfessions || [],
+      homepage_questions: settings.homepageQuestions || DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK
     };
     let { error } = await sb.from("settings").update(fullRow).eq("id",1);
-    if(error && /(purposes|occasions|custom_professions)['"]?\s*column|column.*(purposes|occasions|custom_professions)/i.test(error.message)){
-      // The add_taxonomies.sql migration hasn't been run on this database yet
-      // (those 3 columns don't exist — Supabase's actual error reads "Could
-      // not find the 'occasions' column of 'settings' in the schema cache",
-      // column name BEFORE the word "column", so the original pattern that
-      // only matched "column ... occasions" never actually fired). Retry
-      // without them so brand colour/font/WhatsApp-number/hero-image saves
-      // still work — then surface a clear, actionable error instead of a
-      // cryptic "column not found" one.
-      const { purposes, occasions, custom_professions, ...safeRow } = fullRow;
+    if(error && /(purposes|occasions|custom_professions|homepage_questions)['"]?\s*column|column.*(purposes|occasions|custom_professions|homepage_questions)/i.test(error.message)){
+      // The relevant migration (add_taxonomies.sql or add_homepage_questions.sql)
+      // hasn't been run on this database yet — Supabase's actual error reads
+      // "Could not find the 'homepage_questions' column of 'settings' in the
+      // schema cache", column name BEFORE the word "column", so the original
+      // pattern that only matched "column ... x" never actually fired. Retry
+      // without the missing-column fields so brand colour/font/WhatsApp-number/
+      // hero-image saves still work — then surface a clear, actionable error
+      // instead of a cryptic "column not found" one.
+      const { purposes, occasions, custom_professions, homepage_questions, ...safeRow } = fullRow;
       const retry = await sb.from("settings").update(safeRow).eq("id",1);
       if(retry.error){ console.error("updateSettings:", retry.error.message); throw retry.error; }
-      const migrationErr = new Error("Baaki settings save ho gayi, lekin naya Purpose/Occasion/Profession add karne ke liye pehle 'add_taxonomies.sql' migration Supabase SQL Editor me run karna hoga.");
+      const migrationErr = new Error("Baaki settings save ho gayi, lekin ye field save karne ke liye pehle zaroori migration (.sql file) Supabase SQL Editor me run karna hoga.");
       migrationErr.migrationNeeded = true;
       throw migrationErr;
     }
