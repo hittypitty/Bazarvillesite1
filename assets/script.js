@@ -1730,6 +1730,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyAnimationLevel(SETTINGS.animationLevel);
   const footerWaLink = document.querySelector("#footerWaLink");
   if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
+  const ctaWaLink = document.querySelector("#ctaWaLink");
+  if(ctaWaLink) ctaWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent("Hi Bazarville! I'd like to raise a bulk enquiry.")}`;
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
