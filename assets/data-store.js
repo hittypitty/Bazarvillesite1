@@ -168,7 +168,7 @@ const BazDS = (function(){
     "Employee Farewell","Client / Dealer Meets","Team Outings & Celebrations"
   ];
   const SETTINGS_FALLBACK = {
-    whatsappNumber:"919999999999", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle",
+    whatsappNumber:"919827869031", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle",
     purposes: DEFAULT_PURPOSES_FALLBACK, occasions: DEFAULT_OCCASIONS_FALLBACK, customProfessions: []
   };
 

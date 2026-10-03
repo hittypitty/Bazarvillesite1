@@ -158,7 +158,7 @@ const SEARCH_SYNONYMS = {
 };
 
 const DEFAULT_SETTINGS = {
-  whatsappNumber: "919999999999",
+  whatsappNumber: "919827869031",
   brandColor: "#c6f000",
   brandFont: "inter",
   animationLevel: "subtle",
@@ -319,7 +319,7 @@ function waLink(p, qty, printOpt, color, size){
   const sizeLine = size ? `%0ASize: ${size}` : "";
   const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
   const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(t.price)}/pc%0APlease share more details.`;
-  return `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${msg}`;
+  return `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${msg}`;
 }
 
 function renderGrid(target, list){
@@ -738,7 +738,7 @@ function buildEnquiryModal(){
       qty ? `Quantity: ${qty}` : null,
       deadline ? `Deadline: ${deadline}` : null
     ].filter(Boolean).join("\n");
-    window.open(`https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent(lines)}`, "_blank", "noopener");
+    window.open(`https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent(lines)}`, "_blank", "noopener");
     closeEnquiryModal();
     e.target.reset();
   });
@@ -1162,7 +1162,7 @@ function initQuotePage(){
       </table></div>
       <div class="quote-total">Subtotal: <b>${money(q.subtotal)}</b></div>
       ${q.notes? `<p class="ad-hint">${q.notes}</p>`:""}
-      <a class="btn btn-wa" style="margin-top:16px" target="_blank" href="https://wa.me/${SETTINGS.whatsappNumber||'919999999999'}?text=${encodeURIComponent('Hi Bazarville! I accept Quote '+q.ref+' for '+money(q.subtotal)+'. Please proceed.')}">🟢 Accept via WhatsApp</a>`;
+      <a class="btn btn-wa" style="margin-top:16px" target="_blank" href="https://wa.me/${SETTINGS.whatsappNumber||'919827869031'}?text=${encodeURIComponent('Hi Bazarville! I accept Quote '+q.ref+' for '+money(q.subtotal)+'. Please proceed.')}">🟢 Accept via WhatsApp</a>`;
   });
 }
 
@@ -1801,9 +1801,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyBrandFont(SETTINGS.brandFont);
   applyAnimationLevel(SETTINGS.animationLevel);
   const footerWaLink = document.querySelector("#footerWaLink");
-  if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
+  if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
   const ctaWaLink = document.querySelector("#ctaWaLink");
-  if(ctaWaLink) ctaWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent("Hi Bazarville! I'd like to raise a bulk enquiry.")}`;
+  if(ctaWaLink) ctaWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent("Hi Bazarville! I'd like to raise a bulk enquiry.")}`;
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade
