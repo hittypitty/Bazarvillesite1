@@ -109,6 +109,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(name==="enquiries") renderEnquiriesTable();
     if(name==="orders") renderOrdersTable();
     if(name==="quotes") renderQuotesTable();
+    if(name==="inventory") renderInventoryView();
   }
   document.querySelectorAll("#adNav a[data-view]").forEach(a=>{
     a.addEventListener("click", (e)=>{ e.preventDefault(); location.hash = "#"+a.dataset.view; switchView(a.dataset.view); });
@@ -239,6 +240,100 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </tr>`;
       }).join("");
   }
+
+  /* ================= INVENTORY ================= */
+  // A faster, dedicated in-stock/out-of-stock control surface on top of the
+  // same PRODUCTS array/`stock` boolean the Products tab and public site
+  // already use — toggle one product in place, or check several and apply
+  // a bulk update, without opening each product's full edit screen.
+  let invChecked = new Set();
+  function renderInventoryView(){
+    const table = document.querySelector("#inventoryTable"); if(!table) return;
+    const statsEl = document.querySelector("#invStats");
+    const searchEl = document.querySelector("#invSearch");
+    const filterEl = document.querySelector("#invFilter");
+    const q = (searchEl && searchEl.value || "").trim().toLowerCase();
+    const filter = (filterEl && filterEl.value) || "all";
+
+    const inCount = PRODUCTS.filter(p=>p.stock).length;
+    const outCount = PRODUCTS.length - inCount;
+    if(statsEl) statsEl.innerHTML = `
+      <div class="ad-stat"><b>${PRODUCTS.length}</b><span>Total products</span></div>
+      <div class="ad-stat"><b>${inCount}</b><span>In stock</span></div>
+      <div class="ad-stat"><b>${outCount}</b><span>Out of stock</span></div>`;
+
+    let list = PRODUCTS.slice();
+    if(q) list = list.filter(p=>(p.name||"").toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
+    if(filter==="in") list = list.filter(p=>p.stock);
+    if(filter==="out") list = list.filter(p=>!p.stock);
+
+    table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>MOQ</th><th>Stock</th></tr>` +
+      (list.length ? list.map(p=>`
+        <tr>
+          <td><input type="checkbox" class="inv-check" data-id="${p.id}" ${invChecked.has(p.id)?"checked":""}></td>
+          <td><img src="${(p.img&&p.img[0])||''}" alt=""></td>
+          <td><b>${p.name}</b></td>
+          <td>${p.cat}</td>
+          <td>${p.moq} pcs</td>
+          <td><button type="button" class="ad-stock-toggle ${p.stock?'in':'out'}" data-id="${p.id}">${p.stock?'In stock':'Out of stock'}</button></td>
+        </tr>`).join("") : `<tr><td colspan="6"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
+
+    table.querySelectorAll(".inv-check").forEach(cb=>{
+      cb.addEventListener("change", ()=>{
+        const id = Number(cb.dataset.id);
+        if(cb.checked) invChecked.add(id); else invChecked.delete(id);
+        updateInvBulkButtons();
+      });
+    });
+    table.querySelectorAll(".ad-stock-toggle").forEach(btn=>{
+      btn.addEventListener("click", ()=> AdminUI.toggleStock(Number(btn.dataset.id)));
+    });
+    updateInvBulkButtons();
+  }
+  function updateInvBulkButtons(){
+    const any = invChecked.size > 0;
+    const inBtn = document.querySelector("#invMarkInBtn"), outBtn = document.querySelector("#invMarkOutBtn");
+    if(inBtn) inBtn.disabled = !any;
+    if(outBtn) outBtn.disabled = !any;
+  }
+  window.AdminUI = window.AdminUI || {};
+  AdminUI.toggleStock = async (id)=>{
+    const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
+    const prevStock = p.stock;
+    p.stock = !p.stock; // optimistic — flip immediately, roll back below on failure
+    renderInventoryView(); renderProductsTable(); renderDashboard();
+    try{ await BazDS.upsertProduct(p); }
+    catch(err){ p.stock = prevStock; renderInventoryView(); renderProductsTable(); renderDashboard(); alert("Could not update stock: " + (err.message||"")); }
+  };
+  async function bulkSetStock(newStock){
+    const ids = Array.from(invChecked);
+    if(!ids.length) return;
+    const btn = newStock ? document.querySelector("#invMarkInBtn") : document.querySelector("#invMarkOutBtn");
+    busy(btn, true, "Updating…");
+    const touched = ids.map(id=>PRODUCTS.find(p=>p.id===id)).filter(Boolean);
+    const prevValues = touched.map(p=>p.stock);
+    touched.forEach(p=>{ p.stock = newStock; });
+    renderInventoryView(); renderProductsTable(); renderDashboard();
+    try{
+      await Promise.all(touched.map(p=>BazDS.upsertProduct(p)));
+      invChecked.clear();
+      renderInventoryView();
+    }catch(err){
+      touched.forEach((p,i)=>{ p.stock = prevValues[i]; });
+      renderInventoryView(); renderProductsTable(); renderDashboard();
+      alert("Could not update some products: " + (err.message||""));
+    }finally{
+      busy(btn, false);
+    }
+  }
+  const invSearchEl = document.querySelector("#invSearch");
+  if(invSearchEl) invSearchEl.addEventListener("input", renderInventoryView);
+  const invFilterEl = document.querySelector("#invFilter");
+  if(invFilterEl) invFilterEl.addEventListener("change", renderInventoryView);
+  const invMarkInBtn = document.querySelector("#invMarkInBtn");
+  if(invMarkInBtn) invMarkInBtn.addEventListener("click", ()=>bulkSetStock(true));
+  const invMarkOutBtn = document.querySelector("#invMarkOutBtn");
+  if(invMarkOutBtn) invMarkOutBtn.addEventListener("click", ()=>bulkSetStock(false));
 
   let editingProductId = null;
   let productImages = [];

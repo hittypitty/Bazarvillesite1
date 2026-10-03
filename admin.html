@@ -35,6 +35,7 @@
     <nav class="ad-nav" id="adNav">
       <a href="#dashboard" data-view="dashboard" class="active">📊 Dashboard</a>
       <a href="#products" data-view="products">📦 Products</a>
+      <a href="#inventory" data-view="inventory">📋 Inventory</a>
       <a href="#collections" data-view="collections">🗂️ Collections</a>
       <a href="#enquiries" data-view="enquiries">💬 Enquiries / CRM</a>
       <a href="#orders" data-view="orders">📦 Orders</a>
@@ -83,6 +84,25 @@
       <div id="imageCheckResults"></div>
       <div class="ad-table-wrap">
         <table class="ad-table" id="productsTable"></table>
+      </div>
+    </section>
+
+    <!-- Inventory -->
+    <section class="ad-view" id="view-inventory" style="display:none">
+      <div class="ad-header"><h1>Inventory</h1><p>Quick in-stock / out-of-stock control for every product — toggle right here, or select several and update them together. No need to open each product's edit screen.</p></div>
+      <div class="ad-stats" id="invStats"></div>
+      <div class="ad-inv-toolbar">
+        <input type="search" id="invSearch" placeholder="Search products…">
+        <select id="invFilter">
+          <option value="all">All products</option>
+          <option value="in">In stock only</option>
+          <option value="out">Out of stock only</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="invMarkInBtn" disabled>✅ Mark In Stock</button>
+        <button class="btn btn-outline btn-sm" id="invMarkOutBtn" disabled>🚫 Mark Out of Stock</button>
+      </div>
+      <div class="ad-table-wrap">
+        <table class="ad-table" id="inventoryTable"></table>
       </div>
     </section>
 
