@@ -606,13 +606,13 @@ function renderWishBadge(){
       el = document.createElement("a");
       el.href = "wishlist.html"; el.className = "wishbtn"; el.title = "My Wishlist";
       el.innerHTML = `❤️<span class="wish-count"></span>`;
-      // Lands after the search bar, before the account icon (or before the
-      // hamburger if the account icon hasn't been added yet) — either render
+      // Lands after the search bar, before the WhatsApp enquiry icon (or
+      // before the hamburger if that hasn't been added yet) — either render
       // order (this vs renderAccountBadge) ends up with the same final
-      // left-to-right order: search, wishlist, account, menu.
-      const acctEl = nav.querySelector(".accountbtn");
+      // left-to-right order: search, wishlist, enquiry, menu.
+      const enqEl = nav.querySelector(".enqbtn");
       const menuBtn = nav.querySelector(".menu-btn");
-      nav.insertBefore(el, acctEl || menuBtn || null);
+      nav.insertBefore(el, enqEl || menuBtn || null);
     }
     const count = getWishlist().length;
     const badge = el.querySelector(".wish-count");
@@ -684,6 +684,75 @@ function initRecentlyViewedSection(){
   if(!list.length){ section.style.display = "none"; return; }
   section.style.display = "";
   renderGrid("#recentlyViewedGrid", list);
+}
+
+/* ---------- header "WhatsApp Enquiry" form modal ----------
+   Replaces the old profile/account icon in the header (Vikas's feedback).
+   Collects name/phone/email/product/quantity/deadline, saves a best-effort
+   copy to the enquiries CRM table (so it still shows up in Admin even if the
+   customer never actually sends the WhatsApp message), then opens WhatsApp
+   with everything formatted into one message — same wa.me pattern used by
+   every other enquiry button on the site. */
+function buildEnquiryModal(){
+  if(document.querySelector("#enquiryModal")) return;
+  const modal = document.createElement("div");
+  modal.id = "enquiryModal";
+  modal.className = "qv-modal";
+  modal.innerHTML = `<div class="qv-backdrop"></div><div class="qv-box" role="dialog" aria-modal="true" style="max-width:480px">
+    <button type="button" class="qv-close" aria-label="Close">✕</button>
+    <h2 style="margin-bottom:4px">WhatsApp Enquiry</h2>
+    <p class="ad-hint" style="margin-bottom:18px">Fill this in and we'll open WhatsApp with your details ready to send to our team.</p>
+    <form id="enquiryForm">
+      <div class="enq-field"><label>Name *</label><input type="text" id="enqName" required placeholder="Your full name"></div>
+      <div class="enq-field"><label>Phone number *</label><input type="tel" id="enqPhone" required placeholder="10-digit mobile number"></div>
+      <div class="enq-field"><label>Email</label><input type="email" id="enqEmail" placeholder="you@company.com"></div>
+      <div class="enq-field"><label>What product are you looking for? *</label><textarea id="enqProduct" required placeholder="e.g. Branded steel bottles, A5 diaries…" rows="2"></textarea></div>
+      <div class="enq-field"><label>Quantity</label><input type="text" id="enqQty" placeholder="e.g. 100 pcs"></div>
+      <div class="enq-field"><label>Deadline</label><input type="date" id="enqDeadline"></div>
+      <button type="submit" class="btn btn-wa" style="width:100%;margin-top:6px">🟢 Send via WhatsApp</button>
+    </form>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".qv-backdrop").addEventListener("click", closeEnquiryModal);
+  modal.querySelector(".qv-close").addEventListener("click", closeEnquiryModal);
+  modal.querySelector("#enquiryForm").addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const name = document.querySelector("#enqName").value.trim();
+    const phone = document.querySelector("#enqPhone").value.trim();
+    const email = document.querySelector("#enqEmail").value.trim();
+    const product = document.querySelector("#enqProduct").value.trim();
+    const qty = document.querySelector("#enqQty").value.trim();
+    const deadlineRaw = document.querySelector("#enqDeadline").value;
+    const deadline = deadlineRaw ? new Date(deadlineRaw+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "";
+    if(!name || !phone || !product) return; // required fields — the inputs' own "required" already stops this in practice
+
+    // Best-effort CRM copy — never blocks or delays the WhatsApp redirect below.
+    BazDS.submitGeneralEnquiry({name, phone, email, product, quantity:qty, deadline}).catch(()=>{});
+
+    const lines = [
+      "Hi Bazarville! I'd like to raise an enquiry — here are my details:",
+      `Name: ${name}`,
+      `Phone: ${phone}`,
+      email ? `Email: ${email}` : null,
+      `Requirement: ${product}`,
+      qty ? `Quantity: ${qty}` : null,
+      deadline ? `Deadline: ${deadline}` : null
+    ].filter(Boolean).join("\n");
+    window.open(`https://wa.me/${SETTINGS.whatsappNumber||"919999999999"}?text=${encodeURIComponent(lines)}`, "_blank", "noopener");
+    closeEnquiryModal();
+    e.target.reset();
+  });
+  document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeEnquiryModal(); });
+}
+function closeEnquiryModal(){
+  const modal = document.querySelector("#enquiryModal");
+  if(modal) modal.classList.remove("show");
+  document.body.classList.remove("qv-open");
+}
+function openEnquiryModal(){
+  buildEnquiryModal();
+  document.querySelector("#enquiryModal").classList.add("show");
+  document.body.classList.add("qv-open");
 }
 
 /* ---------- quick view modal (shared rendering, no product.html duplication) ---------- */
@@ -772,13 +841,12 @@ function initMobileNav(){
     <div class="mnav-links">
       <a href="products.html">Shop Products</a>
       <a href="galaxy.html">Shop by Profession</a>
-      <a href="products.html?purpose=Corporate%20Events">Shop by Purpose</a>
       <a href="index.html#collections">Collections</a>
       <a href="index.html#footer">Contact</a>
     </div>
     <div class="mnav-icons">
       <a href="wishlist.html">❤️ My Wishlist</a>
-      <a href="account.html">👤 My Account</a>
+      <button type="button" class="mnav-enquiry-btn">💬 WhatsApp Enquiry</button>
     </div>`;
   document.body.appendChild(overlay);
   document.body.appendChild(drawer);
@@ -787,6 +855,7 @@ function initMobileNav(){
   overlay.addEventListener("click", closeDrawer);
   drawer.querySelector(".mnav-close").addEventListener("click", closeDrawer);
   drawer.querySelectorAll("a").forEach(a=>a.addEventListener("click", closeDrawer));
+  drawer.querySelector(".mnav-enquiry-btn").addEventListener("click", ()=>{ closeDrawer(); openEnquiryModal(); });
   document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeDrawer(); });
   menuBtn.addEventListener("click", ()=> drawer.classList.contains("open") ? closeDrawer() : openDrawer());
 }
@@ -846,18 +915,21 @@ function initComparePage(){
   if(clearBtn) clearBtn.addEventListener("click", ()=>{ setCompare([]); location.href = "compare.html"; });
 }
 
-// This is a B2B catalogue, not a cart-based store — enquiries/quotes happen
-// over WhatsApp instead, so there's no cart icon here (just the account
-// icon, which this function used to add alongside the now-removed cart).
+// This is a B2B catalogue, not a cart/login-based store — enquiries happen
+// over WhatsApp instead, so the header gets a WhatsApp Enquiry icon here
+// (this function used to add the account/profile icon in the same spot;
+// Vikas's feedback was to drop profile and put a direct enquiry option
+// there instead — see openEnquiryModal below for the form it opens).
 function renderAccountBadge(){
   document.querySelectorAll(".navactions").forEach(nav=>{
-    let acctEl = nav.querySelector(".accountbtn");
-    if(!acctEl){
-      acctEl = document.createElement("a");
-      acctEl.href = "account.html"; acctEl.className = "accountbtn"; acctEl.title = "My Account";
-      acctEl.textContent = "👤";
+    let enqEl = nav.querySelector(".enqbtn");
+    if(!enqEl){
+      enqEl = document.createElement("button");
+      enqEl.type = "button"; enqEl.className = "enqbtn"; enqEl.title = "WhatsApp Enquiry";
+      enqEl.textContent = "💬";
+      enqEl.addEventListener("click", openEnquiryModal);
       const menuBtn = nav.querySelector(".menu-btn");
-      nav.insertBefore(acctEl, menuBtn || null);
+      nav.insertBefore(enqEl, menuBtn || null);
     }
   });
 }

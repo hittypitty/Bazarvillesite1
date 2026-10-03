@@ -230,6 +230,28 @@ const BazDS = (function(){
     return !error;
   }
 
+  /** Header "WhatsApp Enquiry" form submission — a best-effort CRM copy, kept
+   *  separate from logEnquiry (which is tied to a specific product page) since
+   *  this one carries the customer's own name/phone/email/deadline, which the
+   *  enquiries table has no dedicated columns for, so they're folded into
+   *  `notes` as a readable block rather than needing a schema migration.
+   *  Never blocks or fails the WhatsApp redirect this is called alongside. */
+  async function submitGeneralEnquiry({name, phone, email, product, quantity, deadline}){
+    const sb = getClient(); if(!sb) return false;
+    const ref = "BZV-" + Math.random().toString(36).slice(2,8).toUpperCase();
+    const notesLines = [
+      `Name: ${name}`, `Phone: ${phone}`,
+      email ? `Email: ${email}` : null,
+      deadline ? `Deadline: ${deadline}` : null
+    ].filter(Boolean);
+    const { error } = await sb.from("enquiries").insert({
+      ref, product_name: product || "", quantity: quantity || null,
+      notes: notesLines.join("\n"), source: "whatsapp_form", status: "new"
+    });
+    if(error) console.error("submitGeneralEnquiry:", error.message);
+    return !error;
+  }
+
   /** Uploads a File to Storage and returns its public URL. folder is just a
    *  path prefix for organisation, e.g. "products" or "collections". */
   /* Shopify-style auto-optimize: resize to a sane max dimension and re-encode as
@@ -447,7 +469,7 @@ const BazDS = (function(){
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings,
-    logEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
+    logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
     signIn, signOut, getCurrentAdmin,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus,
