@@ -335,6 +335,202 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const invMarkOutBtn = document.querySelector("#invMarkOutBtn");
   if(invMarkOutBtn) invMarkOutBtn.addEventListener("click", ()=>bulkSetStock(false));
 
+  /* ---------- Inventory sub-tabs: Stock List / POS Billing ---------- */
+  document.querySelectorAll(".ad-inv-tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      document.querySelectorAll(".ad-inv-tab").forEach(t=>t.classList.remove("active"));
+      tab.classList.add("active");
+      const which = tab.dataset.invtab;
+      document.querySelector("#invStockPanel").style.display = which==="stock" ? "block" : "none";
+      document.querySelector("#invPosPanel").style.display = which==="pos" ? "block" : "none";
+      if(which==="pos"){ renderPosProductList(); renderPosCart(); refreshPosHolds(); }
+    });
+  });
+
+  /* ================= POS (counter billing) =================
+     Lives inside the Inventory tab (not a separate page). A sale is a cart
+     of {productId, name, color, qty, price, img} built from PRODUCTS —
+     "Complete Sale" writes it to the same `orders` table as a normal
+     checkout (tagged source:"pos") and best-effort deducts the chosen
+     colour's tracked quantity (product.colorStock — POS-only, see
+     add_pos.sql); "Hold Sale" parks the cart in pos_holds to resume later. */
+  let posCart = [];
+  let posSelection = {}; // productId -> {color, qty}
+  let posHoldsCache = [];
+
+  function renderPosProductList(){
+    const wrap = document.querySelector("#posProductList"); if(!wrap) return;
+    const q = (document.querySelector("#posProductSearch")?.value || "").trim().toLowerCase();
+    const list = q ? PRODUCTS.filter(p=>(p.name||"").toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q)) : PRODUCTS;
+    wrap.innerHTML = list.length ? list.map(p=>{
+      if(!posSelection[p.id]) posSelection[p.id] = {color: (p.colors&&p.colors[0])||"", qty:1};
+      const sel = posSelection[p.id];
+      const stockVal = (p.colorStock && sel.color && p.colorStock[sel.color]!=null) ? p.colorStock[sel.color] : "";
+      return `
+      <div class="ad-pos-card" data-id="${p.id}">
+        <img src="${(p.img&&p.img[0])||''}" alt="">
+        <div class="ad-pos-card-body">
+          <b>${p.name}</b>
+          <div class="ad-pos-swatches">
+            ${(p.colors||[]).map(c=>`<span class="ad-pos-swatch ${c===sel.color?'active':''}" style="background:${c}" data-id="${p.id}" data-color="${c}" title="${c}"></span>`).join("") || `<span class="ad-hint" style="margin:0 0 6px">No colours on this product</span>`}
+          </div>
+          <div class="ad-pos-card-row">
+            <input type="number" min="1" class="ad-pos-qty" data-id="${p.id}" value="${sel.qty}" title="Quantity">
+            ${sel.color ? `<input type="number" min="0" class="ad-pos-stockval" data-id="${p.id}" data-color="${sel.color}" placeholder="Stock qty" value="${stockVal}" title="Set tracked stock for this colour (POS only)">` : ""}
+            <button type="button" class="btn btn-outline btn-sm ad-pos-addbtn" data-id="${p.id}">+ Add</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("") : `<p class="ad-hint">No products found.</p>`;
+  }
+
+  function renderPosCart(){
+    const wrap = document.querySelector("#posCart"); if(!wrap) return;
+    wrap.innerHTML = posCart.length ? posCart.map((item,i)=>`
+      <div class="ad-pos-cart-row">
+        <img src="${item.img||''}" alt="">
+        <div class="ad-pos-cart-info">
+          <b>${item.name}</b>
+          <span>${item.color?`<i class="ad-pos-dot" style="background:${item.color}"></i>`:""}${item.qty} × ${money(item.price)}</span>
+        </div>
+        <b>${money(item.qty*item.price)}</b>
+        <button type="button" class="ad-icon-btn danger ad-pos-removebtn" data-i="${i}" title="Remove">✕</button>
+      </div>`).join("") : `<p class="ad-hint" style="margin:0">Cart is empty — add products from the left.</p>`;
+    const total = posCart.reduce((s,it)=>s+it.qty*it.price,0);
+    const totalEl = document.querySelector("#posTotal");
+    if(totalEl) totalEl.innerHTML = posCart.length ? `<b>Total: ${money(total)}</b>` : "";
+    const holdBtn = document.querySelector("#posHoldBtn"), completeBtn = document.querySelector("#posCompleteBtn");
+    if(holdBtn) holdBtn.disabled = !posCart.length;
+    if(completeBtn) completeBtn.disabled = !posCart.length;
+  }
+
+  function addToCart(productId){
+    const p = PRODUCTS.find(x=>x.id===productId); if(!p) return;
+    const sel = posSelection[productId] || {color:"", qty:1};
+    const qty = Math.max(1, Number(sel.qty)||1);
+    const t = tierFor(p, qty);
+    posCart.push({productId, name:p.name, color:sel.color, qty, price:t.price, img:(p.img&&p.img[0])||""});
+    renderPosCart();
+  }
+
+  async function savePosStock(productId, color, value){
+    const p = PRODUCTS.find(x=>x.id===productId); if(!p || !color) return;
+    const num = value==="" ? null : Math.max(0, Number(value)||0);
+    p.colorStock = {...(p.colorStock||{})};
+    if(num==null) delete p.colorStock[color]; else p.colorStock[color] = num;
+    try{ await BazDS.upsertProduct(p); }
+    catch(err){ alert("Could not save stock: " + (err.message||"")); }
+  }
+
+  async function holdSale(){
+    if(!posCart.length) return;
+    const nameInput = document.querySelector("#posCustomerName");
+    const label = (nameInput.value.trim()) || ("Hold " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}));
+    const subtotal = posCart.reduce((s,it)=>s+it.qty*it.price,0);
+    const btn = document.querySelector("#posHoldBtn");
+    busy(btn, true, "Holding…");
+    try{
+      await BazDS.holdPosSale({label, items:posCart, subtotal});
+      posCart = []; nameInput.value = "";
+      renderPosCart();
+      await refreshPosHolds();
+    }catch(err){ alert("Could not hold sale: " + (err.message||"")); }
+    finally{ busy(btn, false); }
+  }
+
+  async function completeSale(){
+    if(!posCart.length) return;
+    const customerName = document.querySelector("#posCustomerName").value.trim();
+    const subtotal = posCart.reduce((s,it)=>s+it.qty*it.price,0);
+    const btn = document.querySelector("#posCompleteBtn");
+    busy(btn, true, "Completing…");
+    try{
+      await BazDS.createPosSale({
+        customerName,
+        items: posCart.map(it=>({name:it.name, color:it.color, qty:it.qty, price:it.price})),
+        subtotal
+      });
+      // Best-effort: deduct from tracked colour stock wherever a quantity has
+      // actually been set for that colour — never blocks the sale if it fails.
+      for(const item of posCart){
+        const p = PRODUCTS.find(x=>x.id===item.productId); if(!p || !item.color) continue;
+        const current = (p.colorStock && p.colorStock[item.color]!=null) ? p.colorStock[item.color] : null;
+        if(current==null) continue;
+        p.colorStock = {...p.colorStock, [item.color]: Math.max(0, current-item.qty)};
+        try{ await BazDS.upsertProduct(p); }catch(err){ console.error("POS stock deduction failed for", p.name, err); }
+      }
+      posCart = []; document.querySelector("#posCustomerName").value = "";
+      renderPosCart(); renderPosProductList();
+      try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); }
+      renderDashboard();
+      alert("Sale completed.");
+    }catch(err){ alert("Could not complete sale: " + (err.message||"")); }
+    finally{ busy(btn, false); }
+  }
+
+  async function refreshPosHolds(){
+    posHoldsCache = await BazDS.getPosHolds().catch(()=>[]);
+    renderPosHolds();
+  }
+  function renderPosHolds(){
+    const wrap = document.querySelector("#posHoldsList"); if(!wrap) return;
+    wrap.innerHTML = posHoldsCache.length ? posHoldsCache.map(h=>`
+      <div class="ad-pos-hold-row">
+        <div><b>${h.label||"Held sale"}</b><br><span class="ad-hint" style="margin:0">${(h.items||[]).length} item(s), ${money(h.subtotal||0)}</span></div>
+        <div class="ad-row-actions">
+          <button type="button" class="btn btn-outline btn-sm ad-pos-resumebtn" data-id="${h.id}">Resume</button>
+          <button type="button" class="ad-icon-btn danger ad-pos-deleteholdbtn" data-id="${h.id}" title="Delete">🗑️</button>
+        </div>
+      </div>`).join("") : `<p class="ad-hint" style="margin:0">No held sales.</p>`;
+  }
+  async function resumeHold(id){
+    const h = posHoldsCache.find(x=>x.id===id); if(!h) return;
+    if(posCart.length && !confirm("This replaces the sale you're currently building. Continue?")) return;
+    posCart = (h.items||[]).slice();
+    renderPosCart();
+    try{ await BazDS.deletePosHold(id); }catch(err){ console.error(err); }
+    await refreshPosHolds();
+  }
+  async function deleteHoldHandler(id){
+    if(!confirm("Delete this held sale? This cannot be undone.")) return;
+    try{ await BazDS.deletePosHold(id); await refreshPosHolds(); }
+    catch(err){ alert("Could not delete: " + (err.message||"")); }
+  }
+
+  const posPanel = document.querySelector("#invPosPanel");
+  if(posPanel){
+    posPanel.addEventListener("click", (e)=>{
+      const swatch = e.target.closest(".ad-pos-swatch");
+      if(swatch){ const id=Number(swatch.dataset.id); posSelection[id] = posSelection[id]||{qty:1}; posSelection[id].color = swatch.dataset.color; renderPosProductList(); return; }
+      const addBtn = e.target.closest(".ad-pos-addbtn");
+      if(addBtn){ addToCart(Number(addBtn.dataset.id)); return; }
+      const rmBtn = e.target.closest(".ad-pos-removebtn");
+      if(rmBtn){ posCart.splice(Number(rmBtn.dataset.i),1); renderPosCart(); return; }
+      const resumeBtn = e.target.closest(".ad-pos-resumebtn");
+      if(resumeBtn){ resumeHold(Number(resumeBtn.dataset.id)); return; }
+      const delHoldBtn = e.target.closest(".ad-pos-deleteholdbtn");
+      if(delHoldBtn){ deleteHoldHandler(Number(delHoldBtn.dataset.id)); return; }
+    });
+    posPanel.addEventListener("change", (e)=>{
+      if(e.target.classList.contains("ad-pos-qty")){
+        const id = Number(e.target.dataset.id);
+        posSelection[id] = posSelection[id]||{color:"",qty:1};
+        posSelection[id].qty = Math.max(1, Number(e.target.value)||1);
+      }
+    });
+    posPanel.addEventListener("focusout", (e)=>{
+      if(e.target.classList.contains("ad-pos-stockval")){
+        savePosStock(Number(e.target.dataset.id), e.target.dataset.color, e.target.value.trim());
+      }
+    });
+  }
+  const posSearchEl = document.querySelector("#posProductSearch");
+  if(posSearchEl) posSearchEl.addEventListener("input", renderPosProductList);
+  const posHoldBtn = document.querySelector("#posHoldBtn");
+  if(posHoldBtn) posHoldBtn.addEventListener("click", holdSale);
+  const posCompleteBtn = document.querySelector("#posCompleteBtn");
+  if(posCompleteBtn) posCompleteBtn.addEventListener("click", completeSale);
+
   let editingProductId = null;
   let productImages = [];
   // Parallel to productImages: "" (no colour tag — shows for every colour,

@@ -26,7 +26,7 @@ const BazDS = (function(){
   }
 
   function dbToApp(row){
-    const {images, print_options, meta_title, meta_description, color_images, ...rest} = row;
+    const {images, print_options, meta_title, meta_description, color_images, color_stock, ...rest} = row;
     return {
       ...rest,
       img: images || [],
@@ -35,6 +35,11 @@ const BazDS = (function(){
       // just falls back to `img` above, so nothing changes for any existing
       // product until an admin deliberately assigns colour-specific photos.
       colorImages: color_images || {},
+      // Per-colour stock QUANTITY — POS-only (see add_pos.sql). A colour
+      // missing here just means its quantity hasn't been set in POS yet;
+      // it's unrelated to the plain in-stock/out-of-stock `stock` flag used
+      // everywhere else on the site.
+      colorStock: color_stock || {},
       professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : []),
       // Purpose/Occasion: same "array is the source of truth, singular kept for
       // backward compatibility" pattern as profession/professions above. If a
@@ -50,11 +55,12 @@ const BazDS = (function(){
     };
   }
   function appToDb(p){
-    const {img, printOptions, metaTitle, metaDescription, colorImages, ...rest} = p;
+    const {img, printOptions, metaTitle, metaDescription, colorImages, colorStock, ...rest} = p;
     return {
       ...rest,
       images: img || [],
       color_images: colorImages || {},
+      color_stock: colorStock || {},
       profession: (p.professions && p.professions[0]) || p.profession || "",
       professions: p.professions || (p.profession ? [p.profession] : []),
       purpose: (p.purposes && p.purposes[0]) || p.purpose || "",
@@ -95,7 +101,7 @@ const BazDS = (function(){
     // keep stripping whichever migratable column the latest error names and
     // retrying, until the save succeeds or the error is something else
     // entirely (a real problem, not a missing-migration one).
-    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images"];
+    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images","color_stock"];
     let safeRow = {...row};
     let stripped = [];
     let data, error;
@@ -444,6 +450,54 @@ const BazDS = (function(){
     return true;
   }
 
+  /* ---------- POS (counter billing, inside Admin → Inventory) ----------
+     A POS sale is just an order with source:"pos" — same `orders` table,
+     same dashboard/Orders-list counts, just tagged with where it came from
+     (see add_pos.sql). Unlike createOrder() above (a customer's own
+     checkout), this never reads auth.getSession() for a customer_id — the
+     session here is the ADMIN's own login, not a customer's. */
+  async function createPosSale(sale){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const ref = "BZP-" + Math.random().toString(36).slice(2,8).toUpperCase();
+    const row = {
+      ref, customer_id: null,
+      customer_name: sale.customerName || "Walk-in counter sale", customer_phone: sale.customerPhone || "",
+      customer_email: "", shipping_address: "",
+      items: sale.items, subtotal: sale.subtotal,
+      status: "delivered", payment_method: sale.paymentMethod || "cash", payment_status: "paid",
+      notes: sale.notes || "", source: "pos"
+    };
+    const runInsert = (r) => sb.from("orders").insert(r).select().single();
+    let { data, error } = await runInsert(row);
+    if(error && /source['"]?\s*column|column.*source/i.test(error.message)){
+      // add_pos.sql hasn't been run yet — orders.source doesn't exist. Save
+      // the sale anyway (minus that tag) rather than blocking the sale.
+      const { source, ...safeRow } = row;
+      ({ data, error } = await runInsert(safeRow));
+    }
+    if(error){ console.error("createPosSale:", error.message); throw error; }
+    return data;
+  }
+  async function getPosHolds(){
+    const sb = getClient(); if(!sb) return [];
+    const { data, error } = await sb.from("pos_holds").select("*").order("created_at",{ascending:false});
+    if(error){ console.error("getPosHolds:", error.message); return []; } // table may not exist yet (add_pos.sql not run) — fail quiet, POS still works without Hold
+    return data;
+  }
+  async function holdPosSale(hold){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const row = { label: hold.label || "", items: hold.items, subtotal: hold.subtotal };
+    const { data, error } = await sb.from("pos_holds").insert(row).select().single();
+    if(error){ console.error("holdPosSale:", error.message); throw error; }
+    return data;
+  }
+  async function deletePosHold(id){
+    const sb = getClient(); if(!sb) return false;
+    const { error } = await sb.from("pos_holds").delete().eq("id", id);
+    if(error){ console.error("deletePosHold:", error.message); throw error; }
+    return true;
+  }
+
   /* ---------- quotes (CPQ) ---------- */
   async function createQuote(quote){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
@@ -485,6 +539,7 @@ const BazDS = (function(){
     signIn, signOut, getCurrentAdmin,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus,
+    createPosSale, getPosHolds, holdPosSale, deletePosHold,
     createQuote, getQuotes, getQuoteByRef, updateQuoteStatus
   };
 })();

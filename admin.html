@@ -89,20 +89,54 @@
 
     <!-- Inventory -->
     <section class="ad-view" id="view-inventory" style="display:none">
-      <div class="ad-header"><h1>Inventory</h1><p>Quick in-stock / out-of-stock control for every product — toggle right here, or select several and update them together. No need to open each product's edit screen.</p></div>
-      <div class="ad-stats" id="invStats"></div>
-      <div class="ad-inv-toolbar">
-        <input type="search" id="invSearch" placeholder="Search products…">
-        <select id="invFilter">
-          <option value="all">All products</option>
-          <option value="in">In stock only</option>
-          <option value="out">Out of stock only</option>
-        </select>
-        <button class="btn btn-outline btn-sm" id="invMarkInBtn" disabled>✅ Mark In Stock</button>
-        <button class="btn btn-outline btn-sm" id="invMarkOutBtn" disabled>🚫 Mark Out of Stock</button>
+      <div class="ad-header"><h1>Inventory</h1><p>Stock control and counter billing, in one place.</p></div>
+      <div class="ad-inv-tabs">
+        <button type="button" class="ad-inv-tab active" data-invtab="stock">📋 Stock List</button>
+        <button type="button" class="ad-inv-tab" data-invtab="pos">🧾 POS Billing</button>
       </div>
-      <div class="ad-table-wrap">
-        <table class="ad-table" id="inventoryTable"></table>
+
+      <div id="invStockPanel">
+        <div class="ad-stats" id="invStats"></div>
+        <div class="ad-inv-toolbar">
+          <input type="search" id="invSearch" placeholder="Search products…">
+          <select id="invFilter">
+            <option value="all">All products</option>
+            <option value="in">In stock only</option>
+            <option value="out">Out of stock only</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="invMarkInBtn" disabled>✅ Mark In Stock</button>
+          <button class="btn btn-outline btn-sm" id="invMarkOutBtn" disabled>🚫 Mark Out of Stock</button>
+        </div>
+        <div class="ad-table-wrap">
+          <table class="ad-table" id="inventoryTable"></table>
+        </div>
+      </div>
+
+      <div id="invPosPanel" style="display:none">
+        <p class="ad-hint">Ring up a walk-in / counter sale. Pick a colour and quantity for each item, optionally set that colour's tracked stock (POS-only — doesn't affect the site's In Stock/Out of Stock badge), then complete or hold the sale.</p>
+        <div class="ad-pos-grid">
+          <div class="ad-panel">
+            <h3>Add to sale</h3>
+            <input type="search" id="posProductSearch" placeholder="Search products to add…" style="margin-bottom:14px">
+            <div class="ad-pos-product-list" id="posProductList"></div>
+          </div>
+          <div>
+            <div class="ad-panel">
+              <h3>Current sale</h3>
+              <div class="ad-pos-cart" id="posCart"></div>
+              <div class="ad-pos-total" id="posTotal"></div>
+              <div class="ad-field" style="margin-top:12px"><input id="posCustomerName" placeholder="Customer name (optional)"></div>
+              <div class="ad-pos-actions">
+                <button type="button" class="btn btn-outline btn-sm" id="posHoldBtn" disabled>⏸ Hold Sale</button>
+                <button type="button" class="btn btn-primary btn-sm" id="posCompleteBtn" disabled>✅ Complete Sale</button>
+              </div>
+            </div>
+            <div class="ad-panel">
+              <h3>Held sales</h3>
+              <div id="posHoldsList"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
