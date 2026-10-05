@@ -400,48 +400,52 @@ function initFilters(){
     if(state.purpose && state.purpose!=="All") list = list.filter(p=>(p.purposes&&p.purposes.length?p.purposes:[p.purpose]).includes(state.purpose));
     if(state.occasion && state.occasion!=="All") list = list.filter(p=>(p.occasions&&p.occasions.length?p.occasions:[p.occasion]).includes(state.occasion));
     if(state.q){
-      const needle = state.q.toLowerCase();
+      // Natural-language-ish queries (the hero search bar's own placeholder
+      // suggests "eco-friendly gifts under ₹500…") used to be matched as ONE
+      // whole phrase, so unless a product literally contained that entire
+      // string nothing came back — a 3+ word query almost always returned
+      // zero results. Tokenising the query and matching word-by-word (union
+      // across tokens, ranked by how many tokens hit) fixes that without any
+      // real AI/model call — still plain lookups against SEARCH_SYNONYMS
+      // plus the profession/purpose/occasion values themselves.
+      const STOPWORDS = new Set([
+        "a","an","the","for","with","under","over","below","above","around","near","to","of","in","on","at",
+        "and","or","my","me","i","want","need","looking","look","find","show","some","any","please",
+        "gift","gifts","product","products","item","items","that","this","these","those","is","are","what","can","get","good","best"
+      ]);
+      const rawTokens = state.q.toLowerCase().replace(/[₹$,]/g," ").split(/[^a-z0-9+]+/i).filter(Boolean);
+      const tokens = rawTokens.filter(t=>!STOPWORDS.has(t) && !/^\d+$/.test(t));
+      // If every token got stripped (query was e.g. just "under 500"), fall
+      // back to the raw phrase rather than silently matching everything.
+      const searchTokens = tokens.length ? tokens : [state.q.toLowerCase().trim()];
 
-      // 1) Literal match — unchanged from before: name/category/profession
-      // substring match.
-      const literalMatch = p=>{
-        const haystacks = [p.name, p.cat, p.profession, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])];
-        return haystacks.some(h=>h && h.toLowerCase().includes(needle));
+      const taxonomyValuesForToken = (token)=>{
+        const vals = new Set();
+        Object.keys(SEARCH_SYNONYMS).forEach(key=>{
+          if(key.includes(token) || token.includes(key)) SEARCH_SYNONYMS[key].forEach(v=>vals.add(v));
+        });
+        PROFESSIONS.forEach(pr=>{ if(pr.name.toLowerCase().includes(token) || token.includes(pr.name.toLowerCase())) vals.add(pr.name); });
+        (SETTINGS.purposes||DEFAULT_PURPOSES).forEach(v=>{ if(v.toLowerCase().includes(token) || token.includes(v.toLowerCase())) vals.add(v); });
+        (SETTINGS.occasions||DEFAULT_OCCASIONS).forEach(v=>{ if(v.toLowerCase().includes(token) || token.includes(v.toLowerCase())) vals.add(v); });
+        return vals;
       };
 
-      // 2) "Smart" taxonomy match (no AI — plain lookups against
-      // SEARCH_SYNONYMS plus the profession/purpose/occasion values
-      // themselves) — widens results to products whose profession/purpose/
-      // occasion matches taxonomy values implied by the search phrase, in
-      // ADDITION to the literal match above (union, not replacement).
-      const taxonomyValues = new Set();
-      Object.keys(SEARCH_SYNONYMS).forEach(key=>{
-        if(needle.includes(key) || key.includes(needle)){
-          SEARCH_SYNONYMS[key].forEach(v=>taxonomyValues.add(v));
-        }
-      });
-      PROFESSIONS.forEach(pr=>{
-        if(pr.name.toLowerCase().includes(needle) || needle.includes(pr.name.toLowerCase())) taxonomyValues.add(pr.name);
-      });
-      (SETTINGS.purposes||DEFAULT_PURPOSES).forEach(v=>{
-        if(v.toLowerCase().includes(needle) || needle.includes(v.toLowerCase())) taxonomyValues.add(v);
-      });
-      (SETTINGS.occasions||DEFAULT_OCCASIONS).forEach(v=>{
-        if(v.toLowerCase().includes(needle) || needle.includes(v.toLowerCase())) taxonomyValues.add(v);
-      });
-      const taxonomyMatch = p=>{
-        if(!taxonomyValues.size) return false;
-        return [p.profession, p.purpose, p.occasion, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])]
-          .some(v=>v && taxonomyValues.has(v));
+      const scoreProduct = (p)=>{
+        const literalHaystacks = [p.name, p.cat, p.profession, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])]
+          .filter(Boolean).map(h=>h.toLowerCase());
+        const taxonomyHaystack = [p.profession, p.purpose, p.occasion, ...(p.professions||[]), ...(p.purposes||[]), ...(p.occasions||[])].filter(Boolean);
+        let score = 0;
+        searchTokens.forEach(token=>{
+          if(literalHaystacks.some(h=>h.includes(token))) score += 2; // literal match ranks above taxonomy-only
+          else{
+            const taxVals = taxonomyValuesForToken(token);
+            if(taxVals.size && taxonomyHaystack.some(v=>taxVals.has(v))) score += 1;
+          }
+        });
+        return score;
       };
 
-      // Union of both passes, with literal matches ranked ahead of
-      // taxonomy-only matches (a later overall sort — price/moq/newest — can
-      // still reorder within/after this, same as before).
-      const literalHits = list.filter(literalMatch);
-      const literalIds = new Set(literalHits.map(p=>p.id));
-      const taxonomyHits = list.filter(p=>!literalIds.has(p.id) && taxonomyMatch(p));
-      list = literalHits.concat(taxonomyHits);
+      list = list.map(p=>({p, score:scoreProduct(p)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.p);
     }
     if(state.qty>1){
       list = list.filter(p=> tierFor(p, state.qty).price*state.qty <= (state.budget||999999));
@@ -1908,12 +1912,5 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const id = Number(cmp.dataset.cmpId);
     const ok = toggleCompare(id);
     if(!ok) cmp.checked = inCompare(id);
-  });
-
-  const searchForm = document.querySelector("#heroSearch");
-  if(searchForm) searchForm.addEventListener("submit", e=>{
-    e.preventDefault();
-    const v = document.querySelector("#heroSearchInput").value.trim();
-    location.href = "products.html" + (v? "?q="+encodeURIComponent(v) : "");
   });
 });
