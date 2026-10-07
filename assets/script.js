@@ -230,9 +230,17 @@ function refreshProfessionsList(){
 function publishedProducts(){ return PRODUCTS.filter(p => (p.status||"published") === "published"); }
 
 const money = n => "₹" + n.toLocaleString("en-IN");
+// If a product ever ends up with no pricing tiers (e.g. saved from Admin
+// with every tier row cleared/invalid), p.tiers[0] used to be undefined —
+// every caller then crashed on ".price" (money(), sort-by-price, the
+// budget filter, product cards...), which silently broke whatever feature
+// touched that product next, with no visible error for the shopper. Fall
+// back to a safe ₹0 tier instead of throwing.
+const SAFE_TIER_FALLBACK = {min:1, price:0};
 function tierFor(p, qty){
-  let applicable = p.tiers[0];
-  for(const t of p.tiers){ if(qty >= t.min) applicable = t; }
+  const tiers = (p && Array.isArray(p.tiers) && p.tiers.length) ? p.tiers : [SAFE_TIER_FALLBACK];
+  let applicable = tiers[0];
+  for(const t of tiers){ if(qty >= t.min) applicable = t; }
   return applicable;
 }
 function ref(){ return "BZV-" + Math.random().toString(36).slice(2,6).toUpperCase() + Date.now().toString().slice(-4); }
@@ -276,19 +284,27 @@ window.imgFallback = imgFallback;
      real, computable pricing-curve signal, not a random flag.
    Priority when a product qualifies for more than one: Best Value > Popular
    > Trending. At most one badge shows per card. */
+// Reads x.tiers directly (not via tierFor) for every product on every card
+// render, so a single product saved with no valid tiers (e.g. from Admin
+// with every tier row cleared) used to throw here and silently break
+// rendering for the WHOLE grid it was in — search, sort and filters all
+// looked "broken" with no visible error. safeTiers() guarantees at least
+// one ₹0 tier so this never crashes on bad data again.
+const safeTiers = x => (x && Array.isArray(x.tiers) && x.tiers.length) ? x.tiers : [{min:1, price:0}];
 function computeCardBadge(p){
   if(!PRODUCTS.length) return null;
   const group = PRODUCTS.filter(x=>x.profession===p.profession);
-  const unitPriceAt = x=> x.tiers[x.tiers.length-1].price;
+  const unitPriceAt = x=> { const t = safeTiers(x); return t[t.length-1].price; };
   const bestValue = group.reduce((best,x)=> unitPriceAt(x) < unitPriceAt(best) ? x : best, group[0]);
   if(p.id === bestValue.id) return {emoji:"💰", label:"Best Value"};
 
-  const maxTiers = Math.max(...PRODUCTS.map(x=>x.tiers.length));
-  const popular = PRODUCTS.find(x=>x.tiers.length===maxTiers);
+  const maxTiers = Math.max(...PRODUCTS.map(x=>safeTiers(x).length));
+  const popular = PRODUCTS.find(x=>safeTiers(x).length===maxTiers);
   if(popular && p.id === popular.id) return {emoji:"⭐", label:"Popular"};
 
   const discountPct = x=>{
-    const first = x.tiers[0].price, last = x.tiers[x.tiers.length-1].price;
+    const t = safeTiers(x);
+    const first = t[0].price, last = t[t.length-1].price;
     return first>0 ? (first-last)/first : 0;
   };
   const inStock = PRODUCTS.filter(x=>x.stock);
@@ -578,8 +594,8 @@ function applyProductSeo(p){
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "INR",
-      lowPrice: Math.min(...p.tiers.map(t=>t.price)),
-      highPrice: Math.max(...p.tiers.map(t=>t.price)),
+      lowPrice: Math.min(...safeTiers(p).map(t=>t.price)),
+      highPrice: Math.max(...safeTiers(p).map(t=>t.price)),
       availability: p.stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
     }
   });
@@ -821,7 +837,7 @@ function openQuickView(id){
         <span class="pd-cat">${p.profession}</span>
         <h2>${p.name}</h2>
         <div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
-        <table class="tier-table">${p.tiers.map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
+        <table class="tier-table">${safeTiers(p).map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
         <div class="opt-title">Colour</div>
         <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
@@ -1241,7 +1257,7 @@ function initProductPage(){
              the real price. -->
         <div class="pd-price-box">
           <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
-          ${p.tiers.map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
+          ${safeTiers(p).map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
           </table>
         </div>
         <div class="opt-title">Quantity</div>

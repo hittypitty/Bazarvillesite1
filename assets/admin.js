@@ -856,7 +856,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const match = Object.entries(p.colorImages).find(([,imgs])=>imgs.includes(src));
       return match ? match[0] : "";
     });
-    workingTiers = p ? p.tiers.map(t=>({...t})) : [{min:p?p.moq:10, price:0}];
+    // Guard against a product saved with no/empty tiers (shouldn't happen
+    // after the save-time fallback below, but opening an older bad record
+    // for editing shouldn't crash the admin panel either).
+    workingTiers = (p && Array.isArray(p.tiers) && p.tiers.length) ? p.tiers.map(t=>({...t})) : [{min:p?p.moq||10:10, price:0}];
     workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
     workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
     workingSizes = p ? p.sizes.slice() : ["Standard"];
@@ -1111,7 +1114,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       })(),
       sizes: workingSizes.slice(),
       printOptions: workingPrintOpts.slice(),
-      tiers: workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min),
+      // Never save a product with zero valid tiers — every price display,
+      // sort-by-price and the budget filter on the public site reads
+      // tiers[0], and an empty array used to crash those features for
+      // this product (and silently abort whatever list it was in).
+      tiers: (()=>{
+        const valid = workingTiers.filter(t=>t.min>0).sort((a,b)=>a.min-b.min);
+        return valid.length ? valid : [{min:1, price:0}];
+      })(),
       img: productImages,
       metaTitle: document.querySelector("#pf_metaTitle").value.trim(),
       metaDescription: document.querySelector("#pf_metaDesc").value.trim(),
