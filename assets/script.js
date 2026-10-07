@@ -320,11 +320,20 @@ function computeCardBadge(p){
 }
 
 /* ---------- product card ---------- */
+// Card info block styled closer to Myntra's listing cards: a small
+// category "eyebrow" above the title (like a brand name), and a real
+// "Save X%" chip next to the price computed from the product's own bulk
+// tiers (first-tier price vs last-tier price) — never a fabricated
+// discount, just the genuine price drop a buyer gets by ordering at the
+// top tier instead of the bottom one.
 function productCard(p){
   const t = tierFor(p, p.moq);
   const wished = isWishlisted(p.id);
   const badge = computeCardBadge(p);
   const compared = inCompare(p.id);
+  const tiers = safeTiers(p);
+  const firstPrice = tiers[0].price, lastPrice = tiers[tiers.length-1].price;
+  const savePct = (tiers.length>1 && firstPrice>0 && lastPrice<firstPrice) ? Math.round((firstPrice-lastPrice)/firstPrice*100) : 0;
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
     ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
@@ -335,8 +344,12 @@ function productCard(p){
     <label class="cmp-check" title="Add to compare"><input type="checkbox" data-cmp-id="${p.id}" ${compared?'checked':''}><span>Compare</span></label>
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
+      ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
-      <div class="pprice">${money(t.price)} <small>/ pc starting</small></div>
+      <div class="pprice-row">
+        <div class="pprice">${money(t.price)} <small>/ pc starting</small></div>
+        ${savePct>0? `<span class="psave">Save ${savePct}% on bulk</span>` : ""}
+      </div>
       <div class="pfoot">
         <span class="moqtag">MOQ ${p.moq} pcs</span>
         ${p.stock? `<a class="wa-mini" title="Quick WhatsApp enquiry" target="_blank" href="${waLink(p, p.bulk)}">🟢</a>` : `<a class="wa-mini" title="Check availability" target="_blank" href="${waLink(p, p.moq)}">🟢</a>`}

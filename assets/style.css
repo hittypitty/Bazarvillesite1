@@ -232,19 +232,24 @@ img{max-width:100%;display:block}
 .pcard .badge-stock{position:absolute;top:12px;left:12px;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:20px;z-index:2;font-family:"Plus Jakarta Sans"}
 .badge-stock.in{background:var(--lime);color:var(--on-accent)}
 .badge-stock.out{background:var(--ink);color:#fff}
-.pimg{height:210px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center}
+.pimg{height:210px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);position:relative}
 /* object-fit:contain (not cover) — a fixed-height box + cover always crops
    whichever edge doesn't match the box's aspect ratio, cutting corners off
    portrait/square/odd-shaped product photos. contain always shows the WHOLE
    photo, letting the soft background pad the gap instead of cropping — so
-   this never needs revisiting for future products of any shape. */
-.pimg img{width:100%;height:100%;object-fit:contain;transform:translateZ(0) scale(1);transition:transform .5s cubic-bezier(.16,1,.3,1)}
+   this never needs revisiting for future products of any shape. White bg +
+   a thin bottom hairline (instead of the old flat soft-green fill) reads
+   closer to Myntra/e-comm listing cards, where the photo sits on clean
+   white with a crisp edge into the info block below. */
+.pimg img{width:100%;height:100%;object-fit:contain;padding:10px;box-sizing:border-box;transform:translateZ(0) scale(1);transition:transform .5s cubic-bezier(.16,1,.3,1)}
 .pcard:hover .pimg img{transform:scale(1.06)}
 .pbody{padding:16px;transform:translateZ(30px)}
-.pcat{font-size:11px;font-weight:700;color:var(--lime-deep);text-transform:uppercase;letter-spacing:.04em}
-.pbody h3{font-size:15.5px;margin:6px 0 8px;line-height:1.35;font-weight:600;font-family:"Inter"}
+.pcat{display:block;font-size:10.5px;font-weight:800;color:var(--lime-deep);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.pbody h3{font-size:15.5px;margin:0 0 8px;line-height:1.35;font-weight:600;font-family:"Inter"}
+.pprice-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pprice{font-size:19px;font-weight:800;font-family:"Plus Jakarta Sans"}
 .pprice small{font-size:11.5px;color:var(--muted);font-weight:600}
+.psave{font-size:10.5px;font-weight:800;color:var(--lime-deep);background:var(--soft2);padding:3px 8px;border-radius:20px;white-space:nowrap}
 .pfoot{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .moqtag{font-size:11px;color:var(--muted);font-weight:600}
 .wa-mini{width:34px;height:34px;border-radius:50%;background:var(--wa);color:#fff;display:grid;place-items:center;font-size:16px;flex:none;transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .3s ease}
@@ -664,10 +669,12 @@ body.js-reveal .reveal-right.in{opacity:1;transform:translateX(0)}
   .grid4{gap:10px}
   .pimg{height:130px}
   .pbody{padding:10px}
-  .pcat{font-size:9.5px}
-  .pbody h3{font-size:12.5px;margin:4px 0 5px;line-height:1.3;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+  .pcat{font-size:9.5px;margin-bottom:2px}
+  .pbody h3{font-size:12.5px;margin:0 0 5px;line-height:1.3;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+  .pprice-row{gap:5px}
   .pprice{font-size:14.5px}
   .pprice small{font-size:9.5px}
+  .psave{font-size:9px;padding:2px 6px}
   .pfoot{margin-top:6px}
   .moqtag{font-size:9.5px}
   .wa-mini{width:28px;height:28px;font-size:13px}
