@@ -429,11 +429,27 @@ function initFilters(){
         "and","or","my","me","i","want","need","looking","look","find","show","some","any","please",
         "gift","gifts","product","products","item","items","that","this","these","those","is","are","what","can","get","good","best"
       ]);
+      // A query like "products under 1000" or "gifts under ₹500" is really
+      // TWO signals: a price ceiling, and (sometimes) no product keyword at
+      // all once "products"/"gifts"/"under" are stripped as stopwords and
+      // "1000" as a bare number. That used to leave zero search tokens, which
+      // fell back to literal-matching the ENTIRE raw phrase — a match that
+      // almost never succeeds — so "products under 1000" always returned 0
+      // results even though 11 of 16 products are under ₹1000. Detect an
+      // explicit price ceiling in the text (under/below/less than/upto/max,
+      // optionally with ₹/Rs) and apply it the same way as the sidebar's
+      // "Budget per piece" field, instead of silently failing on it.
+      const priceCeilingMatch = state.q.toLowerCase().match(/(?:under|below|less\s*than|upto|up\s*to|max|<=?)\s*[₹$]?\s*(\d[\d,]*)/);
+      const impliedBudget = priceCeilingMatch ? Number(priceCeilingMatch[1].replace(/,/g,"")) : null;
+
       const rawTokens = state.q.toLowerCase().replace(/[₹$,]/g," ").split(/[^a-z0-9+]+/i).filter(Boolean);
       const tokens = rawTokens.filter(t=>!STOPWORDS.has(t) && !/^\d+$/.test(t));
-      // If every token got stripped (query was e.g. just "under 500"), fall
-      // back to the raw phrase rather than silently matching everything.
-      const searchTokens = tokens.length ? tokens : [state.q.toLowerCase().trim()];
+      // If every token got stripped (query was e.g. just "under 500"), that
+      // means the whole query was noise words/numbers around a price — not a
+      // product keyword at all, so don't filter by text (impliedBudget below
+      // still narrows the list); falling back to matching the raw phrase
+      // almost never succeeds and used to silently zero out the results.
+      const searchTokens = tokens;
 
       const taxonomyValuesForToken = (token)=>{
         const vals = new Set();
@@ -461,7 +477,12 @@ function initFilters(){
         return score;
       };
 
-      list = list.map(p=>({p, score:scoreProduct(p)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.p);
+      if(searchTokens.length){
+        list = list.map(p=>({p, score:scoreProduct(p)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.p);
+      }
+      if(impliedBudget){
+        list = list.filter(p=> tierFor(p, state.qty||1).price <= impliedBudget);
+      }
     }
     // The filter is labelled "Budget per piece (₹)" — it was comparing the
     // TOTAL order cost (per-piece price × quantity) against that number,
