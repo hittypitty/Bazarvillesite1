@@ -163,7 +163,12 @@ img{max-width:100%;display:block}
   .hq-head h1{font-size:28px}
   .hq-chip{font-size:13px;padding:9px 16px}
   .hq-search{flex-wrap:wrap;border-radius:14px}
-  .hq-search .btn{flex:1 1 100%;width:100%;margin-top:4px}
+  /* The base .hq-search .btn rule (above) zeroes out vertical padding so the
+     button reads as a small inline pill next to the input on desktop — but
+     here it drops to its own full-width row, and that same zero padding
+     collapsed it into a ~17px sliver, which is what looked broken/unprofessional
+     on a phone. Give it real button proportions now that it's a standalone row. */
+  .hq-search .btn{flex:1 1 100%;width:100%;margin-top:8px;padding:14px 24px;border-radius:12px}
   .hq-banner img{max-height:220px}
 }
 
