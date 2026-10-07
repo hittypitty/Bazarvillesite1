@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const isDraft = (p.status||"published") === "draft";
         return `<tr>
           <td><img src="${(p.img&&p.img[0])||''}" alt=""></td>
-          <td><b>${p.name}</b></td>
+          <td><b>${p.trending?'<span title="Marked Trending" style="color:var(--lime-deep)">★</span> ':''}${p.name}</b></td>
           <td>${p.cat}</td>
           <td>${money(t.price)}</td>
           <td>${p.moq} pcs</td>
@@ -657,6 +657,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   /* ---------- colour / size tag chips (product form) ---------- */
   let workingColors = [];
+  let workingTrending = false;
   let workingSizes = [];
   let workingPrintOpts = [];
   let workingColorImages = {}; // {"#1a1a1a": ["url1","url2"]} — optional per-colour gallery override
@@ -869,6 +870,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // scrollable form body, so it's visible immediately without scrolling —
     // set its value here since the header markup is static (not rebuilt per-open).
     document.querySelector("#pf_status").value = (p && p.status === "draft") ? "draft" : "published";
+    // Manual Trending override — same "lives in the header, not the
+    // scrollable form body" reasoning as Status above.
+    workingTrending = !!(p && p.trending);
+    const trendingBtn = document.querySelector("#pf_trendingToggle");
+    trendingBtn.classList.toggle("active", workingTrending);
+    trendingBtn.onclick = ()=>{ workingTrending = !workingTrending; trendingBtn.classList.toggle("active", workingTrending); };
     document.querySelector("#productForm").innerHTML = productFormHtml(p);
     renderTierRows(workingTiers);
     renderImgGrid();
@@ -1092,6 +1099,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       bulk: Number(document.querySelector("#pf_bulk").value)||1,
       stock: document.querySelector("#pf_stock").checked,
       status: document.querySelector("#pf_status").value,
+      trending: workingTrending,
       colors: workingColors.slice(),
       // Only keep entries for colours that are still selected and that
       // actually have at least one image — an empty/orphaned entry would

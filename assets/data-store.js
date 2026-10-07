@@ -101,7 +101,7 @@ const BazDS = (function(){
     // keep stripping whichever migratable column the latest error names and
     // retrying, until the save succeeds or the error is something else
     // entirely (a real problem, not a missing-migration one).
-    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images","color_stock"];
+    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images","color_stock","trending"];
     let safeRow = {...row};
     let stripped = [];
     let data, error;

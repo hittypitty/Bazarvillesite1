@@ -293,6 +293,10 @@ window.imgFallback = imgFallback;
 const safeTiers = x => (x && Array.isArray(x.tiers) && x.tiers.length) ? x.tiers : [{min:1, price:0}];
 function computeCardBadge(p){
   if(!PRODUCTS.length) return null;
+  // Admin can manually pin the Trending badge on a specific product (Admin →
+  // product modal → ★ Trending, next to Status). That's a deliberate human
+  // call, so it wins over every auto-computed signal below.
+  if(p.trending) return {emoji:"🔥", label:"Trending"};
   const group = PRODUCTS.filter(x=>x.profession===p.profession);
   const unitPriceAt = x=> { const t = safeTiers(x); return t[t.length-1].price; };
   const bestValue = group.reduce((best,x)=> unitPriceAt(x) < unitPriceAt(best) ? x : best, group[0]);
@@ -373,6 +377,32 @@ function attachTilt(nodes){
 function renderCollections(target, list=COLLECTIONS){
   const el = document.querySelector(target); if(!el) return;
   el.innerHTML = list.map(c=>`<a class="coll" href="collection.html?name=${encodeURIComponent(c.name)}"><img src="${c.img}" alt="${c.name}" loading="lazy"><div class="ov"><b>${c.name}</b><span>${c.tag}</span></div></a>`).join("");
+}
+
+// Prev/next arrow buttons for the "Trending Products" slider (#collGrid is a
+// native scroll-snap track — see .collections in style.css — these buttons
+// are just a mouse/desktop convenience on top of the touch swipe that
+// already works for free). Scrolls by roughly one card + gap each click, and
+// hides whichever arrow has nothing left to scroll to.
+function initCollSlider(){
+  const track = document.querySelector("#collGrid");
+  const prev = document.querySelector("#collArrowPrev");
+  const next = document.querySelector("#collArrowNext");
+  if(!track || !prev || !next) return;
+  const scrollStep = ()=> (track.querySelector(".coll")?.offsetWidth || 260) + 20;
+  const updateArrows = ()=>{
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    prev.classList.toggle("hide", track.scrollLeft <= 4);
+    next.classList.toggle("hide", track.scrollLeft >= maxScroll - 4);
+  };
+  prev.addEventListener("click", ()=> track.scrollBy({left:-scrollStep(), behavior:"smooth"}));
+  next.addEventListener("click", ()=> track.scrollBy({left:scrollStep(), behavior:"smooth"}));
+  track.addEventListener("scroll", updateArrows, {passive:true});
+  // Cards render async (after COLLECTIONS/PRODUCTS load), so the track's
+  // scrollWidth isn't final yet on this tick — check again shortly after.
+  updateArrows();
+  setTimeout(updateArrows, 500);
+  window.addEventListener("resize", updateArrows);
 }
 
 /* ---------- filters (products.html) ---------- */
@@ -1261,6 +1291,7 @@ function initProductPage(){
     <div class="pd-layout">
       <div class="reveal-left">
         <div class="pd-gallery-grid" id="pdGalleryGrid"></div>
+        <div class="pd-gallery-dots" id="pdGalleryDots"></div>
       </div>
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
@@ -1337,6 +1368,34 @@ function initProductPage(){
     grid.querySelectorAll(".pd-gallery-cell").forEach(cell=>{
       cell.addEventListener("click", ()=>openLightbox(Number(cell.dataset.i)));
     });
+    // Mobile only (see .pd-gallery-grid's max-width:640px rule in style.css):
+    // the grid becomes a one-photo-per-screen scroll-snap slider there, so
+    // these dots are the "which photo am I on" indicator a slider needs —
+    // on desktop the grid stays a static multi-column layout and the dots
+    // row stays hidden (same media query). Harmless no-op to build/update
+    // them either way.
+    const dots = document.querySelector("#pdGalleryDots");
+    dots.innerHTML = galleryImages.length > 1
+      ? galleryImages.map((_,i)=>`<span class="pd-gallery-dot${i===0?' active':''}" data-i="${i}"></span>`).join("")
+      : "";
+    dots.querySelectorAll(".pd-gallery-dot").forEach(d=>{
+      d.addEventListener("click", ()=>{
+        const cell = grid.querySelector(`.pd-gallery-cell[data-i="${d.dataset.i}"]`);
+        if(cell) cell.scrollIntoView({behavior:"smooth", inline:"start", block:"nearest"});
+      });
+    });
+    // Debounced scroll listener — updates the active dot as the shopper
+    // swipes through the slider on mobile.
+    let scrollRaf = null;
+    grid.onscroll = ()=>{
+      if(scrollRaf) return;
+      scrollRaf = requestAnimationFrame(()=>{
+        scrollRaf = null;
+        const cellW = grid.querySelector(".pd-gallery-cell")?.offsetWidth || 1;
+        const idx = Math.round(grid.scrollLeft / cellW);
+        dots.querySelectorAll(".pd-gallery-dot").forEach((d,i)=>d.classList.toggle("active", i===idx));
+      });
+    };
   }
   let lightboxIndex = 0;
   function openLightbox(idx){
@@ -1919,7 +1978,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
-  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"),
+  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"), initCollSlider,
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
