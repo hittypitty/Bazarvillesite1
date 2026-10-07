@@ -447,8 +447,14 @@ function initFilters(){
 
       list = list.map(p=>({p, score:scoreProduct(p)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.p);
     }
-    if(state.qty>1){
-      list = list.filter(p=> tierFor(p, state.qty).price*state.qty <= (state.budget||999999));
+    // The filter is labelled "Budget per piece (₹)" — it was comparing the
+    // TOTAL order cost (per-piece price × quantity) against that number,
+    // so e.g. qty 10 + budget 500 silently required ₹50/piece and matched
+    // almost nothing. Compare the per-piece price itself, and apply this
+    // independent of quantity (quantity still only changes which pricing
+    // slab/tier the per-piece price is read from).
+    if(state.budget && state.budget < 999999){
+      list = list.filter(p=> tierFor(p, state.qty||1).price <= state.budget);
     }
     if(state.sort==="price-asc") list.sort((a,b)=>tierFor(a,a.moq).price-tierFor(b,b.moq).price);
     if(state.sort==="price-desc") list.sort((a,b)=>tierFor(b,b.moq).price-tierFor(a,a.moq).price);
