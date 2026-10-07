@@ -321,11 +321,19 @@ function computeCardBadge(p){
 
 /* ---------- product card ---------- */
 // Card info block styled closer to Myntra's listing cards: a small
-// category "eyebrow" above the title (like a brand name), and a real
-// "Save X%" chip next to the price computed from the product's own bulk
-// tiers (first-tier price vs last-tier price) — never a fabricated
-// discount, just the genuine price drop a buyer gets by ordering at the
-// top tier instead of the bottom one.
+// category "eyebrow" above the title (like a brand name), and a price
+// line with a Myntra-style orange "(Save X%)" annotation.
+// NOTE: deliberately NOT a struck-through fake "MRP" — this catalogue has
+// no single-piece/MRP concept anywhere (the product page's own tier table
+// only ever shows real quantity-break prices), and in the common case
+// where a product's first tier starts right at its MOQ, the "current"
+// price and that first-tier price are the SAME number — a strikethrough
+// there would literally read "₹399 ₹399 (0% OFF)", which is both
+// pointless and the kind of fake-discount dark pattern worth avoiding.
+// Instead, offPct is the real, computable price drop between a product's
+// first tier and its best (highest-quantity) tier — "how much cheaper it
+// gets if you order more" — labelled clearly as a bulk saving, not a
+// discount off the price shown.
 function productCard(p){
   const t = tierFor(p, p.moq);
   const wished = isWishlisted(p.id);
@@ -333,7 +341,7 @@ function productCard(p){
   const compared = inCompare(p.id);
   const tiers = safeTiers(p);
   const firstPrice = tiers[0].price, lastPrice = tiers[tiers.length-1].price;
-  const savePct = (tiers.length>1 && firstPrice>0 && lastPrice<firstPrice) ? Math.round((firstPrice-lastPrice)/firstPrice*100) : 0;
+  const offPct = (tiers.length>1 && firstPrice>lastPrice && firstPrice>0) ? Math.round((firstPrice-lastPrice)/firstPrice*100) : 0;
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
     ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
@@ -347,9 +355,10 @@ function productCard(p){
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
       <div class="pprice-row">
-        <div class="pprice">${money(t.price)} <small>/ pc starting</small></div>
-        ${savePct>0? `<span class="psave">Save ${savePct}% on bulk</span>` : ""}
+        <span class="pprice">${money(t.price)}</span><small class="pprice-unit">/ pc</small>
+        ${offPct>0? `<span class="poff">(Save up to ${offPct}%)</span>` : ""}
       </div>
+      <div class="pprice-note">starting price</div>
       <div class="pfoot">
         <span class="moqtag">MOQ ${p.moq} pcs</span>
         ${p.stock? `<a class="wa-mini" title="Quick WhatsApp enquiry" target="_blank" href="${waLink(p, p.bulk)}">🟢</a>` : `<a class="wa-mini" title="Check availability" target="_blank" href="${waLink(p, p.moq)}">🟢</a>`}
