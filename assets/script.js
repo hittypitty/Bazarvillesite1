@@ -567,6 +567,33 @@ function initFilters(){
   const filterToggle = document.querySelector(".filter-toggle");
   const filtersPanel = document.querySelector(".filters");
   if(filterToggle && filtersPanel) filterToggle.addEventListener("click",()=>filtersPanel.classList.toggle("open"));
+
+  // Mobile bottom-bar Sort — a small bottom sheet instead of the (now
+  // hidden-on-mobile) native <select id="sortSelect">. Picking an option
+  // just sets that same select's value and fires "change" on it, so the
+  // existing sortSel listener above does the actual sorting — no sorting
+  // logic duplicated here.
+  const sortBtn = document.querySelector("#mabSortBtn");
+  const sortSheet = document.querySelector("#sortSheet");
+  const sortBackdrop = document.querySelector("#sortSheetBackdrop");
+  if(sortBtn && sortSheet && sortBackdrop && sortSel){
+    const syncActiveOpt = ()=>{
+      sortSheet.querySelectorAll(".sort-sheet-opt").forEach(o=>o.classList.toggle("active", o.dataset.val === sortSel.value));
+    };
+    const openSheet = ()=>{ syncActiveOpt(); sortSheet.classList.add("show"); sortBackdrop.classList.add("show"); document.body.style.overflow = "hidden"; };
+    const closeSheet = ()=>{ sortSheet.classList.remove("show"); sortBackdrop.classList.remove("show"); document.body.style.overflow = ""; };
+    sortBtn.addEventListener("click", openSheet);
+    sortBackdrop.addEventListener("click", closeSheet);
+    document.querySelector("#sortSheetClose")?.addEventListener("click", closeSheet);
+    sortSheet.querySelectorAll(".sort-sheet-opt").forEach(opt=>{
+      opt.addEventListener("click", ()=>{
+        sortSel.value = opt.dataset.val;
+        sortSel.dispatchEvent(new Event("change"));
+        closeSheet();
+      });
+    });
+    syncActiveOpt();
+  }
 }
 
 /* ---------- navbar search (present on every page's header) ----------

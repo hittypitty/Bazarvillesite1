@@ -5,7 +5,7 @@
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Work+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css"></head><body>
+<link rel="stylesheet" href="assets/style.css"></head><body class="has-mobile-actionbar">
 
 <div class="topbar"><div class="ticker"><span>🛍️ 5,000+ products in the catalogue</span><span>✅ Design approval before dispatch</span><span>💬 Structured WhatsApp bulk enquiry</span><span>🚚 Pan-India bulk shipping</span></div></div>
 
@@ -21,7 +21,6 @@
 </div></section>
 
 <section class="section" style="padding-top:10px"><div class="container">
-  <button class="btn btn-outline filter-toggle btn-sm" style="margin-bottom:16px">⚙ Filters</button>
   <div class="shell">
     <aside class="filters reveal-left">
       <div class="fgroup">
@@ -70,6 +69,27 @@
   </div>
 </div></section>
 </main>
+
+<!-- Mobile-only bottom action bar (Myntra-style): replaces the old inline
+     "⚙ Filters" button + always-visible Sort dropdown, which on a phone sat
+     above the fold and pushed the actual products further down. Sort opens
+     a small bottom sheet; Filter reuses the same .filters.open toggle the
+     old button drove. Hidden entirely on tablet/desktop — see .mobile-actionbar
+     in style.css. -->
+<div class="mobile-actionbar" id="mobileActionBar">
+  <button type="button" class="mab-btn" id="mabSortBtn"><span class="mab-ic">↕</span>Sort</button>
+  <span class="mab-sep"></span>
+  <button type="button" class="mab-btn filter-toggle" id="mabFilterBtn"><span class="mab-ic">⚙</span>Filter</button>
+</div>
+<div class="sort-sheet-backdrop" id="sortSheetBackdrop"></div>
+<div class="sort-sheet" id="sortSheet">
+  <div class="sort-sheet-head">Sort by<button type="button" class="sort-sheet-close" id="sortSheetClose" aria-label="Close">✕</button></div>
+  <div class="sort-sheet-opt" data-val="relevance">Relevance</div>
+  <div class="sort-sheet-opt" data-val="price-asc">Price: Low to High</div>
+  <div class="sort-sheet-opt" data-val="price-desc">Price: High to Low</div>
+  <div class="sort-sheet-opt" data-val="moq-asc">MOQ: Low to High</div>
+  <div class="sort-sheet-opt" data-val="newest">Newest</div>
+</div>
 
 <footer class="footer" id="footer"><div class="container">
   <div class="footgrid">

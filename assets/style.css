@@ -305,6 +305,29 @@ img{max-width:100%;display:block}
 .resultbar select{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit}
 .filter-toggle{display:none}
 
+/* ---- mobile bottom action bar (Sort / Filter) — Myntra-style, replaces
+   the old inline "⚙ Filters" button + always-visible sort dropdown, which
+   on a phone sat above the fold and pushed the actual products down. Shown
+   only ≤1000px (see .mobile-actionbar{display:flex} in that media block);
+   .mab-btn reuses .filter-toggle's class on the Filter button so the
+   existing JS toggle (initFilters() in script.js) wires it for free. ---- */
+.mobile-actionbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -12px rgba(26,26,26,.18);padding:6px 0;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+.mab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;font:inherit;font-size:12px;font-weight:700;color:var(--ink);padding:8px 4px;cursor:pointer}
+.mab-ic{font-size:17px;line-height:1}
+.mab-sep{width:1px;background:var(--line);margin:6px 0}
+
+/* bottom sheet for Sort */
+.sort-sheet-backdrop{position:fixed;inset:0;background:rgba(15,15,13,.5);z-index:70;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.sort-sheet-backdrop.show{opacity:1;pointer-events:auto}
+.sort-sheet{position:fixed;left:0;right:0;bottom:0;z-index:71;background:#fff;border-radius:18px 18px 0 0;padding:6px 6px calc(10px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .28s cubic-bezier(.16,1,.3,1);box-shadow:0 -10px 30px -10px rgba(0,0,0,.25)}
+.sort-sheet.show{transform:translateY(0)}
+.sort-sheet-head{display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:15px;padding:12px 14px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.sort-sheet-close{border:0;background:none;font-size:16px;cursor:pointer;color:var(--muted);padding:4px}
+.sort-sheet-opt{padding:13px 14px;font-size:14.5px;font-weight:600;cursor:pointer;border-radius:10px;transition:background .15s ease}
+.sort-sheet-opt:hover{background:var(--soft)}
+.sort-sheet-opt.active{color:var(--lime-deep);font-weight:800}
+.sort-sheet-opt.active::after{content:"✓";float:right}
+
 /* ================= PRODUCT DETAIL ================= */
 .pd-layout{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start}
 /* The gallery column is usually shorter than the options/description column
@@ -593,6 +616,14 @@ body.js-reveal .reveal-right.in{opacity:1;transform:translateX(0)}
   .filters.open{display:block}
   .filter-toggle{display:inline-flex}
   .pd-layout{grid-template-columns:1fr}
+  /* Sort moves into the bottom action bar's sheet on mobile — the resultbar
+     keeps just the product count. */
+  .resultbar #sortSelect{display:none}
+  .mobile-actionbar{display:flex}
+  /* clearance so the fixed bottom bar never covers the footer/last row —
+     scoped to pages that actually have the bar (products.html's <body
+     class="has-mobile-actionbar">), not every page at this width. */
+  body.has-mobile-actionbar{padding-bottom:62px}
   .galaxy-stage{height:480px}
   .ring1{width:180px;height:180px}.ring2{width:300px;height:300px}.ring3{width:410px;height:410px}
   .counterband{grid-template-columns:1fr 1fr}
@@ -625,7 +656,24 @@ body.js-reveal .reveal-right.in{opacity:1;transform:translateX(0)}
   .hero-actions .btn{flex:1 1 calc(50% - 6px);padding:12px 16px;font-size:13px}
   .logostrip{justify-content:center;gap:12px 22px}
   .logochip{font-size:14.5px}
-  .gates,.grid4,.grid3,.tgrid,.footgrid{grid-template-columns:1fr}
+  .gates,.grid3,.tgrid,.footgrid{grid-template-columns:1fr}
+  /* .grid4 (product cards) deliberately stays 2-column even at phone width —
+     Myntra-style compact cards (see the mobile pcard tuning below) — instead
+     of collapsing to 1 huge full-width card per row, which was the main
+     reason the products page felt endlessly long on mobile. */
+  .grid4{gap:10px}
+  .pimg{height:130px}
+  .pbody{padding:10px}
+  .pcat{font-size:9.5px}
+  .pbody h3{font-size:12.5px;margin:4px 0 5px;line-height:1.3;-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+  .pprice{font-size:14.5px}
+  .pprice small{font-size:9.5px}
+  .pfoot{margin-top:6px}
+  .moqtag{font-size:9.5px}
+  .wa-mini{width:28px;height:28px;font-size:13px}
+  .pcard .badge-stock,.pcard .badge-signal{font-size:9px;padding:4px 8px;top:8px}
+  .pcard .badge-stock{left:8px}
+  .pcard .badge-signal{right:8px}
   .cta-banner{flex-direction:column;text-align:left;align-items:flex-start;padding:34px}
   .section{padding:48px 0}
   .pagehead h1{font-size:27px}
@@ -673,6 +721,14 @@ body.anim-full .pcard.tilt:hover{animation-play-state:paused}
 @media(max-width:820px),(pointer:coarse){
   .pcard-actions,.cmp-check{opacity:1;transform:none}
 }
+/* The "Compare" checkbox is absolutely positioned at the card's
+   bottom-right and was overlapping the compact 2-up mobile pfoot row (MOQ +
+   WhatsApp button) now that cards are half as wide (see .grid4/.pimg/.pfoot
+   tuning above). Compare is still reachable from the product/quick-view
+   page, so just hide it on these narrow cards instead of cramming a third
+   control into an already tight footer row. Placed after the base
+   .cmp-check{display:flex} rule above so it actually wins the cascade. */
+@media(max-width:600px){ .cmp-check{display:none} }
 /* product-detail / quick-view "big" wishlist button (has an icon + text label) */
 .wish-btn.pd-wish,.wish-btn.qv-wish{position:static;width:auto;height:auto;border-radius:10px;padding:12px 18px;gap:8px;display:inline-flex;align-items:center;font-weight:700;font-size:14px;font-family:inherit;color:var(--ink)}
 .wish-btn.pd-wish.active,.wish-btn.qv-wish.active{border-color:#e8546b;color:#c2334c;background:#fff0f2}
