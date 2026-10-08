@@ -3,6 +3,17 @@
    only ever hides content when this script is actually running to reveal it again. */
 document.body.classList.add("js-reveal");
 
+// Any element marked .js-open-enquiry (the homepage/contact/privacy "Send
+// WhatsApp Enquiry" CTA banners) opens the same structured enquiry
+// form/modal as the header's WhatsApp icon, instead of jumping straight to
+// a wa.me link — per Vikas's feedback that these should collect details on
+// the site first. buildEnquiryModal()'s own submit handler is what opens
+// WhatsApp afterwards, with the filled-in details. Delegated on document so
+// it works for every current/future instance with no per-page wiring.
+document.addEventListener("click", (e)=>{
+  if(e.target.closest(".js-open-enquiry")) { e.preventDefault(); openEnquiryModal(); }
+});
+
 const img = (kw, seed) => `https://picsum.photos/seed/bzv${seed}/600/600`;
 
 const DEFAULT_PRODUCTS = [
@@ -746,26 +757,16 @@ function toggleWishlist(id){
   setWishlist(list);
   return list.includes(id);
 }
+// Vikas asked to remove the wishlist (❤️) icon from the header nav — this
+// used to inject a .wishbtn into every .navactions bar. The wishlist
+// *feature* itself stays fully intact (heart buttons on product cards,
+// quick view and the product page still save/toggle via toggleWishlist(),
+// and wishlist.html still works for anyone who lands there directly) —
+// only the dedicated nav icon/badge is gone. If an older page load already
+// has a stray .wishbtn in its nav (shouldn't happen, but harmless to guard
+// against), this cleans it up instead of leaving it half-wired.
 function renderWishBadge(){
-  document.querySelectorAll(".navactions").forEach(nav=>{
-    let el = nav.querySelector(".wishbtn");
-    if(!el){
-      el = document.createElement("a");
-      el.href = "wishlist.html"; el.className = "wishbtn"; el.title = "My Wishlist";
-      el.innerHTML = `❤️<span class="wish-count"></span>`;
-      // Lands after the search bar, before the WhatsApp enquiry icon (or
-      // before the hamburger if that hasn't been added yet) — either render
-      // order (this vs renderAccountBadge) ends up with the same final
-      // left-to-right order: search, wishlist, enquiry, menu.
-      const enqEl = nav.querySelector(".enqbtn");
-      const menuBtn = nav.querySelector(".menu-btn");
-      nav.insertBefore(el, enqEl || menuBtn || null);
-    }
-    const count = getWishlist().length;
-    const badge = el.querySelector(".wish-count");
-    badge.textContent = count>0 ? count : "";
-    badge.style.display = count>0 ? "flex" : "none";
-  });
+  document.querySelectorAll(".navactions .wishbtn").forEach(el=>el.remove());
 }
 
 /* ---------- compare (sessionStorage — a "currently comparing" set, not meant
@@ -1073,7 +1074,12 @@ function renderAccountBadge(){
     if(!enqEl){
       enqEl = document.createElement("button");
       enqEl.type = "button"; enqEl.className = "enqbtn"; enqEl.title = "WhatsApp Enquiry";
-      enqEl.textContent = "💬";
+      // A proper WhatsApp-branded icon (green circle, white phone glyph —
+      // see .enqbtn in style.css) instead of a plain 💬 emoji, per Vikas's
+      // feedback. Still opens the same structured enquiry form/modal, not
+      // WhatsApp directly — the form itself hands off to WhatsApp once
+      // submitted (see buildEnquiryModal()'s submit handler).
+      enqEl.innerHTML = `<svg viewBox="0 0 32 32" width="19" height="19" fill="currentColor" aria-hidden="true"><path d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.1.55 4.08 1.6 5.86L4 29l8.3-1.56a11.96 11.96 0 0 0 3.72.6h.01c6.62 0 12.02-5.4 12.02-12.02C28.04 8.4 22.64 3 16.02 3Zm0 21.8h-.01a9.8 9.8 0 0 1-4.99-1.37l-.36-.21-4.93.93.93-4.8-.23-.37a9.76 9.76 0 0 1-1.5-5.96C4.93 9.6 9.98 4.98 16.02 4.98c5.4 0 9.83 4.42 9.83 9.84 0 5.42-4.43 9.98-9.83 9.98Zm5.4-7.37c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.48-1.76-1.66-2.06-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.6-.91-2.2-.24-.57-.49-.5-.67-.5-.17 0-.37-.02-.57-.02-.2 0-.52.07-.8.37-.27.3-1.05 1.02-1.05 2.5s1.07 2.9 1.22 3.1c.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"/></svg>`;
       enqEl.addEventListener("click", openEnquiryModal);
       const menuBtn = nav.querySelector(".menu-btn");
       nav.insertBefore(enqEl, menuBtn || null);
@@ -2018,8 +2024,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyAnimationLevel(SETTINGS.animationLevel);
   const footerWaLink = document.querySelector("#footerWaLink");
   if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
-  const ctaWaLink = document.querySelector("#ctaWaLink");
-  if(ctaWaLink) ctaWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent("Hi Bazarville! I'd like to raise a bulk enquiry.")}`;
+  // #ctaWaLink used to be set here too, back when the "Send WhatsApp Enquiry"
+  // CTA banners were plain wa.me links. They're now .js-open-enquiry buttons
+  // that open the structured enquiry form instead (see the document-level
+  // click delegation near the top of this file), so there's no href left to
+  // populate.
 
   // each page only has some of these roots present — guard clauses handle that — but
   // run every init in its own try/catch too, so one page's issue can never cascade

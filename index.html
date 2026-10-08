@@ -39,13 +39,25 @@
 
 <section class="trusted reveal"><div class="container">
   <p>TRUSTED BY PROCUREMENT & HR TEAMS AT</p>
-  <div class="logostrip">
-    <div class="logochip"><span class="dot"></span>Nimbus Corp</div>
-    <div class="logochip"><span class="dot"></span>Vertex Health</div>
-    <div class="logochip"><span class="dot"></span>Orbit Retail</div>
-    <div class="logochip"><span class="dot"></span>Clearline IT</div>
-    <div class="logochip"><span class="dot"></span>Summit Edu</div>
-    <div class="logochip"><span class="dot"></span>Harbor Hotels</div>
+  <!-- Auto-scrolling marquee (Vikas: "want this to be moving"), same doubled-
+       content technique as .topbar .ticker and .hq-ticker — the list is
+       repeated twice back-to-back and the CSS animation scrolls exactly 50%
+       of the track width, so the loop point is invisible. Pauses on hover. -->
+  <div class="trusted-tickerwrap">
+    <div class="logostrip">
+      <div class="logochip"><span class="dot"></span>Nimbus Corp</div>
+      <div class="logochip"><span class="dot"></span>Vertex Health</div>
+      <div class="logochip"><span class="dot"></span>Orbit Retail</div>
+      <div class="logochip"><span class="dot"></span>Clearline IT</div>
+      <div class="logochip"><span class="dot"></span>Summit Edu</div>
+      <div class="logochip"><span class="dot"></span>Harbor Hotels</div>
+      <div class="logochip"><span class="dot"></span>Nimbus Corp</div>
+      <div class="logochip"><span class="dot"></span>Vertex Health</div>
+      <div class="logochip"><span class="dot"></span>Orbit Retail</div>
+      <div class="logochip"><span class="dot"></span>Clearline IT</div>
+      <div class="logochip"><span class="dot"></span>Summit Edu</div>
+      <div class="logochip"><span class="dot"></span>Harbor Hotels</div>
+    </div>
   </div>
 </div></section>
 
@@ -95,9 +107,14 @@
 <section class="section"><div class="container">
   <div class="title reveal"><h2>What buyers say</h2></div>
   <div class="tgrid stagger">
-    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"We ordered 300 onboarding kits in two days flat — the WhatsApp enquiry with the reference number made follow-up painless."</p><div class="twho"><div class="tav">R</div><div><b>Riya Sharma</b><span>HR Lead, Clearline IT</span></div></div></div>
-    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"The quantity-based pricing is exactly what procurement needs — no more back-and-forth on slab pricing."</p><div class="twho"><div class="tav">A</div><div><b>Anil Mehta</b><span>Procurement, Summit Edu</span></div></div></div>
-    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"Shop by Profession helped us find relevant gifting options for our hospital staff in minutes."</p><div class="twho"><div class="tav">S</div><div><b>Sana Iyer</b><span>Admin Head, Vertex Health</span></div></div></div>
+    <!-- Reviewer name links out to their LinkedIn profile (Vikas's ask) — real
+         per-person profile URLs aren't in hand yet, so these point at the
+         Bazarville company LinkedIn page as a working placeholder. Swap each
+         href for e.g. https://www.linkedin.com/in/<their-handle> once Vikas
+         sends the real profile links; nothing else needs to change. -->
+    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"We ordered 300 onboarding kits in two days flat — the WhatsApp enquiry with the reference number made follow-up painless."</p><div class="twho"><div class="tav">R</div><div><a class="twho-name" href="https://in.linkedin.com/company/bazarville" target="_blank" rel="noopener">Riya Sharma</a><span>HR Lead, Clearline IT</span></div></div></div>
+    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"The quantity-based pricing is exactly what procurement needs — no more back-and-forth on slab pricing."</p><div class="twho"><div class="tav">A</div><div><a class="twho-name" href="https://in.linkedin.com/company/bazarville" target="_blank" rel="noopener">Anil Mehta</a><span>Procurement, Summit Edu</span></div></div></div>
+    <div class="tcard reveal"><div class="stars">★★★★★</div><p>"Shop by Profession helped us find relevant gifting options for our hospital staff in minutes."</p><div class="twho"><div class="tav">S</div><div><a class="twho-name" href="https://in.linkedin.com/company/bazarville" target="_blank" rel="noopener">Sana Iyer</a><span>Admin Head, Vertex Health</span></div></div></div>
   </div>
 </div></section>
 
@@ -112,7 +129,7 @@
 </div></section>
 
 <section class="section"><div class="container">
-  <div class="cta-banner reveal-zoom"><div><h2>Ready to raise a bulk enquiry?</h2><p>Pick your products, set your quantity, and send a structured WhatsApp enquiry in one tap.</p></div><a class="btn btn-lime" id="ctaWaLink" target="_blank" rel="noopener" href="https://wa.me/919827869031">🟢 Send WhatsApp Enquiry</a></div>
+  <div class="cta-banner reveal-zoom"><div><h2>Ready to raise a bulk enquiry?</h2><p>Pick your products, set your quantity, and send a structured WhatsApp enquiry in one tap.</p></div><button type="button" class="btn btn-lime js-open-enquiry">🟢 Send WhatsApp Enquiry</button></div>
 </div></section>
 </main>
 
