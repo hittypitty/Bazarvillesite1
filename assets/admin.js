@@ -343,75 +343,174 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const which = tab.dataset.invtab;
       document.querySelector("#invStockPanel").style.display = which==="stock" ? "block" : "none";
       document.querySelector("#invPosPanel").style.display = which==="pos" ? "block" : "none";
-      if(which==="pos"){ renderPosProductList(); renderPosCart(); refreshPosHolds(); }
+      if(which==="pos"){
+        renderPosCats(); renderPosProductList(); renderPosCart(); refreshPosHolds();
+        tickPosClock();
+        const billNoEl = document.querySelector("#posBillNo");
+        if(billNoEl && !billNoEl.value) resetPosBill();
+      }
     });
   });
 
   /* ================= POS (counter billing) =================
-     Lives inside the Inventory tab (not a separate page). A sale is a cart
-     of {productId, name, color, qty, price, img} built from PRODUCTS —
-     "Complete Sale" writes it to the same `orders` table as a normal
-     checkout (tagged source:"pos") and best-effort deducts the chosen
-     colour's tracked quantity (product.colorStock — POS-only, see
-     add_pos.sql); "Hold Sale" parks the cart in pos_holds to resume later. */
+     Redesigned to match the reference POS layout Vikas sent (WhatsApp,
+     10/10): a topbar (title, live date/time, Hold Sales / Recent Bills),
+     a search + category-filtered product grid, and an editable bill panel
+     on the right — bill no, a line-item table with an inline qty stepper,
+     a note field, totals and Hold/Complete actions.
+     A sale is still a cart of {productId, name, color, size, qty, price,
+     img} built from PRODUCTS — "Complete Sale" writes it to the same
+     `orders` table as a normal checkout (tagged source:"pos") and
+     best-effort deducts the chosen colour's tracked quantity
+     (product.colorStock — POS-only, see add_pos.sql, set from the Quick
+     Add modal); "Hold Sale" parks the cart in pos_holds to resume later. */
   let posCart = [];
-  let posSelection = {}; // productId -> {color, qty}
   let posHoldsCache = [];
+  let posActiveCat = "";
+  let posQaProduct = null;
+  let posQaSel = {color:"", size:"", qty:1};
+  let posRecentCache = [];
+
+  function formatPosDateTime(d){
+    return d.toLocaleDateString("en-IN",{weekday:"short", day:"2-digit", month:"short", year:"numeric"}) +
+      ", " + d.toLocaleTimeString("en-IN",{hour:"numeric", minute:"2-digit", hour12:true});
+  }
+  // Shorter form (no weekday) for the narrow bill panel column, so it never
+  // wraps awkwardly the way the full topbar format would at that width.
+  function formatPosDateTimeShort(d){
+    return d.toLocaleDateString("en-IN",{day:"2-digit", month:"short", year:"numeric"}) +
+      ", " + d.toLocaleTimeString("en-IN",{hour:"numeric", minute:"2-digit", hour12:true});
+  }
+  function tickPosClock(){
+    const now = new Date();
+    const a = document.querySelector("#posDateTime"); if(a) a.textContent = formatPosDateTime(now);
+    const b = document.querySelector("#posBillDateTime"); if(b) b.textContent = formatPosDateTimeShort(now);
+  }
+  setInterval(tickPosClock, 30000);
+
+  async function nextPosBillNo(){
+    try{
+      const orders = await BazDS.getOrders();
+      const posCount = orders.filter(o=>o.source==="pos").length;
+      return "POS-" + String(posCount+1).padStart(6,"0");
+    }catch(err){ return "POS-" + String(Date.now()).slice(-6); }
+  }
+  async function resetPosBill(){
+    const billNoEl = document.querySelector("#posBillNo");
+    if(billNoEl) billNoEl.value = await nextPosBillNo();
+  }
+
+  function renderPosCats(){
+    const wrap = document.querySelector("#posCats"); if(!wrap) return;
+    const cats = [...new Set(PRODUCTS.map(p=>p.cat).filter(Boolean))].sort();
+    wrap.innerHTML = [`<button type="button" class="pos-cat-pill ${posActiveCat===""?'active':''}" data-cat="">All</button>`]
+      .concat(cats.map(c=>`<button type="button" class="pos-cat-pill ${posActiveCat===c?'active':''}" data-cat="${c}">${c}</button>`))
+      .join("");
+  }
+
+  function filteredPosProducts(){
+    const q = (document.querySelector("#posProductSearch")?.value || "").trim().toLowerCase();
+    return PRODUCTS.filter(p=>{
+      if(posActiveCat && p.cat !== posActiveCat) return false;
+      if(!q) return true;
+      return (p.name||"").toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q);
+    });
+  }
 
   function renderPosProductList(){
     const wrap = document.querySelector("#posProductList"); if(!wrap) return;
-    const q = (document.querySelector("#posProductSearch")?.value || "").trim().toLowerCase();
-    const list = q ? PRODUCTS.filter(p=>(p.name||"").toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q)) : PRODUCTS;
+    const list = filteredPosProducts();
     wrap.innerHTML = list.length ? list.map(p=>{
-      if(!posSelection[p.id]) posSelection[p.id] = {color: (p.colors&&p.colors[0])||"", qty:1};
-      const sel = posSelection[p.id];
-      const stockVal = (p.colorStock && sel.color && p.colorStock[sel.color]!=null) ? p.colorStock[sel.color] : "";
+      const t = tierFor(p, p.moq);
       return `
-      <div class="ad-pos-card" data-id="${p.id}">
-        <img src="${(p.img&&p.img[0])||''}" alt="">
-        <div class="ad-pos-card-body">
-          <b>${p.name}</b>
-          <div class="ad-pos-swatches">
-            ${(p.colors||[]).map(c=>`<span class="ad-pos-swatch ${c===sel.color?'active':''}" style="background:${c}" data-id="${p.id}" data-color="${c}" title="${c}"></span>`).join("") || `<span class="ad-hint" style="margin:0 0 6px">No colours on this product</span>`}
-          </div>
-          <div class="ad-pos-card-row">
-            <input type="number" min="1" class="ad-pos-qty" data-id="${p.id}" value="${sel.qty}" title="Quantity">
-            ${sel.color ? `<input type="number" min="0" class="ad-pos-stockval" data-id="${p.id}" data-color="${sel.color}" placeholder="Stock qty" value="${stockVal}" title="Set tracked stock for this colour (POS only)">` : ""}
-            <button type="button" class="btn btn-outline btn-sm ad-pos-addbtn" data-id="${p.id}">+ Add</button>
-          </div>
+      <div class="pos-product-card" data-id="${p.id}">
+        <div class="pos-product-img"><img src="${(p.img&&p.img[0])||''}" alt="" loading="lazy"></div>
+        <div class="pos-product-body">
+          <b class="pos-product-name">${p.name}</b>
+          <div class="pos-product-price">${money(t.price)}</div>
+          <div class="pos-product-stock ${p.stock?'in':'out'}"><i></i>${p.stock?'In Stock':'Out of Stock'}</div>
+          <button type="button" class="btn btn-outline btn-sm pos-product-addbtn" data-id="${p.id}">+ Add</button>
         </div>
       </div>`;
-    }).join("") : `<p class="ad-hint">No products found.</p>`;
+    }).join("") : `<p class="ad-hint" style="grid-column:1/-1">No products found.</p>`;
   }
 
-  function renderPosCart(){
-    const wrap = document.querySelector("#posCart"); if(!wrap) return;
-    wrap.innerHTML = posCart.length ? posCart.map((item,i)=>`
-      <div class="ad-pos-cart-row">
-        <img src="${item.img||''}" alt="">
-        <div class="ad-pos-cart-info">
-          <b>${item.name}</b>
-          <span>${item.color?`<i class="ad-pos-dot" style="background:${item.color}"></i>`:""}${item.qty} × ${money(item.price)}</span>
-        </div>
-        <b>${money(item.qty*item.price)}</b>
-        <button type="button" class="ad-icon-btn danger ad-pos-removebtn" data-i="${i}" title="Remove">✕</button>
-      </div>`).join("") : `<p class="ad-hint" style="margin:0">Cart is empty — add products from the left.</p>`;
-    const total = posCart.reduce((s,it)=>s+it.qty*it.price,0);
-    const totalEl = document.querySelector("#posTotal");
-    if(totalEl) totalEl.innerHTML = posCart.length ? `<b>Total: ${money(total)}</b>` : "";
-    const holdBtn = document.querySelector("#posHoldBtn"), completeBtn = document.querySelector("#posCompleteBtn");
-    if(holdBtn) holdBtn.disabled = !posCart.length;
-    if(completeBtn) completeBtn.disabled = !posCart.length;
-  }
-
-  function addToCart(productId){
+  /* ---------- Quick Add modal (colour / size / qty, opened by tapping a
+     product card — the "+Add" button on the card itself skips straight to
+     a 1-qty add with the default colour/size for a fast single tap) ---- */
+  function quickAddDirect(productId){
     const p = PRODUCTS.find(x=>x.id===productId); if(!p) return;
-    const sel = posSelection[productId] || {color:"", qty:1};
-    const qty = Math.max(1, Number(sel.qty)||1);
-    const t = tierFor(p, qty);
-    posCart.push({productId, name:p.name, color:sel.color, qty, price:t.price, img:(p.img&&p.img[0])||""});
+    const color = (p.colors&&p.colors[0])||"", size = (p.sizes&&p.sizes[0])||"";
+    const t = tierFor(p, 1);
+    posCart.push({productId:p.id, name:p.name, color, size, qty:1, price:t.price, img:(p.img&&p.img[0])||""});
     renderPosCart();
   }
+
+  function openPosQuickAdd(productId){
+    const p = PRODUCTS.find(x=>x.id===productId); if(!p) return;
+    posQaProduct = p;
+    posQaSel = {color:(p.colors&&p.colors[0])||"", size:(p.sizes&&p.sizes[0])||"", qty:1};
+    renderPosQuickAdd();
+    document.querySelector("#posQuickAddModalBackdrop").classList.add("show");
+  }
+  function closePosQuickAdd(){
+    document.querySelector("#posQuickAddModalBackdrop").classList.remove("show");
+    posQaProduct = null;
+  }
+  function renderPosQuickAdd(){
+    const p = posQaProduct; if(!p) return;
+    const t = tierFor(p, posQaSel.qty);
+    const stockVal = (p.colorStock && posQaSel.color && p.colorStock[posQaSel.color]!=null) ? p.colorStock[posQaSel.color] : "";
+    document.querySelector("#posQuickAddBody").innerHTML = `
+      <div class="pos-qa-top">
+        <img class="pos-qa-img" src="${(p.img&&p.img[0])||''}" alt="">
+        <div>
+          <h3 class="pos-qa-name">${p.name}</h3>
+          <div class="pos-qa-price">${money(t.price)}<small> / pc</small></div>
+        </div>
+      </div>
+      ${(p.colors&&p.colors.length) ? `
+      <label class="pos-qa-label">Colour</label>
+      <div class="pos-qa-swatches">${p.colors.map(c=>`<span class="pos-qa-swatch ${c===posQaSel.color?'active':''}" style="background:${c}" data-color="${c}" title="${c}"></span>`).join("")}</div>
+      <input type="number" min="0" id="posQaStockVal" class="pos-qa-stockinput" placeholder="Stock for this colour (optional)" value="${stockVal}">` : ""}
+      ${(p.sizes&&p.sizes.length) ? `
+      <label class="pos-qa-label">Size</label>
+      <div class="pos-qa-sizes">${p.sizes.map(s=>`<button type="button" class="pos-qa-size ${s===posQaSel.size?'active':''}" data-size="${s}">${s}</button>`).join("")}</div>` : ""}
+      <label class="pos-qa-label">Quantity</label>
+      <div class="pos-qa-qtyrow">
+        <button type="button" class="ad-icon-btn" id="posQaMinus">−</button>
+        <span class="pos-qa-qtyval" id="posQaQtyVal">${posQaSel.qty}</span>
+        <button type="button" class="ad-icon-btn" id="posQaPlus">+</button>
+      </div>`;
+    const addBtn = document.querySelector("#posQaAddBtn");
+    if(addBtn) addBtn.textContent = `Add to Cart  ·  ${money(t.price*posQaSel.qty)}`;
+  }
+  const posQaBody = document.querySelector("#posQuickAddBody");
+  if(posQaBody){
+    posQaBody.addEventListener("click", (e)=>{
+      const sw = e.target.closest(".pos-qa-swatch");
+      if(sw){ posQaSel.color = sw.dataset.color; renderPosQuickAdd(); return; }
+      const sz = e.target.closest(".pos-qa-size");
+      if(sz){ posQaSel.size = sz.dataset.size; renderPosQuickAdd(); return; }
+      if(e.target.closest("#posQaMinus")){ posQaSel.qty = Math.max(1, posQaSel.qty-1); renderPosQuickAdd(); return; }
+      if(e.target.closest("#posQaPlus")){ posQaSel.qty = posQaSel.qty+1; renderPosQuickAdd(); return; }
+    });
+    posQaBody.addEventListener("focusout", (e)=>{
+      if(e.target.id==="posQaStockVal" && posQaProduct) savePosStock(posQaProduct.id, posQaSel.color, e.target.value.trim());
+    });
+  }
+  const posQaAddBtn = document.querySelector("#posQaAddBtn");
+  if(posQaAddBtn) posQaAddBtn.addEventListener("click", ()=>{
+    const p = posQaProduct; if(!p) return;
+    const qty = Math.max(1, posQaSel.qty);
+    const t = tierFor(p, qty);
+    posCart.push({productId:p.id, name:p.name, color:posQaSel.color, size:posQaSel.size, qty, price:t.price, img:(p.img&&p.img[0])||""});
+    renderPosCart();
+    closePosQuickAdd();
+  });
+  [document.querySelector("#closePosQuickAddModal"), document.querySelector("#cancelPosQuickAddBtn")].forEach(b=>{
+    if(b) b.addEventListener("click", closePosQuickAdd);
+  });
 
   async function savePosStock(productId, color, value){
     const p = PRODUCTS.find(x=>x.id===productId); if(!p || !color) return;
@@ -422,17 +521,67 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     catch(err){ alert("Could not save stock: " + (err.message||"")); }
   }
 
+  /* ---------- the bill itself (right panel) ---------- */
+  function variantLabel(item){
+    const parts = [];
+    if(item.color) parts.push(`<i class="pos-cart-dot" style="background:${item.color}"></i>`);
+    if(item.size) parts.push(item.size);
+    return parts.length ? parts.join(" ") : "—";
+  }
+  function renderPosCart(){
+    const wrap = document.querySelector("#posCart"); if(!wrap) return;
+    wrap.innerHTML = posCart.length ? posCart.map((item,i)=>`
+      <tr class="pos-cart-row">
+        <td class="pos-cart-prod"><img src="${item.img||''}" alt=""><span>${item.name}</span></td>
+        <td class="pos-cart-variant">${variantLabel(item)}</td>
+        <td><div class="pos-qty-stepper">
+          <button type="button" class="pos-qty-minus" data-i="${i}" title="Decrease">−</button>
+          <span>${item.qty}</span>
+          <button type="button" class="pos-qty-plus" data-i="${i}" title="Increase">+</button>
+        </div></td>
+        <td class="pos-cart-total"><b>${money(item.qty*item.price)}</b></td>
+        <td><button type="button" class="ad-icon-btn danger pos-cart-removebtn" data-i="${i}" title="Remove">🗑️</button></td>
+      </tr>`).join("") : `<tr><td colspan="5"><p class="ad-hint" style="margin:0;text-align:center;padding:26px 0">Cart is empty — add products from the catalogue.</p></td></tr>`;
+    const totalItems = posCart.reduce((s,it)=>s+it.qty,0);
+    const total = posCart.reduce((s,it)=>s+it.qty*it.price,0);
+    const itemsCountEl = document.querySelector("#posItemsCount"); if(itemsCountEl) itemsCountEl.textContent = posCart.length;
+    const totalItemsEl = document.querySelector("#posTotalItems"); if(totalItemsEl) totalItemsEl.textContent = totalItems;
+    const totalEl = document.querySelector("#posTotal"); if(totalEl) totalEl.textContent = money(total);
+    const holdBtn = document.querySelector("#posHoldBtn"), completeBtn = document.querySelector("#posCompleteBtn");
+    if(holdBtn) holdBtn.disabled = !posCart.length;
+    if(completeBtn) completeBtn.disabled = !posCart.length;
+  }
+  function changeCartQty(i, delta){
+    const item = posCart[i]; if(!item) return;
+    const newQty = Math.max(1, item.qty + delta);
+    if(newQty === item.qty) return;
+    const p = PRODUCTS.find(x=>x.id===item.productId);
+    item.qty = newQty;
+    if(p) item.price = tierFor(p, newQty).price; // recompute bulk-tier price at the new qty
+    renderPosCart();
+  }
+  function clearCart(){
+    if(!posCart.length) return;
+    if(!confirm("Clear all items from the current bill?")) return;
+    posCart = [];
+    renderPosCart();
+  }
+
   async function holdSale(){
     if(!posCart.length) return;
     const nameInput = document.querySelector("#posCustomerName");
-    const label = (nameInput.value.trim()) || ("Hold " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}));
+    const noteInput = document.querySelector("#posOrderNote");
+    const billNo = document.querySelector("#posBillNo")?.value || "";
+    const label = (nameInput.value.trim()) || billNo || ("Hold " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}));
     const subtotal = posCart.reduce((s,it)=>s+it.qty*it.price,0);
     const btn = document.querySelector("#posHoldBtn");
     busy(btn, true, "Holding…");
     try{
       await BazDS.holdPosSale({label, items:posCart, subtotal});
-      posCart = []; nameInput.value = "";
+      posCart = []; nameInput.value = ""; if(noteInput) noteInput.value = "";
+      const noteRow = document.querySelector("#posNoteRow"); if(noteRow) noteRow.style.display = "none";
       renderPosCart();
+      await resetPosBill();
       await refreshPosHolds();
     }catch(err){ alert("Could not hold sale: " + (err.message||"")); }
     finally{ busy(btn, false); }
@@ -441,14 +590,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   async function completeSale(){
     if(!posCart.length) return;
     const customerName = document.querySelector("#posCustomerName").value.trim();
+    const noteInput = document.querySelector("#posOrderNote");
+    const billNo = document.querySelector("#posBillNo")?.value || "";
+    const note = (noteInput?.value||"").trim();
     const subtotal = posCart.reduce((s,it)=>s+it.qty*it.price,0);
     const btn = document.querySelector("#posCompleteBtn");
     busy(btn, true, "Completing…");
     try{
       await BazDS.createPosSale({
         customerName,
-        items: posCart.map(it=>({name:it.name, color:it.color, qty:it.qty, price:it.price})),
-        subtotal
+        items: posCart.map(it=>({name:it.name, color:it.color, size:it.size, qty:it.qty, price:it.price})),
+        subtotal,
+        notes: [billNo?`Bill No: ${billNo}`:"", note].filter(Boolean).join(" — ")
       });
       // Best-effort: deduct from tracked colour stock wherever a quantity has
       // actually been set for that colour — never blocks the sale if it fails.
@@ -460,7 +613,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         try{ await BazDS.upsertProduct(p); }catch(err){ console.error("POS stock deduction failed for", p.name, err); }
       }
       posCart = []; document.querySelector("#posCustomerName").value = "";
+      if(noteInput) noteInput.value = "";
+      const noteRow = document.querySelector("#posNoteRow"); if(noteRow) noteRow.style.display = "none";
       renderPosCart(); renderPosProductList();
+      await resetPosBill();
       try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); }
       renderDashboard();
       alert("Sale completed.");
@@ -468,18 +624,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     finally{ busy(btn, false); }
   }
 
+  /* ---------- Hold Sales modal ---------- */
   async function refreshPosHolds(){
     posHoldsCache = await BazDS.getPosHolds().catch(()=>[]);
     renderPosHolds();
+    const pill = document.querySelector("#posHoldsCount");
+    if(pill){
+      if(posHoldsCache.length){ pill.textContent = posHoldsCache.length; pill.style.display = "inline-flex"; }
+      else pill.style.display = "none";
+    }
   }
   function renderPosHolds(){
     const wrap = document.querySelector("#posHoldsList"); if(!wrap) return;
     wrap.innerHTML = posHoldsCache.length ? posHoldsCache.map(h=>`
-      <div class="ad-pos-hold-row">
-        <div><b>${h.label||"Held sale"}</b><br><span class="ad-hint" style="margin:0">${(h.items||[]).length} item(s), ${money(h.subtotal||0)}</span></div>
+      <div class="pos-bill-row" data-id="${h.id}">
+        <div><b>${h.label||"Held sale"}</b><span class="ad-hint" style="margin:0;display:block">${(h.items||[]).length} item(s) · ${money(h.subtotal||0)}</span></div>
         <div class="ad-row-actions">
-          <button type="button" class="btn btn-outline btn-sm ad-pos-resumebtn" data-id="${h.id}">Resume</button>
-          <button type="button" class="ad-icon-btn danger ad-pos-deleteholdbtn" data-id="${h.id}" title="Delete">🗑️</button>
+          <button type="button" class="btn btn-outline btn-sm pos-resumebtn" data-id="${h.id}">Resume</button>
+          <button type="button" class="ad-icon-btn danger pos-deleteholdbtn" data-id="${h.id}" title="Delete">🗑️</button>
         </div>
       </div>`).join("") : `<p class="ad-hint" style="margin:0">No held sales.</p>`;
   }
@@ -490,42 +652,96 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderPosCart();
     try{ await BazDS.deletePosHold(id); }catch(err){ console.error(err); }
     await refreshPosHolds();
+    closePosHoldsModal();
   }
   async function deleteHoldHandler(id){
     if(!confirm("Delete this held sale? This cannot be undone.")) return;
     try{ await BazDS.deletePosHold(id); await refreshPosHolds(); }
     catch(err){ alert("Could not delete: " + (err.message||"")); }
   }
+  const posHoldsBtn = document.querySelector("#posHoldsBtn");
+  if(posHoldsBtn) posHoldsBtn.addEventListener("click", async ()=>{ await refreshPosHolds(); document.querySelector("#posHoldsModalBackdrop").classList.add("show"); });
+  const closePosHoldsModal = ()=>document.querySelector("#posHoldsModalBackdrop").classList.remove("show");
+  [document.querySelector("#closePosHoldsModal"), document.querySelector("#cancelPosHoldsBtn")].forEach(b=>{ if(b) b.addEventListener("click", closePosHoldsModal); });
+  const posHoldsModalBackdrop = document.querySelector("#posHoldsModalBackdrop");
+  if(posHoldsModalBackdrop) posHoldsModalBackdrop.addEventListener("click", (e)=>{
+    const resumeBtn = e.target.closest(".pos-resumebtn");
+    if(resumeBtn){ resumeHold(Number(resumeBtn.dataset.id)); return; }
+    const delBtn = e.target.closest(".pos-deleteholdbtn");
+    if(delBtn){ deleteHoldHandler(Number(delBtn.dataset.id)); return; }
+  });
 
+  /* ---------- Recent Bills modal (completed POS sales — orders tagged
+     source:"pos"; row click reuses the existing Order Detail modal) ---- */
+  function posRecentRowHtml(o){
+    const dt = new Date(o.created_at);
+    const dateStr = dt.toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) + ", " + dt.toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true});
+    return `<div class="pos-bill-row pos-bill-row-click" data-id="${o.id}">
+      <div><b>${o.ref}</b><span class="ad-hint" style="margin:0;display:block">${o.customer_name||"Walk-in Customer"} · ${dateStr}</span></div>
+      <div class="pos-bill-row-right">
+        <span class="ad-badge in">${(o.payment_status||"paid")==="paid" ? "Paid" : (o.payment_status||"Paid")}</span>
+        <b>${money(o.subtotal||0)}</b>
+        <span class="pos-bill-chevron">›</span>
+      </div>
+    </div>`;
+  }
+  function renderPosRecent(){
+    const wrap = document.querySelector("#posRecentList"); if(!wrap) return;
+    const q = (document.querySelector("#posRecentSearch")?.value||"").trim().toLowerCase();
+    const list = q ? posRecentCache.filter(o=>(o.ref||"").toLowerCase().includes(q) || (o.customer_name||"").toLowerCase().includes(q)) : posRecentCache;
+    wrap.innerHTML = list.length ? list.map(posRecentRowHtml).join("") : `<p class="ad-hint" style="margin:0">No bills yet — completed POS sales will show up here.</p>`;
+  }
+  async function refreshPosRecent(){
+    try{ const orders = await BazDS.getOrders(); posRecentCache = orders.filter(o=>o.source==="pos"); }
+    catch(err){ console.error(err); posRecentCache = []; }
+    renderPosRecent();
+  }
+  const posRecentBtn = document.querySelector("#posRecentBtn");
+  if(posRecentBtn) posRecentBtn.addEventListener("click", async ()=>{ await refreshPosRecent(); document.querySelector("#posRecentModalBackdrop").classList.add("show"); });
+  const closePosRecentModal = ()=>document.querySelector("#posRecentModalBackdrop").classList.remove("show");
+  [document.querySelector("#closePosRecentModal"), document.querySelector("#cancelPosRecentBtn")].forEach(b=>{ if(b) b.addEventListener("click", closePosRecentModal); });
+  const posRecentSearchEl = document.querySelector("#posRecentSearch");
+  if(posRecentSearchEl) posRecentSearchEl.addEventListener("input", renderPosRecent);
+  const posRecentModalBackdrop = document.querySelector("#posRecentModalBackdrop");
+  if(posRecentModalBackdrop) posRecentModalBackdrop.addEventListener("click", (e)=>{
+    const row = e.target.closest(".pos-bill-row-click");
+    if(row){ closePosRecentModal(); AdminUI.openOrder(Number(row.dataset.id)); }
+  });
+
+  /* ---------- catalogue / cart interactions + misc POS buttons ---------- */
   const posPanel = document.querySelector("#invPosPanel");
   if(posPanel){
     posPanel.addEventListener("click", (e)=>{
-      const swatch = e.target.closest(".ad-pos-swatch");
-      if(swatch){ const id=Number(swatch.dataset.id); posSelection[id] = posSelection[id]||{qty:1}; posSelection[id].color = swatch.dataset.color; renderPosProductList(); return; }
-      const addBtn = e.target.closest(".ad-pos-addbtn");
-      if(addBtn){ addToCart(Number(addBtn.dataset.id)); return; }
-      const rmBtn = e.target.closest(".ad-pos-removebtn");
+      const catPill = e.target.closest(".pos-cat-pill");
+      if(catPill){ posActiveCat = catPill.dataset.cat || ""; renderPosCats(); renderPosProductList(); return; }
+      const addBtn = e.target.closest(".pos-product-addbtn");
+      if(addBtn){ quickAddDirect(Number(addBtn.dataset.id)); return; }
+      const prodCard = e.target.closest(".pos-product-card");
+      if(prodCard){ openPosQuickAdd(Number(prodCard.dataset.id)); return; }
+      const qtyMinus = e.target.closest(".pos-qty-minus");
+      if(qtyMinus){ changeCartQty(Number(qtyMinus.dataset.i), -1); return; }
+      const qtyPlus = e.target.closest(".pos-qty-plus");
+      if(qtyPlus){ changeCartQty(Number(qtyPlus.dataset.i), 1); return; }
+      const rmBtn = e.target.closest(".pos-cart-removebtn");
       if(rmBtn){ posCart.splice(Number(rmBtn.dataset.i),1); renderPosCart(); return; }
-      const resumeBtn = e.target.closest(".ad-pos-resumebtn");
-      if(resumeBtn){ resumeHold(Number(resumeBtn.dataset.id)); return; }
-      const delHoldBtn = e.target.closest(".ad-pos-deleteholdbtn");
-      if(delHoldBtn){ deleteHoldHandler(Number(delHoldBtn.dataset.id)); return; }
-    });
-    posPanel.addEventListener("change", (e)=>{
-      if(e.target.classList.contains("ad-pos-qty")){
-        const id = Number(e.target.dataset.id);
-        posSelection[id] = posSelection[id]||{color:"",qty:1};
-        posSelection[id].qty = Math.max(1, Number(e.target.value)||1);
-      }
-    });
-    posPanel.addEventListener("focusout", (e)=>{
-      if(e.target.classList.contains("ad-pos-stockval")){
-        savePosStock(Number(e.target.dataset.id), e.target.dataset.color, e.target.value.trim());
-      }
     });
   }
   const posSearchEl = document.querySelector("#posProductSearch");
   if(posSearchEl) posSearchEl.addEventListener("input", renderPosProductList);
+  const posEditBillNoBtn = document.querySelector("#posEditBillNoBtn");
+  if(posEditBillNoBtn) posEditBillNoBtn.addEventListener("click", ()=>{
+    const el = document.querySelector("#posBillNo"); if(!el) return;
+    el.readOnly = !el.readOnly;
+    if(!el.readOnly) el.focus();
+  });
+  const posAddNoteBtn = document.querySelector("#posAddNoteBtn");
+  if(posAddNoteBtn) posAddNoteBtn.addEventListener("click", ()=>{
+    const row = document.querySelector("#posNoteRow"); if(!row) return;
+    row.style.display = row.style.display==="none" ? "flex" : "none";
+    if(row.style.display==="flex") document.querySelector("#posOrderNote").focus();
+  });
+  const posClearCartBtn = document.querySelector("#posClearCartBtn");
+  if(posClearCartBtn) posClearCartBtn.addEventListener("click", clearCart);
   const posHoldBtn = document.querySelector("#posHoldBtn");
   if(posHoldBtn) posHoldBtn.addEventListener("click", holdSale);
   const posCompleteBtn = document.querySelector("#posCompleteBtn");

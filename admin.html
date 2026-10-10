@@ -113,27 +113,76 @@
       </div>
 
       <div id="invPosPanel" style="display:none">
-        <p class="ad-hint">Ring up a walk-in / counter sale. Pick a colour and quantity for each item, optionally set that colour's tracked stock (POS-only — doesn't affect the site's In Stock/Out of Stock badge), then complete or hold the sale.</p>
-        <div class="ad-pos-grid">
-          <div class="ad-panel">
-            <h3>Add to sale</h3>
-            <input type="search" id="posProductSearch" placeholder="Search products to add…" style="margin-bottom:14px">
-            <div class="ad-pos-product-list" id="posProductList"></div>
+        <div class="pos-topbar">
+          <div class="pos-topbar-left">
+            <h2>POS Billing</h2>
+            <span class="pos-badge">Counter Sale</span>
           </div>
-          <div>
-            <div class="ad-panel">
-              <h3>Current sale</h3>
-              <div class="ad-pos-cart" id="posCart"></div>
-              <div class="ad-pos-total" id="posTotal"></div>
-              <div class="ad-field" style="margin-top:12px"><input id="posCustomerName" placeholder="Customer name (optional)"></div>
-              <div class="ad-pos-actions">
-                <button type="button" class="btn btn-outline btn-sm" id="posHoldBtn" disabled>⏸ Hold Sale</button>
-                <button type="button" class="btn btn-primary btn-sm" id="posCompleteBtn" disabled>✅ Complete Sale</button>
+          <div class="pos-topbar-right">
+            <span class="pos-datetime" id="posDateTime"></span>
+            <button type="button" class="btn btn-outline btn-sm" id="posHoldsBtn">⏸️ Hold Sales<span class="pos-count-pill" id="posHoldsCount" style="display:none">0</span></button>
+            <button type="button" class="btn btn-outline btn-sm" id="posRecentBtn">🧾 Recent Bills</button>
+          </div>
+        </div>
+
+        <div class="pos-layout">
+          <!-- Catalogue: search + categories + product grid -->
+          <div class="pos-catalog">
+            <div class="pos-search-row">
+              <div class="pos-search-box">
+                <span class="pos-search-ic">🔍</span>
+                <input type="search" id="posProductSearch" placeholder="Search products (name, SKU, category)…">
               </div>
             </div>
-            <div class="ad-panel">
-              <h3>Held sales</h3>
-              <div id="posHoldsList"></div>
+            <div class="pos-cats" id="posCats"></div>
+            <div class="pos-product-grid" id="posProductList"></div>
+          </div>
+
+          <!-- Bill panel -->
+          <div class="pos-billpanel">
+            <div class="pos-bill-head">
+              <div class="pos-bill-head-col">
+                <label class="pos-bill-label">Bill No.</label>
+                <div class="pos-billno-row">
+                  <input type="text" id="posBillNo" class="pos-billno-input" readonly>
+                  <button type="button" class="ad-icon-btn" id="posEditBillNoBtn" title="Edit bill number">✏️</button>
+                </div>
+              </div>
+              <div class="pos-bill-head-col pos-bill-head-col-right">
+                <label class="pos-bill-label">Date &amp; Time</label>
+                <div class="pos-bill-datetime" id="posBillDateTime"></div>
+              </div>
+            </div>
+
+            <div class="pos-items-head">
+              <h3>Items (<span id="posItemsCount">0</span>)</h3>
+              <div class="pos-items-head-actions">
+                <button type="button" class="ad-icon-btn danger" id="posClearCartBtn" title="Clear cart">🗑️</button>
+                <button type="button" class="btn btn-outline btn-sm" id="posAddNoteBtn">📝 Add Note</button>
+              </div>
+            </div>
+
+            <div class="pos-cart-table-wrap">
+              <table class="pos-cart-table">
+                <thead><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+                <tbody id="posCart"></tbody>
+              </table>
+            </div>
+
+            <div class="pos-note-row" id="posNoteRow" style="display:none">
+              <input type="text" id="posOrderNote" placeholder="Add order note (optional)…">
+            </div>
+
+            <div class="ad-field pos-customer-row"><input id="posCustomerName" placeholder="Customer name (optional)"></div>
+
+            <div class="pos-totals">
+              <div class="pos-totals-row"><span>Total Items</span><b id="posTotalItems">0</b></div>
+              <div class="pos-totals-row pos-totals-grand"><span>Total</span><b id="posTotal">₹0</b></div>
+            </div>
+
+            <div class="pos-actions">
+              <button type="button" class="btn btn-outline" id="posHoldBtn" disabled>⏸️ Hold Sale</button>
+              <button type="button" class="btn btn-primary" id="posCompleteBtn" disabled>✅ Complete Sale</button>
             </div>
           </div>
         </div>
@@ -343,6 +392,43 @@
     <div class="ad-modal-foot">
       <button class="btn btn-outline btn-sm" id="cancelQuoteBtn">Cancel</button>
       <button class="btn btn-primary btn-sm" id="saveQuoteBtn">Create Quote</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== POS QUICK-ADD MODAL ===================== -->
+<div class="ad-modal-backdrop" id="posQuickAddModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2>Add to Bill</h2><span class="ad-modal-close" id="closePosQuickAddModal">✕</span></div>
+    <div class="ad-modal-body" id="posQuickAddBody"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelPosQuickAddBtn">Cancel</button>
+      <button class="btn btn-primary" id="posQaAddBtn" style="flex:1">Add to Cart</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== POS HOLD SALES MODAL ===================== -->
+<div class="ad-modal-backdrop" id="posHoldsModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2>Hold Sales</h2><span class="ad-modal-close" id="closePosHoldsModal">✕</span></div>
+    <div class="ad-modal-body" id="posHoldsList"></div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelPosHoldsBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== POS RECENT BILLS MODAL ===================== -->
+<div class="ad-modal-backdrop" id="posRecentModalBackdrop">
+  <div class="ad-modal ad-modal-lg">
+    <div class="ad-modal-head"><h2>Recent Bills</h2><span class="ad-modal-close" id="closePosRecentModal">✕</span></div>
+    <div class="ad-modal-body">
+      <input type="search" id="posRecentSearch" placeholder="Search invoice number or customer…" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px 13px;font:inherit;margin-bottom:14px">
+      <div id="posRecentList"></div>
+    </div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelPosRecentBtn">Close</button>
     </div>
   </div>
 </div>

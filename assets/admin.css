@@ -59,32 +59,156 @@ body{background:var(--soft)}
 .ad-stock-toggle.out{background:#eee;color:#888}
 .ad-stock-toggle:hover{opacity:.85}
 
-/* ---------- POS billing panel ---------- */
-.ad-pos-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start}
-.ad-pos-product-list{max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
-.ad-pos-card{display:flex;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px;align-items:flex-start}
-.ad-pos-card img{width:46px;height:46px;object-fit:cover;border-radius:8px;flex-shrink:0}
-.ad-pos-card-body{flex:1;min-width:0}
-.ad-pos-card-body b{font-size:13.5px;display:block;margin-bottom:6px}
-.ad-pos-swatches{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.ad-pos-swatch{width:20px;height:20px;border-radius:50%;border:2px solid #fff;outline:1.5px solid var(--line);cursor:pointer;flex-shrink:0}
-.ad-pos-swatch.active{outline:2.5px solid var(--lime-deep)}
-.ad-pos-card-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.ad-pos-qty{width:52px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:12.5px}
-.ad-pos-stockval{width:78px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:12.5px}
-.ad-pos-cart{display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;margin-bottom:12px}
-.ad-pos-cart-row{display:flex;align-items:center;gap:10px}
-.ad-pos-cart-row img{width:36px;height:36px;object-fit:cover;border-radius:7px;flex-shrink:0}
-.ad-pos-cart-info{flex:1;min-width:0;display:flex;flex-direction:column;font-size:12.5px}
-.ad-pos-cart-info span{color:var(--muted);display:flex;align-items:center;gap:5px}
-.ad-pos-dot{width:9px;height:9px;border-radius:50%;display:inline-block;outline:1px solid var(--line)}
-.ad-pos-total{font-size:16px;padding-top:10px;border-top:1px solid var(--line)}
-.ad-pos-actions{display:flex;gap:10px;margin-top:14px}
-.ad-pos-actions .btn{flex:1}
-.ad-pos-hold-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
-.ad-pos-hold-row:first-child{border-top:none}
+/* ---------- POS billing panel ----------
+   Redesigned to match the reference POS layout Vikas sent (WhatsApp,
+   10/10): topbar + category-filtered product grid on the left, an
+   editable bill panel on the right. See the big POS block in admin.js
+   for the behaviour each of these pairs with. */
+.pos-topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.pos-topbar-left{display:flex;align-items:center;gap:10px}
+.pos-topbar-left h2{font-size:21px}
+.pos-badge{background:var(--lime);color:var(--on-accent);font-size:11px;font-weight:800;padding:5px 11px;border-radius:20px}
+.pos-topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pos-datetime{font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap}
+.pos-count-pill{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 5px;margin-left:6px;border-radius:20px;background:var(--ink);color:#fff;font-size:10px;font-weight:800}
+
+.pos-layout{display:grid;grid-template-columns:1.35fr 1fr;gap:20px;align-items:start}
+/* min-width:0 stops each grid item's intrinsic content size (the product
+   grid's own minmax(150px,1fr) columns, the bill table's rows) from
+   overriding the 1.35fr/1fr split above — without it the browser was
+   sizing tracks off content width instead, squeezing the bill panel. */
+.pos-catalog,.pos-billpanel{min-width:0}
+
+/* catalogue (search + category pills + product grid) */
+.pos-search-row{margin-bottom:12px}
+.pos-search-box{position:relative;display:flex;align-items:center}
+.pos-search-ic{position:absolute;left:14px;font-size:14px;opacity:.5;pointer-events:none}
+.pos-search-box input{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px 12px 38px;font:inherit;font-size:13.5px;outline:none;transition:border-color .2s ease,box-shadow .2s ease;background:#fff}
+.pos-search-box input:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(26,26,26,.06)}
+
+.pos-cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-bottom:16px}
+.pos-cats::-webkit-scrollbar{display:none}
+.pos-cat-pill{flex:none;border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:8px 16px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s ease,border-color .2s ease,color .2s ease}
+.pos-cat-pill:hover{border-color:var(--ink);color:var(--ink);transform:translateY(-1px)}
+.pos-cat-pill.active{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.pos-product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;max-height:600px;overflow-y:auto;padding:2px}
+.pos-product-card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .25s cubic-bezier(.16,1,.3,1),box-shadow .3s ease,border-color .3s ease}
+.pos-product-card:hover{transform:translateY(-4px);box-shadow:0 18px 32px -18px rgba(26,26,26,.28);border-color:transparent}
+.pos-product-img{height:110px;background:var(--soft);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pos-product-img img{width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box;transition:transform .4s cubic-bezier(.16,1,.3,1)}
+.pos-product-card:hover .pos-product-img img{transform:scale(1.07)}
+.pos-product-body{padding:11px 12px}
+.pos-product-name{display:block;font-size:12.5px;line-height:1.3;margin-bottom:5px;min-height:32px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pos-product-price{font-size:14.5px;font-weight:800;font-family:"Plus Jakarta Sans";margin-bottom:5px}
+.pos-product-stock{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--muted);margin-bottom:9px}
+.pos-product-stock i{width:7px;height:7px;border-radius:50%;background:#bbb;flex:none}
+.pos-product-stock.in i{background:#1fae56}
+.pos-product-stock.out i{background:#c0392b}
+.pos-product-addbtn{width:100%;transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s ease,color .2s ease}
+.pos-product-addbtn:hover{background:var(--ink);color:#fff;border-color:var(--ink);transform:scale(1.03)}
+.pos-product-addbtn:active{transform:scale(.97)}
+
+/* bill panel */
+.pos-billpanel{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:20px;display:flex;flex-direction:column;position:sticky;top:20px}
+.pos-bill-head{display:flex;justify-content:space-between;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.pos-bill-head-col-right{text-align:right}
+.pos-bill-label{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;white-space:nowrap}
+.pos-billno-row{display:flex;align-items:center;gap:6px}
+.pos-billno-input{border:none;background:none;font-family:"Plus Jakarta Sans";font-weight:800;font-size:15px;padding:0;width:110px;color:var(--ink)}
+.pos-billno-input:not([readonly]){border-bottom:1.5px dashed var(--ink);outline:none}
+.pos-bill-datetime{font-size:12px;font-weight:700;white-space:nowrap}
+
+.pos-items-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pos-items-head h3{font-size:14.5px}
+.pos-items-head-actions{display:flex;align-items:center;gap:8px}
+
+.pos-cart-table-wrap{max-height:280px;overflow-y:auto;margin-bottom:10px}
+.pos-cart-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.pos-cart-table thead th{position:sticky;top:0;background:#fff;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:0 6px 8px;font-weight:800}
+.pos-cart-table td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:middle}
+.pos-cart-row{transition:background .2s ease}
+.pos-cart-row:hover td{background:var(--soft)}
+.pos-cart-prod{display:flex;align-items:center;gap:8px;max-width:140px}
+.pos-cart-prod img{width:32px;height:32px;object-fit:cover;border-radius:7px;flex:none}
+.pos-cart-prod span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pos-cart-variant{white-space:nowrap;color:var(--muted)}
+.pos-cart-dot{width:9px;height:9px;border-radius:50%;display:inline-block;outline:1px solid var(--line);margin-right:3px;vertical-align:middle}
+.pos-cart-total{white-space:nowrap}
+.pos-qty-stepper{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:20px;padding:3px 9px}
+.pos-qty-stepper button{width:18px;height:18px;border:none;background:none;font-size:13px;line-height:1;cursor:pointer;color:var(--ink-soft);display:grid;place-items:center;border-radius:50%;transition:background .2s ease,color .2s ease,transform .2s ease}
+.pos-qty-stepper button:hover{background:var(--ink);color:#fff;transform:scale(1.12)}
+.pos-qty-stepper span{min-width:14px;text-align:center;font-weight:700}
+
+.pos-note-row{margin-bottom:10px}
+.pos-note-row input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px}
+.pos-customer-row{margin-bottom:6px}
+
+.pos-totals{padding-top:12px;margin-top:4px;border-top:1px solid var(--line)}
+.pos-totals-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-soft);padding:4px 0}
+.pos-totals-grand{font-size:20px;color:var(--ink);padding-top:6px}
+.pos-totals-grand b{font-family:"Plus Jakarta Sans";font-weight:800}
+
+.pos-actions{display:flex;gap:10px;margin-top:16px}
+.pos-actions .btn{flex:1;transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease}
+.pos-actions .btn:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 14px 26px -14px rgba(26,26,26,.35)}
+.pos-actions .btn:not(:disabled):active{transform:translateY(0)}
+
+/* Hold Sales / Recent Bills modal rows (shared layout) */
+.pos-bill-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 4px;border-top:1px solid var(--line);font-size:13px;transition:background .2s ease}
+.pos-bill-row:first-child{border-top:none}
+.pos-bill-row-click{cursor:pointer;border-radius:10px;margin:0 -8px;padding:14px 8px}
+.pos-bill-row-click:hover{background:var(--soft)}
+.pos-bill-row-right{display:flex;align-items:center;gap:12px}
+.pos-bill-chevron{font-size:18px;color:var(--muted);transition:transform .2s ease}
+.pos-bill-row-click:hover .pos-bill-chevron{transform:translateX(3px)}
+
+/* Quick Add modal (colour / size / qty picker) */
+.pos-qa-top{display:flex;gap:14px;align-items:center;margin-bottom:18px}
+.pos-qa-img{width:72px;height:72px;object-fit:contain;background:var(--soft);border-radius:12px;padding:6px;flex:none}
+.pos-qa-name{font-size:15.5px;margin-bottom:4px}
+.pos-qa-price{font-size:17px;font-weight:800;font-family:"Plus Jakarta Sans"}
+.pos-qa-price small{font-size:11px;font-weight:600;color:var(--muted)}
+.pos-qa-label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:14px 0 8px}
+.pos-qa-swatches{display:flex;gap:9px;flex-wrap:wrap}
+.pos-qa-swatch{width:30px;height:30px;border-radius:50%;border:2.5px solid #fff;outline:1.5px solid var(--line);cursor:pointer;transition:transform .2s cubic-bezier(.34,1.56,.64,1),outline-color .2s ease}
+.pos-qa-swatch:hover{transform:scale(1.1)}
+.pos-qa-swatch.active{outline:2.5px solid var(--lime-deep)}
+.pos-qa-stockinput{width:100%;margin-top:10px;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:12.5px}
+.pos-qa-sizes{display:flex;gap:8px;flex-wrap:wrap}
+.pos-qa-size{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:transform .2s cubic-bezier(.34,1.56,.64,1),background .2s ease,color .2s ease,border-color .2s ease}
+.pos-qa-size:hover{border-color:var(--ink)}
+.pos-qa-size.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.pos-qa-qtyrow{display:flex;align-items:center;gap:18px}
+.pos-qa-qtyrow .ad-icon-btn{width:38px;height:38px;border-radius:50%;font-size:17px}
+.pos-qa-qtyval{font-size:17px;font-weight:800;min-width:22px;text-align:center}
+
 @media (max-width:900px){
-  .ad-pos-grid{grid-template-columns:1fr}
+  .pos-layout{grid-template-columns:1fr}
+  .pos-billpanel{position:static}
+  .pos-product-grid{max-height:none}
+}
+@media (max-width:560px){
+  .pos-topbar{align-items:flex-start}
+  .pos-topbar-right{width:100%;justify-content:space-between}
+  .pos-datetime{width:100%;order:-1;margin-bottom:2px}
+  .pos-product-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .pos-product-img{height:92px}
+  .pos-actions{flex-direction:column}
+  /* The cart table's 5 columns (image+name, variant, qty stepper, total,
+     delete) don't fit a phone-width bill panel at their desktop sizing —
+     Total/delete were getting clipped off the right edge. Drop the
+     thumbnail, let the product name wrap, and tighten everything else so
+     all 5 columns fit without relying on a hidden horizontal scroll. */
+  .pos-cart-table{font-size:11px}
+  .pos-cart-table thead th{padding:0 3px 6px;font-size:9px}
+  .pos-cart-table td{padding:8px 3px}
+  .pos-cart-prod{max-width:none}
+  .pos-cart-prod img{display:none}
+  .pos-cart-prod span{white-space:normal;line-height:1.25}
+  .pos-qty-stepper{gap:4px;padding:2px 5px}
+  .pos-qty-stepper button{width:15px;height:15px;font-size:11px}
+  .pos-bill-head{flex-wrap:wrap}
 }
 
 .ad-panel{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:24px;margin-bottom:20px;transition:box-shadow .3s ease}
@@ -241,8 +365,6 @@ body.role-super .ad-super-only{display:block}
   .ad-modal-body{padding:18px}
   .ad-modal-foot{padding:14px 18px;flex-wrap:wrap}
   .ad-modal-foot .btn{flex:1 1 auto}
-  .ad-pos-card-row{flex-direction:column;align-items:stretch}
-  .ad-pos-qty,.ad-pos-stockval{width:100%}
 }
 
 /* ---------- profession multi-select chips (product form) ---------- */
