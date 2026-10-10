@@ -353,6 +353,16 @@ function productCard(p){
   const tiers = safeTiers(p);
   const firstPrice = tiers[0].price, lastPrice = tiers[tiers.length-1].price;
   const offPct = (tiers.length>1 && firstPrice>lastPrice && firstPrice>0) ? Math.round((firstPrice-lastPrice)/firstPrice*100) : 0;
+  // A product saved in Admin with no price tiers at all (or every tier left
+  // at ₹0) falls back to SAFE_TIER_FALLBACK (₹0) inside tierFor()/safeTiers()
+  // purely so the rest of the page doesn't crash — but showing a real
+  // shopper "₹0 / pc" on the card reads as a broken/free product, which is
+  // worse than just admitting pricing isn't set yet. Detect that exact case
+  // here and show "Price on request" instead; this is a data gap (the
+  // product needs tiers added in Admin), not something the storefront can
+  // invent a number for.
+  const rawTiers = Array.isArray(p.tiers) ? p.tiers : [];
+  const hasPricing = rawTiers.length>0 && rawTiers.some(x=>x && x.price>0);
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
     <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
     ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
@@ -365,11 +375,14 @@ function productCard(p){
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
       <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
+      ${hasPricing ? `
       <div class="pprice-row">
         <span class="pprice">${money(t.price)}</span><small class="pprice-unit">/ pc</small>
         ${offPct>0? `<span class="poff">(Save up to ${offPct}%)</span>` : ""}
       </div>
-      <div class="pprice-note">starting price</div>
+      <div class="pprice-note">starting price</div>` : `
+      <div class="pprice-row"><span class="pprice pprice-tbd">Price on request</span></div>
+      <div class="pprice-note">ask us on WhatsApp</div>`}
       <div class="pfoot">
         <span class="moqtag">MOQ ${p.moq} pcs</span>
         ${p.stock? `<a class="wa-mini" title="Quick WhatsApp enquiry" target="_blank" href="${waLink(p, p.bulk)}">🟢</a>` : `<a class="wa-mini" title="Check availability" target="_blank" href="${waLink(p, p.moq)}">🟢</a>`}
@@ -1006,6 +1019,37 @@ function initMobileNav(){
   drawer.querySelector(".mnav-enquiry-btn").addEventListener("click", ()=>{ closeDrawer(); openEnquiryModal(); });
   document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeDrawer(); });
   menuBtn.addEventListener("click", ()=> drawer.classList.contains("open") ? closeDrawer() : openDrawer());
+}
+
+/* ---------- collapsible mobile footer ("Make the footer like tap to more",
+   Vikas's WhatsApp feedback) ----------
+   The footer markup is identical on every page: a brand/social column
+   (.ffirst) followed by 3 link columns. On mobile those 3 columns made the
+   footer very long, so here they get wrapped in a .footlinks box that
+   starts collapsed behind a "View more" toggle — CSS only applies the
+   collapse below 640px, so desktop is untouched. Runs on every page via the
+   shared inits array; guarded so it's a no-op if the footer markup is
+   missing or already wrapped. */
+function initFooterCollapse(){
+  const grid = document.querySelector(".footgrid");
+  if(!grid || grid.querySelector(".footlinks")) return;
+  const cols = Array.from(grid.children).filter(el=>!el.classList.contains("ffirst"));
+  if(cols.length < 2) return;
+  const wrap = document.createElement("div");
+  wrap.className = "footlinks";
+  cols.forEach(col=>wrap.appendChild(col));
+  grid.appendChild(wrap);
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "foottoggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.innerHTML = `<span>View more</span><span class="foottoggle-car">▾</span>`;
+  grid.insertBefore(toggle, wrap);
+  toggle.addEventListener("click", ()=>{
+    const open = wrap.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.querySelector("span").textContent = open ? "View less" : "View more";
+  });
 }
 
 /* ---------- wishlist page (wishlist.html) ---------- */
@@ -2040,7 +2084,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
-    initMobileNav, initWishlistPage, initComparePage, initRecentlyViewedSection];
+    initMobileNav, initFooterCollapse, initWishlistPage, initComparePage, initRecentlyViewedSection];
   inits.forEach(fn=>{ try{ fn(); } catch(err){ console.error("Bazarville init error:", fn.name, err); } });
 
   // fire-and-forget enquiry logging — never blocks the WhatsApp redirect itself
