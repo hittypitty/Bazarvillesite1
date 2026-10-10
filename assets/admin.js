@@ -335,7 +335,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const invMarkOutBtn = document.querySelector("#invMarkOutBtn");
   if(invMarkOutBtn) invMarkOutBtn.addEventListener("click", ()=>bulkSetStock(false));
 
-  /* ---------- Inventory sub-tabs: Stock List / POS Billing ---------- */
+  /* ---------- Inventory sub-tabs: Stock List / POS Billing / History ---------- */
   document.querySelectorAll(".ad-inv-tab").forEach(tab=>{
     tab.addEventListener("click", ()=>{
       document.querySelectorAll(".ad-inv-tab").forEach(t=>t.classList.remove("active"));
@@ -343,12 +343,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const which = tab.dataset.invtab;
       document.querySelector("#invStockPanel").style.display = which==="stock" ? "block" : "none";
       document.querySelector("#invPosPanel").style.display = which==="pos" ? "block" : "none";
+      document.querySelector("#invHistoryPanel").style.display = which==="history" ? "block" : "none";
       if(which==="pos"){
         renderPosCats(); renderPosProductList(); renderPosCart(); refreshPosHolds();
         tickPosClock();
         const billNoEl = document.querySelector("#posBillNo");
         if(billNoEl && !billNoEl.value) resetPosBill();
       }
+      if(which==="history") loadHistory();
     });
   });
 
@@ -707,6 +709,100 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const row = e.target.closest(".pos-bill-row-click");
     if(row){ closePosRecentModal(); AdminUI.openOrder(Number(row.dataset.id)); }
   });
+
+  /* ---------- History (Inventory → History tab) ----------
+     The "Recent Bills" popup above only shows a quick, unfiltered list
+     while billing. This tab is the full picture: every completed POS bill
+     (orders tagged source:"pos"), searchable by bill ref/customer and
+     filterable by date range, with a CSV export — for looking back over a
+     whole day/week's counter sales rather than just the last few. */
+  let historyCache = [];
+  async function loadHistory(){
+    try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); }
+    historyCache = (allOrdersCache||[]).filter(o=>o.source==="pos")
+      .sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+    renderHistoryStats();
+    renderHistoryTable();
+  }
+  function filteredHistory(){
+    const q = (document.querySelector("#historySearch")?.value||"").trim().toLowerCase();
+    const from = document.querySelector("#historyFrom")?.value || "";
+    const to = document.querySelector("#historyTo")?.value || "";
+    return historyCache.filter(o=>{
+      if(q && !((o.ref||"").toLowerCase().includes(q) || (o.customer_name||"").toLowerCase().includes(q))) return false;
+      const d = o.created_at ? o.created_at.slice(0,10) : "";
+      if(from && d < from) return false;
+      if(to && d > to) return false;
+      return true;
+    });
+  }
+  function renderHistoryStats(){
+    const el = document.querySelector("#historyStats"); if(!el) return;
+    const list = filteredHistory();
+    const revenue = list.reduce((s,o)=>s+(o.subtotal||0),0);
+    const todayStr = new Date().toISOString().slice(0,10);
+    const todayList = list.filter(o=>(o.created_at||"").slice(0,10)===todayStr);
+    const todayRevenue = todayList.reduce((s,o)=>s+(o.subtotal||0),0);
+    el.innerHTML = `
+      <div class="ad-stat"><b>${list.length}</b><span>Bills${(document.querySelector("#historySearch")?.value||document.querySelector("#historyFrom")?.value||document.querySelector("#historyTo")?.value)?" (filtered)":""}</span></div>
+      <div class="ad-stat"><b>${money(revenue)}</b><span>Revenue${(document.querySelector("#historySearch")?.value||document.querySelector("#historyFrom")?.value||document.querySelector("#historyTo")?.value)?" (filtered)":""}</span></div>
+      <div class="ad-stat"><b>${todayList.length}</b><span>Bills today</span></div>
+      <div class="ad-stat"><b>${money(todayRevenue)}</b><span>Revenue today</span></div>`;
+  }
+  function historyRowHtml(o){
+    const itemCount = (o.items||[]).reduce((n,it)=>n+(it.qty||1),0);
+    return `<tr data-id="${o.id}">
+      <td><b>${o.ref}</b></td>
+      <td>${o.customer_name||"Walk-in Customer"}</td>
+      <td>${itemCount} pcs</td>
+      <td>${money(o.subtotal||0)}</td>
+      <td><span class="ad-badge in">${(o.payment_status||"paid")==="paid"?"Paid":(o.payment_status||"Paid")}</span></td>
+      <td>${new Date(o.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}, ${new Date(o.created_at).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true})}</td>
+      <td><button class="ad-icon-btn" title="View bill" onclick="AdminUI.openOrder(${o.id})">👁️</button></td>
+    </tr>`;
+  }
+  function renderHistoryTable(){
+    // Note: unlike the Orders/Enquiries tables, this never replaces the
+    // table wrapper's innerHTML with a plain empty-state message — doing
+    // that would delete the <table id="historyTable"> element itself, and
+    // once a bill gets completed in the same session there'd be no table
+    // left for the next render to find (document.querySelector would
+    // return null and silently no-op). Keeping the row inside the table
+    // keeps #historyTable alive for the empty→filled transition.
+    const el = document.querySelector("#historyTable"); if(!el) return;
+    if(!historyCache.length){
+      el.innerHTML = `<tr><td style="padding:28px 16px;text-align:center" class="ad-hint">No POS bills yet — completed counter sales will show up here.</td></tr>`;
+      return;
+    }
+    const list = filteredHistory();
+    el.innerHTML = `<tr><th>Bill No.</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Date</th><th></th></tr>` +
+      (list.length ? list.map(historyRowHtml).join("") : `<tr><td colspan="7"><p class="ad-hint" style="margin:0;text-align:center;padding:20px 0">No bills match this filter.</p></td></tr>`);
+  }
+  function exportHistoryCsv(list){
+    const header = ["Bill No.","Customer","Items","Total","Payment Status","Date"];
+    const rows = list.map(o=>{
+      const itemCount = (o.items||[]).reduce((n,it)=>n+(it.qty||1),0);
+      return [o.ref, o.customer_name||"Walk-in Customer", itemCount, o.subtotal||0, (o.payment_status||"paid"), new Date(o.created_at).toLocaleString("en-IN")];
+    });
+    const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `bazarville-pos-history-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+  [document.querySelector("#historySearch"), document.querySelector("#historyFrom"), document.querySelector("#historyTo")].forEach(el=>{
+    if(el) el.addEventListener("input", ()=>{ renderHistoryStats(); renderHistoryTable(); });
+  });
+  const historyClearFilterBtn = document.querySelector("#historyClearFilterBtn");
+  if(historyClearFilterBtn) historyClearFilterBtn.addEventListener("click", ()=>{
+    const s = document.querySelector("#historySearch"), f = document.querySelector("#historyFrom"), t = document.querySelector("#historyTo");
+    if(s) s.value = ""; if(f) f.value = ""; if(t) t.value = "";
+    renderHistoryStats(); renderHistoryTable();
+  });
+  const historyExportBtn = document.querySelector("#historyExportBtn");
+  if(historyExportBtn) historyExportBtn.addEventListener("click", ()=> exportHistoryCsv(filteredHistory()));
 
   /* ---------- catalogue / cart interactions + misc POS buttons ---------- */
   const posPanel = document.querySelector("#invPosPanel");

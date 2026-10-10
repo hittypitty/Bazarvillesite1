@@ -93,6 +93,7 @@
       <div class="ad-inv-tabs">
         <button type="button" class="ad-inv-tab active" data-invtab="stock">📋 Stock List</button>
         <button type="button" class="ad-inv-tab" data-invtab="pos">🧾 POS Billing</button>
+        <button type="button" class="ad-inv-tab" data-invtab="history">🕘 History</button>
       </div>
 
       <div id="invStockPanel">
@@ -185,6 +186,23 @@
               <button type="button" class="btn btn-primary" id="posCompleteBtn" disabled>✅ Complete Sale</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- History: every completed POS bill (not just the last few shown in
+           the quick Recent Bills popup above) — searchable and filterable
+           by date, so a full day/week's counter sales can be pulled up. -->
+      <div id="invHistoryPanel" style="display:none">
+        <div class="ad-inv-toolbar">
+          <input type="search" id="historySearch" placeholder="Search bill no., customer…">
+          <input type="date" id="historyFrom" title="From date">
+          <input type="date" id="historyTo" title="To date">
+          <button class="btn btn-outline btn-sm" id="historyClearFilterBtn" type="button">✕ Clear filters</button>
+          <button class="btn btn-outline btn-sm" id="historyExportBtn" type="button">⬇ Export CSV</button>
+        </div>
+        <div class="ad-stats" id="historyStats"></div>
+        <div class="ad-table-wrap">
+          <table class="ad-table" id="historyTable"></table>
         </div>
       </div>
     </section>
