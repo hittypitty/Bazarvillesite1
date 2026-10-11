@@ -333,14 +333,66 @@ const BazDS = (function(){
     const sb = getClient(); if(!sb) return;
     await sb.auth.signOut();
   }
-  /** Returns {email, role} for the signed-in user, or null if not signed in. */
+  /** Returns {email, role, fullName, permissions} for the signed-in user, or null if not signed in.
+   *  permissions is an array of section ids, or null on a database that hasn't run
+   *  add_user_permissions.sql yet (callers treat null as "legacy — allow everything"). */
   async function getCurrentAdmin(){
     const sb = getClient(); if(!sb) return null;
     const { data: { session } } = await sb.auth.getSession();
     if(!session) return null;
-    const { data, error } = await sb.from("profiles").select("email, role").eq("id", session.user.id).single();
+    let { data, error } = await sb.from("profiles").select("email, role, full_name, permissions").eq("id", session.user.id).single();
+    if(error && /full_name|permissions/i.test(error.message)){
+      ({ data, error } = await sb.from("profiles").select("email, role").eq("id", session.user.id).single());
+    }
     if(error){ console.error("getCurrentAdmin:", error.message); return null; }
-    return data;
+    return { email: data.email, role: data.role, fullName: data.full_name || "", permissions: Array.isArray(data.permissions) ? data.permissions : null };
+  }
+
+  /* ---------- team management (Admin → Users & Roles; Super Admin only) ---------- */
+  async function getTeam(){
+    const sb = getClient(); if(!sb) return [];
+    let { data, error } = await sb.from("profiles").select("*").order("created_at",{ascending:true});
+    if(error){ console.error("getTeam:", error.message); throw error; }
+    return (data||[]).map(r=>({ id:r.id, email:r.email, role:r.role, fullName:r.full_name||"", permissions:Array.isArray(r.permissions)?r.permissions:null, createdAt:r.created_at }));
+  }
+  /** Creates a staff login. A browser can't use Supabase's admin API (that needs the secret service
+   *  key), so this signs the new user up with a THROWAWAY client that never stores a session — the
+   *  Super Admin who is doing this stays signed in as themselves — then the signed-in Super Admin
+   *  sets that new profile's role/permissions. If your Supabase project has "Confirm email" turned
+   *  on (Authentication → Providers → Email), the new user must click the confirmation email once
+   *  before they can sign in. */
+  async function createStaffUser({email, password, fullName, role, permissions}){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const temp = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth:{ persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, storageKey:"bz-new-user-temp" }
+    });
+    const { data, error } = await temp.auth.signUp({ email, password, options:{ data:{ account_type:"staff", full_name:fullName||"" } } });
+    if(error) throw error;
+    const user = data && data.user;
+    if(!user) throw new Error("Could not create the user — please try again.");
+    if(Array.isArray(user.identities) && user.identities.length===0) throw new Error("An account with this email already exists.");
+    await updateStaffProfile(user.id, { role, permissions, fullName });
+    return user;
+  }
+  async function updateStaffProfile(id, {role, permissions, fullName}){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const row = { role, permissions, full_name: fullName||"" };
+    let { data, error } = await sb.from("profiles").update(row).eq("id", id).select();
+    if(error && /permissions|full_name/i.test(error.message)){
+      throw new Error("The database needs one more setup step first — run supabase/add_user_permissions.sql in your Supabase SQL Editor, then try again.");
+    }
+    if(error){ console.error("updateStaffProfile:", error.message); throw error; }
+    if(!data || !data.length) throw new Error("Could not update this user (no matching profile, or only a Super Admin may do this).");
+    return data[0];
+  }
+  /** Removes the profile row = revokes all admin access. (The login itself can only be deleted from
+   *  Supabase → Authentication → Users; without a profile it can no longer open the admin panel.) */
+  async function removeStaffProfile(id){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const { data, error } = await sb.from("profiles").delete().eq("id", id).select();
+    if(error){ console.error("removeStaffProfile:", error.message); throw error; }
+    if(!data || !data.length) throw new Error("Could not remove this user (only a Super Admin may do this).");
+    return true;
   }
 
   /** opts.since: ISO timestamp — only enquiries on/after this are returned. */
@@ -536,7 +588,7 @@ const BazDS = (function(){
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings,
     logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
-    signIn, signOut, getCurrentAdmin,
+    signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus,
     createPosSale, getPosHolds, holdPosSale, deletePosHold,

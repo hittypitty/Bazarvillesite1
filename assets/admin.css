@@ -419,3 +419,21 @@ body.role-super .ad-super-only{display:block}
 @media(max-width:900px){
   .ad-dash-grid{grid-template-columns:1fr}
 }
+
+/* ---------- Users & Roles: team table + Add/Edit User modal ---------- */
+.ad-perm-chips{display:flex;flex-wrap:wrap;gap:6px;max-width:460px}
+.ad-perm-chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--soft);border:1px solid var(--line);color:var(--ink-soft);white-space:nowrap}
+.ad-user-super{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;margin-bottom:16px;cursor:pointer;font-size:13px;line-height:1.45;transition:border-color .2s ease,background .2s ease}
+.ad-user-super:hover{border-color:var(--ink)}
+.ad-user-super:has(input:checked){background:var(--lime);border-color:var(--lime-deep);color:var(--on-accent)}
+.ad-user-super input{margin-top:3px;width:auto;flex:none}
+.ad-user-permhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:13px}
+.ad-link-btn{background:none;border:none;padding:0;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.ad-link-btn:hover{color:var(--lime-deep)}
+.ad-perm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ad-perm-opt{display:flex;align-items:center;gap:9px;padding:11px 12px;border:1.5px solid var(--line);border-radius:11px;font-size:13px;font-weight:600;cursor:pointer;transition:border-color .2s ease,background .2s ease,transform .2s cubic-bezier(.34,1.56,.64,1)}
+.ad-perm-opt:hover{border-color:var(--ink);transform:translateY(-1px)}
+.ad-perm-opt:has(input:checked){background:var(--soft);border-color:var(--ink)}
+.ad-perm-opt input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--ink);cursor:pointer}
+.ad-perms-disabled{opacity:.45;pointer-events:none}
+@media(max-width:560px){ .ad-perm-grid{grid-template-columns:1fr} }

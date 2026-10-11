@@ -40,7 +40,7 @@
       <a href="#enquiries" data-view="enquiries">💬 Enquiries / CRM</a>
       <a href="#orders" data-view="orders">📦 Orders</a>
       <a href="#quotes" data-view="quotes">📝 Quotes</a>
-      <a href="#settings" data-view="settings" class="ad-super-only">⚙️ Site Settings</a>
+      <a href="#settings" data-view="settings">⚙️ Site Settings</a>
       <a href="#roles" data-view="roles" class="ad-super-only">👥 Users &amp; Roles</a>
       <a href="dashboard.html" target="_blank">📈 Enquiry Reports ↗</a>
       <a href="index.html" target="_blank">🌐 View Live Site ↗</a>
@@ -299,22 +299,21 @@
 
     <!-- Roles -->
     <section class="ad-view" id="view-roles" style="display:none">
-      <div class="ad-header"><h1>Users &amp; Roles</h1><p>How access is split, per the Phase 1 blueprint.</p></div>
-      <div class="ad-roles-grid">
-        <div class="ad-panel">
-          <h3>👑 Super Admin</h3>
-          <p class="ad-hint">Full system control.</p>
-          <ul class="ad-checklist"><li>✅ Everything a Catalog Manager can do</li><li>✅ Site settings (WhatsApp number, hero banners)</li><li>✅ User &amp; role management</li><li>✅ Full enquiry reporting</li></ul>
-        </div>
-        <div class="ad-panel">
-          <h3>🗂️ Catalog Manager</h3>
-          <p class="ad-hint">Cataloguing only.</p>
-          <ul class="ad-checklist"><li>✅ Create, edit, publish products</li><li>✅ Manage collections</li><li>🚫 No access to site settings</li><li>🚫 No access to user/role management</li></ul>
-        </div>
+      <div class="ad-header"><h1>Users &amp; Roles</h1><p>Create team logins and tick exactly which sections each person can use.</p>
+        <button class="btn btn-primary" id="addUserBtn">+ Add User</button>
       </div>
-      <div class="ad-panel">
-        <h3>How to add a team member</h3>
-        <p class="ad-hint">This is now real, server-enforced access — the role lives in the <code>profiles</code> table and Row Level Security checks it on every request, so it can't be bypassed from the browser. To add someone: Supabase dashboard → Authentication → Users → Add user (creates them as Catalog Manager automatically) — then, to make them Super Admin, run <code>update public.profiles set role='super_admin' where email='them@example.com';</code> in the SQL editor. There's no invite/remove UI here yet — that's the next thing worth building if you get more than one or two admins.</p>
+      <div class="ad-table-wrap">
+        <table class="ad-table" id="teamTable"></table>
+      </div>
+      <div class="ad-panel" style="margin-top:20px">
+        <h3>How access works</h3>
+        <ul class="ad-checklist">
+          <li>👑 <b>Super Admin</b> — everything, including Site Settings and this Users &amp; Roles page.</li>
+          <li>☑️ <b>Everyone else</b> — only the sections ticked for them. Unticked sections disappear from their menu, and the database itself refuses their requests for that data.</li>
+          <li>🔑 New users sign in at this same admin page with the email + password you set here. If your Supabase project has "Confirm email" on, they must click the confirmation email once first.</li>
+          <li>🚫 <b>Remove access</b> deletes their team profile so they can no longer open the admin panel. (To delete the login completely, also remove them under Supabase → Authentication → Users.)</li>
+        </ul>
+        <p class="ad-hint" style="margin-top:12px">First time? Run <code>supabase/add_user_permissions.sql</code> once in the Supabase SQL Editor — that is what makes the ticks enforceable.</p>
       </div>
     </section>
   </main>
@@ -410,6 +409,30 @@
     <div class="ad-modal-foot">
       <button class="btn btn-outline btn-sm" id="cancelQuoteBtn">Cancel</button>
       <button class="btn btn-primary btn-sm" id="saveQuoteBtn">Create Quote</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== USER (TEAM MEMBER) MODAL ===================== -->
+<div class="ad-modal-backdrop" id="userModalBackdrop">
+  <div class="ad-modal">
+    <div class="ad-modal-head"><h2 id="userModalTitle">Add User</h2><span class="ad-modal-close" id="closeUserModal">✕</span></div>
+    <div class="ad-modal-body">
+      <div class="ad-field"><label>Full name</label><input id="uf_name" placeholder="e.g. Rahul Sharma"></div>
+      <div class="ad-field"><label>Email (login)</label><input id="uf_email" type="email" placeholder="name@example.com" autocomplete="off"></div>
+      <div class="ad-field" id="uf_passwordField"><label>Password</label><input id="uf_password" type="text" placeholder="At least 6 characters" autocomplete="new-password"></div>
+      <label class="ad-user-super" id="uf_superRow"><input type="checkbox" id="uf_super"> <span><b>👑 Super Admin</b> — full access to everything, including Site Settings and Users &amp; Roles</span></label>
+      <div id="uf_permsWrap">
+        <div class="ad-user-permhead"><b>Can access</b>
+          <span><button type="button" class="ad-link-btn" id="uf_selectAll">Select all</button> · <button type="button" class="ad-link-btn" id="uf_clearAll">Clear</button></span>
+        </div>
+        <div class="ad-perm-grid" id="uf_perms"></div>
+      </div>
+      <p class="ad-hint" id="uf_error" style="color:#c0392b;display:none;margin:12px 0 0"></p>
+    </div>
+    <div class="ad-modal-foot">
+      <button class="btn btn-outline btn-sm" id="cancelUserBtn">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="saveUserBtn">Create User</button>
     </div>
   </div>
 </div>

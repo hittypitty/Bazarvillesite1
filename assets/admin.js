@@ -25,6 +25,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     {id:"subtle", label:"Subtle (Default)", desc:"Gentle hover-tilt and fade-in, as originally designed."},
     {id:"full",   label:"Full 3D",          desc:"Deeper hover-tilt, plus an idle 3D floating effect on product cards."}
   ];
+  // Same timing trap again: showShell() reads these before the rest of this
+  // function has run, so they must be declared up here too.
+  const ALL_SECTIONS = [
+    {id:"dashboard",   label:"📊 Dashboard"},
+    {id:"products",    label:"📦 Products"},
+    {id:"inventory",   label:"📋 Inventory (Stock, POS Billing, History)"},
+    {id:"collections", label:"🗂️ Collections"},
+    {id:"enquiries",   label:"💬 Enquiries / CRM"},
+    {id:"orders",      label:"🛒 Orders"},
+    {id:"quotes",      label:"📝 Quotes"},
+    {id:"settings",    label:"⚙️ Site Settings"}
+  ];
+  let currentAdmin = null;
   // Same timing trap as the presets above: renderDashboard() (below) reads
   // the orders/quotes/enquiries caches, and showShell() can call it before
   // the `let` declarations that used to live further down this file would
@@ -71,9 +84,20 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.querySelector("#loginScreen").style.display = "none";
     document.querySelector("#adminShell").style.display = "grid";
     const isSuper = admin.role === "super_admin";
+    currentAdmin = admin;
     document.body.classList.toggle("role-super", isSuper);
-    document.querySelector("#roleBadge").textContent = isSuper ? `👑 ${admin.email}` : `🗂️ ${admin.email}`;
-    if(!isSuper && ["settings","roles"].includes(location.hash.replace("#",""))) location.hash = "#dashboard";
+    document.querySelector("#roleBadge").textContent = isSuper ? `👑 ${admin.email}` : `🗂️ ${admin.fullName||admin.email}`;
+    // Per-user section ticks (Users & Roles). permissions === null means the
+    // database hasn't run add_user_permissions.sql yet — behave as before
+    // (every non-super user keeps the old Catalog Manager access).
+    document.querySelectorAll("#adNav a[data-view]").forEach(a=>{
+      if(a.dataset.view==="roles") return; // controlled by .ad-super-only
+      a.style.display = canView(a.dataset.view) ? "" : "none";
+    });
+    const reportsLink = document.querySelector('#adNav a[href="dashboard.html"]');
+    if(reportsLink) reportsLink.style.display = canView("enquiries") ? "" : "none";
+    const wanted = location.hash.replace("#","") || "dashboard";
+    if(!canView(wanted)) location.hash = "#" + firstAllowedView();
 
     // Load the live catalogue for the admin panel itself (product/collection
     // lists, dashboard counts) — same Supabase data the public site reads.
@@ -96,11 +120,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderColorSwatches();
     renderFontSwatches();
     renderAnimationOptions();
-    switchView(location.hash.replace("#","") || "dashboard");
+    switchView(location.hash.replace("#","") || firstAllowedView());
   }
 
   /* ---------- view switching ---------- */
+  function canView(view){
+    if(!currentAdmin) return false;
+    if(currentAdmin.role==="super_admin") return true;
+    if(view==="roles") return false;
+    if(!Array.isArray(currentAdmin.permissions)) return view!=="settings"; // legacy: pre-migration Catalog Manager
+    return currentAdmin.permissions.includes(view);
+  }
+  function firstAllowedView(){
+    const hit = ALL_SECTIONS.find(sec=>canView(sec.id));
+    return hit ? hit.id : "dashboard";
+  }
+
   function switchView(name){
+    if(!canView(name) && !(name==="roles" && currentAdmin && currentAdmin.role==="super_admin")) name = firstAllowedView();
     document.querySelectorAll(".ad-view").forEach(v=>v.style.display = "none");
     const target = document.querySelector("#view-"+name);
     if(target) target.style.display = "block"; else document.querySelector("#view-dashboard").style.display = "block";
@@ -110,6 +147,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(name==="orders") renderOrdersTable();
     if(name==="quotes") renderQuotesTable();
     if(name==="inventory") renderInventoryView();
+    if(name==="roles") renderTeamTable();
   }
   document.querySelectorAll("#adNav a[data-view]").forEach(a=>{
     a.addEventListener("click", (e)=>{ e.preventDefault(); location.hash = "#"+a.dataset.view; switchView(a.dataset.view); });
@@ -1881,6 +1919,114 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     }catch(err){ alert("Could not update order: " + err.message); }
     finally{ busy(saveOrderBtn, false); }
   });
+
+  /* ================= TEAM / USERS & ROLES (Super Admin only) =================
+     "+ Add User" creates a real Supabase login (see BazDS.createStaffUser) and
+     stores which admin sections they may use as tick-marks in
+     profiles.permissions; Row Level Security (supabase/add_user_permissions.sql)
+     enforces those ticks on the database itself. */
+  let teamCache = [];
+  let editingUserId = null;
+
+  function permSummary(u){
+    if(u.role==="super_admin") return `<span class="ad-badge in">👑 Everything</span>`;
+    const perms = Array.isArray(u.permissions) ? u.permissions : ALL_SECTIONS.filter(x=>x.id!=="settings").map(x=>x.id);
+    if(!perms.length) return `<span class="ad-badge out">No access yet</span>`;
+    return perms.map(id=>{ const sec = ALL_SECTIONS.find(x=>x.id===id); return `<span class="ad-perm-chip">${sec?sec.label.replace(/ \(.*\)/,""):id}</span>`; }).join("");
+  }
+  function teamRowHtml(u){
+    const isMe = currentAdmin && u.email===currentAdmin.email;
+    return `<tr data-id="${u.id}">
+      <td><b>${u.fullName||"—"}</b>${isMe?` <span class="ad-badge in">You</span>`:""}<br><span class="ad-hint" style="margin:0">${u.email||""}</span></td>
+      <td>${u.role==="super_admin"?"👑 Super Admin":"🗂️ Team member"}</td>
+      <td><div class="ad-perm-chips">${permSummary(u)}</div></td>
+      <td><div class="ad-row-actions">
+        <button class="ad-icon-btn" title="Edit access" data-teamact="edit" data-id="${u.id}">✏️</button>
+        ${isMe?"":`<button class="ad-icon-btn danger" title="Remove access" data-teamact="remove" data-id="${u.id}">🗑️</button>`}
+      </div></td>
+    </tr>`;
+  }
+  async function renderTeamTable(){
+    const el = document.querySelector("#teamTable"); if(!el) return;
+    try{ teamCache = await BazDS.getTeam(); }
+    catch(err){ el.innerHTML = `<tr><td><p class="ad-hint" style="margin:0;padding:18px 0;text-align:center">Could not load the team list — ${err.message||"only a Super Admin can see this."}</p></td></tr>`; return; }
+    el.innerHTML = `<tr><th>User</th><th>Role</th><th>Can access</th><th></th></tr>` + teamCache.map(teamRowHtml).join("");
+  }
+  const teamTableEl = document.querySelector("#teamTable");
+  if(teamTableEl) teamTableEl.addEventListener("click", (e)=>{
+    const btn = e.target.closest("[data-teamact]"); if(!btn) return;
+    const u = teamCache.find(x=>x.id===btn.dataset.id); if(!u) return;
+    if(btn.dataset.teamact==="edit") openUserModal(u);
+    if(btn.dataset.teamact==="remove") removeUser(u);
+  });
+
+  function renderPermGrid(selected){
+    document.querySelector("#uf_perms").innerHTML = ALL_SECTIONS.map(sec=>`
+      <label class="ad-perm-opt"><input type="checkbox" value="${sec.id}" ${selected.includes(sec.id)?"checked":""}><span>${sec.label}</span></label>`).join("");
+  }
+  function syncSuperToggle(){
+    const isSuper = document.querySelector("#uf_super").checked;
+    document.querySelector("#uf_permsWrap").classList.toggle("ad-perms-disabled", isSuper);
+    document.querySelectorAll("#uf_perms input").forEach(i=>{ i.disabled = isSuper; });
+  }
+  function openUserModal(u){
+    editingUserId = u ? u.id : null;
+    const err = document.querySelector("#uf_error"); err.style.display = "none";
+    document.querySelector("#userModalTitle").textContent = u ? "Edit User" : "Add User";
+    document.querySelector("#saveUserBtn").textContent = u ? "Save Changes" : "Create User";
+    document.querySelector("#uf_name").value = u ? u.fullName : "";
+    const emailEl = document.querySelector("#uf_email"); emailEl.value = u ? (u.email||"") : ""; emailEl.disabled = !!u;
+    document.querySelector("#uf_password").value = "";
+    document.querySelector("#uf_passwordField").style.display = u ? "none" : "block";
+    const isMe = !!(u && currentAdmin && u.email===currentAdmin.email);
+    const superEl = document.querySelector("#uf_super");
+    superEl.checked = !!(u && u.role==="super_admin"); superEl.disabled = isMe; // can't demote yourself
+    const startPerms = u ? (Array.isArray(u.permissions) ? u.permissions : ALL_SECTIONS.filter(x=>x.id!=="settings").map(x=>x.id)) : [];
+    renderPermGrid(startPerms);
+    syncSuperToggle();
+    document.querySelector("#userModalBackdrop").classList.add("show");
+  }
+  const closeUserModal = ()=>document.querySelector("#userModalBackdrop").classList.remove("show");
+  [document.querySelector("#closeUserModal"), document.querySelector("#cancelUserBtn")].forEach(b=>{ if(b) b.addEventListener("click", closeUserModal); });
+  const addUserBtn = document.querySelector("#addUserBtn");
+  if(addUserBtn) addUserBtn.addEventListener("click", ()=>openUserModal(null));
+  const ufSuper = document.querySelector("#uf_super");
+  if(ufSuper) ufSuper.addEventListener("change", syncSuperToggle);
+  const ufSelectAll = document.querySelector("#uf_selectAll"), ufClearAll = document.querySelector("#uf_clearAll");
+  if(ufSelectAll) ufSelectAll.addEventListener("click", ()=>document.querySelectorAll("#uf_perms input:not(:disabled)").forEach(i=>{ i.checked = true; }));
+  if(ufClearAll) ufClearAll.addEventListener("click", ()=>document.querySelectorAll("#uf_perms input:not(:disabled)").forEach(i=>{ i.checked = false; }));
+
+  const saveUserBtn = document.querySelector("#saveUserBtn");
+  if(saveUserBtn) saveUserBtn.addEventListener("click", async ()=>{
+    const errEl = document.querySelector("#uf_error");
+    const showErr = (m)=>{ errEl.textContent = m; errEl.style.display = "block"; };
+    errEl.style.display = "none";
+    const fullName = document.querySelector("#uf_name").value.trim();
+    const email = document.querySelector("#uf_email").value.trim();
+    const password = document.querySelector("#uf_password").value;
+    const isSuper = document.querySelector("#uf_super").checked;
+    const permissions = [...document.querySelectorAll("#uf_perms input:checked")].map(i=>i.value);
+    if(!editingUserId){
+      if(!email || !/^\S+@\S+\.\S+$/.test(email)) return showErr("Enter a valid email address.");
+      if(password.length < 6) return showErr("Password must be at least 6 characters.");
+    }
+    if(!isSuper && !permissions.length && !confirm("No sections are ticked — this user won't be able to open anything. Continue?")) return;
+    busy(saveUserBtn, true, editingUserId ? "Saving…" : "Creating…");
+    try{
+      const role = isSuper ? "super_admin" : "catalog_manager";
+      if(editingUserId) await BazDS.updateStaffProfile(editingUserId, {role, permissions, fullName});
+      else await BazDS.createStaffUser({email, password, fullName, role, permissions});
+      closeUserModal();
+      await renderTeamTable();
+      if(!editingUserId) alert(`User created. They can now sign in at this admin page with:\n\nEmail: ${email}\nPassword: ${password}\n\n(If your Supabase project requires email confirmation, they must click the confirmation email first.)`);
+    }catch(err){ showErr(err.message || "Could not save this user."); }
+    finally{ busy(saveUserBtn, false); }
+  });
+  async function removeUser(u){
+    if(!confirm(`Remove admin access for ${u.fullName||u.email}? They will no longer be able to open the admin panel.`)) return;
+    try{ await BazDS.removeStaffProfile(u.id); await renderTeamTable(); }
+    catch(err){ alert("Could not remove: " + (err.message||"")); }
+  }
 
   /* ================= QUOTES (CPQ) ================= */
   let quoteLineItems = [];
