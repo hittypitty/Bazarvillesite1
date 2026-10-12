@@ -990,3 +990,13 @@ body.mnav-lock{overflow:hidden}
 .logochip.logochip-img{padding:8px 22px;min-width:110px;justify-content:center}
 .logochip-img img{height:34px;width:auto;max-width:150px;object-fit:contain;display:block}
 [hidden]{display:none!important}
+
+/* Vikas (Oct 12, evening): nav search plain white (no green), bigger WhatsApp icon */
+.nav-search{background:#fff;border-color:var(--line)}
+.nav-search:hover{border-color:#c9cabd}
+.nav-search:focus-within{border-color:var(--ink);box-shadow:0 0 0 4px rgba(26,26,26,.08),0 8px 20px -10px rgba(26,26,26,.25)}
+.searchbtn{background:var(--ink);color:#fff;box-shadow:none}
+.searchbtn:hover{background:#333;color:#fff;box-shadow:0 6px 14px -6px rgba(0,0,0,.4)}
+.enqbtn{width:52px;height:52px}
+.enqbtn svg{width:30px;height:30px}
+@media(max-width:640px){.enqbtn{width:46px;height:46px}.enqbtn svg{width:26px;height:26px}}
