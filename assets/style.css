@@ -961,3 +961,10 @@ body.mnav-lock{overflow:hidden}
 .cs-ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none}
 .cs-fb{background:#1877f2}.cs-li{background:#0a66c2}
 .cs-ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
+
+/* Vikas (Oct 12): budget gate grey instead of dark green; enquiry hint */
+.gate.g3{background:linear-gradient(155deg,#8a8e88,#5f635d)}
+.gate.g3 h3,.gate.g3 .go{color:#fff}
+.gate.g3 p{color:#eceeea}
+.gate:hover.g3{box-shadow:0 26px 48px -16px rgba(60,63,58,.45)}
+.enq-hint{display:block;margin-top:6px;font-size:12px;color:var(--muted)}

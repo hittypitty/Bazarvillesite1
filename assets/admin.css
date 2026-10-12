@@ -456,3 +456,10 @@ body.role-super .ad-super-only{display:block}
   .be-row{grid-template-columns:1fr 1fr 38px;grid-template-areas:"name name name" "qty price del" "line line line"}
   .be-name{grid-area:name}.be-qty{grid-area:qty}.be-price{grid-area:price}.be-toggle{grid-area:del}.be-line{grid-area:line;text-align:right}
 }
+
+/* non-blocking toasts (replace native alert/confirm popups in POS) */
+#adToastHost{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:max-content;max-width:92vw}
+.ad-toast{background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:0 14px 30px -10px rgba(0,0,0,.45);opacity:0;transform:translateY(12px);transition:opacity .25s ease,transform .25s ease}
+.ad-toast.ok{border:1.5px solid var(--lime);color:var(--lime)}
+.ad-toast.error{background:#b3261e;color:#fff}
+.ad-toast.show{opacity:1;transform:translateY(0)}

@@ -865,10 +865,8 @@ function buildEnquiryModal(){
     <form id="enquiryForm">
       <div class="enq-field"><label>Name *</label><input type="text" id="enqName" required placeholder="Your full name"></div>
       <div class="enq-field"><label>Phone number *</label><input type="tel" id="enqPhone" required placeholder="10-digit mobile number"></div>
-      <div class="enq-field"><label>Email</label><input type="email" id="enqEmail" placeholder="you@company.com"></div>
-      <div class="enq-field"><label>What product are you looking for? *</label><textarea id="enqProduct" required placeholder="e.g. Branded steel bottles, A5 diaries…" rows="2"></textarea></div>
-      <div class="enq-field"><label>Quantity</label><input type="text" id="enqQty" placeholder="e.g. 100 pcs"></div>
-      <div class="enq-field"><label>Deadline</label><input type="date" id="enqDeadline"></div>
+      <div class="enq-field"><label>What product are you looking for? *</label><textarea id="enqProduct" required placeholder="e.g. Black keychain - 5 pcs" rows="2"></textarea><small class="enq-hint">Write the product and quantity together, like: Black keychain - 5 pcs</small></div>
+      <div class="enq-field"><label>Order deadline</label><input type="date" id="enqDeadline"></div>
       <button type="submit" class="btn btn-wa" style="width:100%;margin-top:6px">🟢 Send via WhatsApp</button>
     </form>
   </div>`;
@@ -879,24 +877,20 @@ function buildEnquiryModal(){
     e.preventDefault();
     const name = document.querySelector("#enqName").value.trim();
     const phone = document.querySelector("#enqPhone").value.trim();
-    const email = document.querySelector("#enqEmail").value.trim();
     const product = document.querySelector("#enqProduct").value.trim();
-    const qty = document.querySelector("#enqQty").value.trim();
     const deadlineRaw = document.querySelector("#enqDeadline").value;
     const deadline = deadlineRaw ? new Date(deadlineRaw+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "";
     if(!name || !phone || !product) return; // required fields — the inputs' own "required" already stops this in practice
 
     // Best-effort CRM copy — never blocks or delays the WhatsApp redirect below.
-    BazDS.submitGeneralEnquiry({name, phone, email, product, quantity:qty, deadline}).catch(()=>{});
+    BazDS.submitGeneralEnquiry({name, phone, product, deadline}).catch(()=>{});
 
     const lines = [
       "Hi Bazarville! I'd like to raise an enquiry — here are my details:",
       `Name: ${name}`,
       `Phone: ${phone}`,
-      email ? `Email: ${email}` : null,
       `Requirement: ${product}`,
-      qty ? `Quantity: ${qty}` : null,
-      deadline ? `Deadline: ${deadline}` : null
+      deadline ? `Order deadline: ${deadline}` : null
     ].filter(Boolean).join("\n");
     window.open(`https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent(lines)}`, "_blank", "noopener");
     closeEnquiryModal();

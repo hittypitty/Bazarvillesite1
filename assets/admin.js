@@ -467,6 +467,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const ci = p && p.colorImages && color ? p.colorImages[color] : null;
     return (ci && ci.length && ci[0]) || (p && p.img && p.img[0]) || "";
   }
+  /* Non-blocking toast — POS used native alert()/confirm() popups (Vikas: "popups nahi chahiye"). */
+  function posToast(msg, type){
+    let host = document.querySelector("#adToastHost");
+    if(!host){ host = document.createElement("div"); host.id = "adToastHost"; document.body.appendChild(host); }
+    const t = document.createElement("div");
+    t.className = "ad-toast " + (type==="error" ? "error" : "ok");
+    t.textContent = msg;
+    host.appendChild(t);
+    requestAnimationFrame(()=>t.classList.add("show"));
+    setTimeout(()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(), 350); }, type==="error" ? 4500 : 2200);
+  }
   function posUnitPrice(p, qty){
     const t = tierFor(p, qty);
     if(t && t.price > 0) return t.price;
@@ -577,7 +588,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     p.colorStock = {...(p.colorStock||{})};
     if(num==null) delete p.colorStock[color]; else p.colorStock[color] = num;
     try{ await BazDS.upsertProduct(p); }
-    catch(err){ alert("Could not save stock: " + (err.message||"")); }
+    catch(err){ posToast("Could not save stock: " + (err.message||""), "error"); }
   }
 
   /* ---------- the bill itself (right panel) ---------- */
@@ -621,7 +632,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   function clearCart(){
     if(!posCart.length) return;
-    if(!confirm("Clear all items from the current bill?")) return;
     posCart = [];
     renderPosCart();
   }
@@ -642,7 +652,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       renderPosCart();
       await resetPosBill();
       await refreshPosHolds();
-    }catch(err){ alert("Could not hold sale: " + (err.message||"")); }
+    }catch(err){ posToast("Could not hold sale: " + (err.message||""), "error"); }
     finally{ busy(btn, false); }
   }
 
@@ -678,8 +688,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       await resetPosBill();
       try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); }
       renderDashboard();
-      alert("Sale completed.");
-    }catch(err){ alert("Could not complete sale: " + (err.message||"")); }
+      posToast("✅ Sale completed");
+    }catch(err){ posToast("Could not complete sale: " + (err.message||""), "error"); }
     finally{ busy(btn, false); }
   }
 
@@ -706,7 +716,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   async function resumeHold(id){
     const h = posHoldsCache.find(x=>x.id===id); if(!h) return;
-    if(posCart.length && !confirm("This replaces the sale you're currently building. Continue?")) return;
     posCart = (h.items||[]).slice();
     renderPosCart();
     try{ await BazDS.deletePosHold(id); }catch(err){ console.error(err); }
@@ -714,9 +723,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     closePosHoldsModal();
   }
   async function deleteHoldHandler(id){
-    if(!confirm("Delete this held sale? This cannot be undone.")) return;
     try{ await BazDS.deletePosHold(id); await refreshPosHolds(); }
-    catch(err){ alert("Could not delete: " + (err.message||"")); }
+    catch(err){ posToast("Could not delete: " + (err.message||""), "error"); }
   }
   const posHoldsBtn = document.querySelector("#posHoldsBtn");
   if(posHoldsBtn) posHoldsBtn.addEventListener("click", async ()=>{ await refreshPosHolds(); document.querySelector("#posHoldsModalBackdrop").classList.add("show"); });

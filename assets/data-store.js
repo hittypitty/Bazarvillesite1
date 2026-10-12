@@ -254,13 +254,13 @@ const BazDS = (function(){
    *  enquiries table has no dedicated columns for, so they're folded into
    *  `notes` as a readable block rather than needing a schema migration.
    *  Never blocks or fails the WhatsApp redirect this is called alongside. */
-  async function submitGeneralEnquiry({name, phone, email, product, quantity, deadline}){
+  async function submitGeneralEnquiry({name, phone, email, product, quantity, deadline}){ // email/quantity now optional (form no longer asks)
     const sb = getClient(); if(!sb) return false;
     const ref = "BZV-" + Math.random().toString(36).slice(2,8).toUpperCase();
     const notesLines = [
       `Name: ${name}`, `Phone: ${phone}`,
       email ? `Email: ${email}` : null,
-      deadline ? `Deadline: ${deadline}` : null
+      deadline ? `Order deadline: ${deadline}` : null
     ].filter(Boolean);
     const { error } = await sb.from("enquiries").insert({
       ref, product_name: product || "", quantity: quantity || null,
