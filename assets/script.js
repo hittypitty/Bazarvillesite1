@@ -370,7 +370,6 @@ function productCard(p){
       <button type="button" class="wish-btn ${wished?'active':''}" data-wish-id="${p.id}" title="${wished?'Remove from wishlist':'Add to wishlist'}" aria-label="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
       <button type="button" class="qv-btn" data-qv-id="${p.id}" title="Quick View" aria-label="Quick View">👁</button>
     </div>
-    <label class="cmp-check" title="Add to compare"><input type="checkbox" data-cmp-id="${p.id}" ${compared?'checked':''}><span>Compare</span></label>
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}

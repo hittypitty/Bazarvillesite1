@@ -1000,3 +1000,6 @@ body.mnav-lock{overflow:hidden}
 .enqbtn{width:52px;height:52px}
 .enqbtn svg{width:30px;height:30px}
 @media(max-width:640px){.enqbtn{width:46px;height:46px}.enqbtn svg{width:26px;height:26px}}
+
+/* Vikas: Compare checkbox removed from product cards */
+.cmp-check,.compare-bar{display:none!important}
