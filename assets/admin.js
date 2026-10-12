@@ -861,9 +861,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="be-head"><span>Product</span><span>Qty</span><span>Price ₹</span><span>Total</span><span></span></div>
         ${b.rows.map((r,idx)=>{
           const it = b.orig[r.i];
-          const variant = [it.color?`<i class="pos-cart-dot" style="background:${it.color}"></i>`:"", it.size||""].filter(Boolean).join(" ");
+          const p = findBillProduct(it);
+          // options = the product's colours/sizes, plus whatever the bill already has (in case it was since removed from the product)
+          const colors = [...new Set([...(p&&p.colors||[]), ...(r.color?[r.color]:[])])];
+          const sizes = [...new Set([...(p&&p.sizes||[]), ...(r.size?[r.size]:[])])];
+          const variant = (colors.length || sizes.length) ? `<div class="be-variant">
+              ${colors.length?`<span class="be-swatches">${colors.map(c=>`<span class="be-swatch ${c===r.color?'active':''}" data-color="${c}" style="background:${c}" title="${c}"></span>`).join("")}</span>`:""}
+              ${sizes.length?`<select class="be-size"><option value="">Size</option>${sizes.map(sz=>`<option value="${sz}" ${sz===r.size?'selected':''}>${sz}</option>`).join("")}</select>`:""}
+            </div>` : "";
           return `<div class="be-row ${r.removed?'removed':''}" data-idx="${idx}">
-            <span class="be-name"><b>${it.name||"Item"}</b>${variant?`<small>${variant}</small>`:""}${r.removed?`<small class="be-removed">Removed</small>`:""}</span>
+            <span class="be-name"><b>${it.name||"Item"}</b>${variant}${r.removed?`<small class="be-removed">Removed</small>`:""}</span>
             <input type="number" min="0" class="be-qty" value="${r.qty}" ${r.removed?"disabled":""}>
             <input type="number" min="0" class="be-price" value="${r.price}" ${r.removed?"disabled":""}>
             <b class="be-line">${r.removed?"—":money((Number(r.qty)||0)*(Number(r.price)||0))}</b>
@@ -878,7 +885,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const o = (allOrdersCache||[]).find(x=>x.id===id); if(!o) return;
     const orig = (o.items||[]).map(it=>({...it}));
     editingBill = {id, ref:o.ref, customer:(o.customer_name==="Walk-in counter sale"?"":o.customer_name)||"", orig,
-      rows: orig.map((it,i)=>({i, qty:it.qty||1, price:it.price||0, removed:false}))};
+      rows: orig.map((it,i)=>({i, qty:it.qty||1, price:it.price||0, color:it.color||"", size:it.size||"", removed:false}))};
     document.querySelector("#billEditTitle").textContent = "Edit Bill " + (o.ref||"");
     renderBillEdit();
     document.querySelector("#billEditModalBackdrop").classList.add("show");
@@ -896,7 +903,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       row.querySelector(".be-line").textContent = money((Number(r.qty)||0)*(Number(r.price)||0));
       document.querySelector("#be_total").textContent = money(billEditTotal());
     });
+    billEditBody.addEventListener("change", (e)=>{
+      if(!editingBill || !e.target.classList.contains("be-size")) return;
+      editingBill.rows[Number(e.target.closest(".be-row").dataset.idx)].size = e.target.value;
+    });
     billEditBody.addEventListener("click", (e)=>{
+      const sw = e.target.closest(".be-swatch");
+      if(sw && editingBill){
+        editingBill.customer = document.querySelector("#be_name").value;
+        editingBill.rows[Number(sw.closest(".be-row").dataset.idx)].color = sw.dataset.color;
+        renderBillEdit(); return;
+      }
       const t = e.target.closest(".be-toggle"); if(!t || !editingBill) return;
       editingBill.customer = document.querySelector("#be_name").value;
       const r = editingBill.rows[Number(t.closest(".be-row").dataset.idx)];
@@ -909,24 +926,27 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const err = document.querySelector("#be_error");
     const kept = b.rows.filter(r=>!r.removed && Number(r.qty)>0);
     if(!kept.length){ err.textContent = "Bill me kam se kam ek item rehna chahiye."; err.style.display = "block"; return; }
-    const items = kept.map(r=>({...b.orig[r.i], qty:Math.round(Number(r.qty)), price:Number(r.price)||0}));
+    const items = kept.map(r=>({...b.orig[r.i], color:r.color, size:r.size, qty:Math.round(Number(r.qty)), price:Number(r.price)||0}));
     const subtotal = items.reduce((s,it)=>s+it.qty*it.price,0);
     const customerName = document.querySelector("#be_name").value.trim();
     busy(saveBillEditBtn, true, "Saving…");
     try{
       await BazDS.updatePosSale(b.id, {customerName, items, subtotal});
-      // stock: diff per original line (removed / qty 0 lines count as fully returned)
+      // stock: the original colour gets the old qty back, the (possibly new) colour is charged the new qty.
+      // Only colours that have tracked stock are touched.
       const touched = new Set();
-      b.rows.forEach(r=>{
-        const it = b.orig[r.i];
-        const newQty = (r.removed || !(Number(r.qty)>0)) ? 0 : Math.round(Number(r.qty));
-        const delta = (it.qty||1) - newQty; // +ve = pieces came back
-        const p = findBillProduct(it);
-        if(!delta || !p || !it.color) return;
-        const cur = (p.colorStock && p.colorStock[it.color]!=null) ? p.colorStock[it.color] : null;
+      const bump = (p, color, delta)=>{
+        if(!p || !color || !delta) return;
+        const cur = (p.colorStock && p.colorStock[color]!=null) ? p.colorStock[color] : null;
         if(cur==null) return;
-        p.colorStock = {...p.colorStock, [it.color]: Math.max(0, cur + delta)};
+        p.colorStock = {...p.colorStock, [color]: Math.max(0, cur + delta)};
         touched.add(p);
+      };
+      b.rows.forEach(r=>{
+        const it = b.orig[r.i], p = findBillProduct(it);
+        const newQty = (r.removed || !(Number(r.qty)>0)) ? 0 : Math.round(Number(r.qty));
+        bump(p, it.color, +(it.qty||1));
+        bump(p, r.color, -newQty);
       });
       for(const p of touched){ try{ await BazDS.upsertProduct(p); }catch(e){ console.error("Stock adjust failed for", p.name, e); } }
       closeBillEdit();
