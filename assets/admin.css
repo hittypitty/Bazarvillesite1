@@ -469,3 +469,30 @@ body.role-super .ad-super-only{display:block}
 .be-swatch:hover{transform:scale(1.15)}
 .be-swatch.active{box-shadow:0 0 0 2.5px var(--ink)}
 .be-variant .be-size{padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:#fff;min-width:70px}
+
+/* Stock list: available quantity */
+.inv-qty-cell{min-width:150px}
+.inv-qty-colors{display:flex;flex-direction:column;gap:5px}
+.inv-qty-row{display:flex;align-items:center;gap:8px}
+.inv-qty-input{width:84px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font:inherit;font-size:13px;background:#fff}
+.inv-qty-input:focus{outline:none;border-color:var(--lime-deep);box-shadow:0 0 0 3px rgba(198,240,0,.3)}
+.inv-qty-total{margin-top:6px;font-size:12px;font-weight:800;color:var(--green-deep,#3f7a00)}
+.inv-qty-total.muted{color:var(--muted);font-weight:600}
+.be-priceval{font-weight:700;color:var(--ink)}
+
+/* 360° / 3D section in product form */
+.ad-view360{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ad-view360-col{border:1.5px dashed var(--line);border-radius:14px;padding:14px;background:var(--soft);min-width:0}
+.ad-view360-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;align-items:center;min-height:48px}
+.ad-view360-strip img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none;background:#fff}
+.ad-view360-count{flex:none;font-size:12px;font-weight:800;color:var(--muted);padding-left:6px}
+@media(max-width:700px){.ad-view360{grid-template-columns:1fr}}
+
+/* Trusted-by admin list */
+.ad-brand-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.ad-brand-row{display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.ad-brand-row img{width:54px;height:36px;object-fit:contain;flex:none}
+.ad-brand-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad-brand-noimg{width:54px;font-size:11px;color:var(--muted);flex:none}
+.ad-brand-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ad-brand-add input[type=text],.ad-brand-add input:not([type]){flex:1;min-width:180px;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit}

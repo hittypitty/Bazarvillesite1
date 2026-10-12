@@ -26,7 +26,7 @@ const BazDS = (function(){
   }
 
   function dbToApp(row){
-    const {images, print_options, meta_title, meta_description, color_images, color_stock, ...rest} = row;
+    const {images, print_options, meta_title, meta_description, color_images, color_stock, view_360, model_url, ...rest} = row;
     return {
       ...rest,
       img: images || [],
@@ -40,6 +40,9 @@ const BazDS = (function(){
       // it's unrelated to the plain in-stock/out-of-stock `stock` flag used
       // everywhere else on the site.
       colorStock: color_stock || {},
+      // 360° spin frames (ordered image URLs) and an optional 3D model (.glb) URL — see add_360_view.sql.
+      view360: Array.isArray(view_360) ? view_360 : [],
+      model3d: model_url || "",
       professions: row.professions && row.professions.length ? row.professions : (row.profession ? [row.profession] : []),
       // Purpose/Occasion: same "array is the source of truth, singular kept for
       // backward compatibility" pattern as profession/professions above. If a
@@ -55,12 +58,14 @@ const BazDS = (function(){
     };
   }
   function appToDb(p){
-    const {img, printOptions, metaTitle, metaDescription, colorImages, colorStock, ...rest} = p;
+    const {img, printOptions, metaTitle, metaDescription, colorImages, colorStock, view360, model3d, ...rest} = p;
     return {
       ...rest,
       images: img || [],
       color_images: colorImages || {},
       color_stock: colorStock || {},
+      view_360: view360 || [],
+      model_url: model3d || "",
       profession: (p.professions && p.professions[0]) || p.profession || "",
       professions: p.professions || (p.profession ? [p.profession] : []),
       purpose: (p.purposes && p.purposes[0]) || p.purpose || "",
@@ -101,7 +106,7 @@ const BazDS = (function(){
     // keep stripping whichever migratable column the latest error names and
     // retrying, until the save succeeds or the error is something else
     // entirely (a real problem, not a missing-migration one).
-    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images","color_stock","trending"];
+    const MIGRATABLE_COLUMNS = ["purposes","occasions","color_images","color_stock","trending","view_360","model_url"];
     let safeRow = {...row};
     let stripped = [];
     let data, error;
@@ -119,7 +124,10 @@ const BazDS = (function(){
       console.warn(`Product saved, but these newer fields couldn't be saved because their migration hasn't been run yet in Supabase: ${stripped.join(", ")}. Run the matching .sql file(s) from the supabase/ folder in the Supabase SQL Editor.`);
     }
     if(error){ console.error("upsertProduct:", error.message); throw error; }
-    return dbToApp(data);
+    const saved = dbToApp(data);
+    // let the admin UI warn when a newer field (e.g. trending / 360° view) was dropped because its migration hasn't been run
+    if(stripped.length) Object.defineProperty(saved, "__stripped", {value: stripped});
+    return saved;
   }
 
   async function deleteProduct(id){
@@ -203,7 +211,9 @@ const BazDS = (function(){
       purposes: (data.purposes && data.purposes.length) ? data.purposes : DEFAULT_PURPOSES_FALLBACK,
       occasions: (data.occasions && data.occasions.length) ? data.occasions : DEFAULT_OCCASIONS_FALLBACK,
       customProfessions: data.custom_professions || [],
-      homepageQuestions: (data.homepage_questions && data.homepage_questions.length) ? data.homepage_questions : DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK
+      homepageQuestions: (data.homepage_questions && data.homepage_questions.length) ? data.homepage_questions : DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK,
+      // [{name, logo}] shown in the homepage "Trusted by" strip (add_360_view.sql adds the column)
+      trustedBrands: Array.isArray(data.trusted_brands) ? data.trusted_brands : []
     };
   }
 
@@ -238,6 +248,19 @@ const BazDS = (function(){
       throw migrationErr;
     }
     if(error){ console.error("updateSettings:", error.message); throw error; }
+    return true;
+  }
+
+  /** Saved on its own (not part of updateSettings) so a database that hasn't run add_360_view.sql yet
+      never breaks the other settings saves. */
+  async function updateTrustedBrands(list){
+    const sb = getClient(); if(!sb) return false;
+    const { error } = await sb.from("settings").update({ trusted_brands: list }).eq("id",1);
+    if(error){
+      console.error("updateTrustedBrands:", error.message);
+      if(/trusted_brands/i.test(error.message)) throw new Error("Pehle supabase/add_360_view.sql Supabase SQL Editor me run karo, phir brands save honge.");
+      throw error;
+    }
     return true;
   }
 
@@ -320,6 +343,15 @@ const BazDS = (function(){
     if(error){ console.error("uploadImage:", error.message); throw error; }
     const { data } = sb.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
+  }
+
+  /** Upload any file as-is (no image optimisation) — used for 3D models (.glb). */
+  async function uploadFile(file, folder){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g,"")}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, file, { cacheControl:"3600", upsert:false, contentType: file.type || "model/gltf-binary" });
+    if(error){ console.error("uploadFile:", error.message); throw error; }
+    return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
   }
 
   /* ---------- auth ---------- */
@@ -595,8 +627,8 @@ const BazDS = (function(){
   return {
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
-    getSettings, updateSettings,
-    logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
+    getSettings, updateSettings, updateTrustedBrands,
+    logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage, uploadFile,
     signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus, updatePosSale,

@@ -1382,6 +1382,8 @@ function initProductPage(){
   el.innerHTML = `
     <div class="pd-layout">
       <div class="reveal-left">
+        <div class="pd-view-tabs" id="pdViewTabs" hidden></div>
+        <div class="pd-viewer" id="pdViewer" hidden></div>
         <div class="pd-gallery-grid" id="pdGalleryGrid"></div>
         <div class="pd-gallery-dots" id="pdGalleryDots"></div>
       </div>
@@ -1521,6 +1523,7 @@ function initProductPage(){
   const firstColorHex = p.colors[0];
   const firstColorImgs = p.colorImages && firstColorHex ? p.colorImages[firstColorHex] : null;
   renderPdGallery(firstColorImgs && firstColorImgs.length ? firstColorImgs : null);
+  initProductViews(p);
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
@@ -2078,7 +2081,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
-  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), ()=>renderCollections("#collGrid"), initCollSlider,
+  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
@@ -2116,3 +2119,141 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(!ok) cmp.checked = inCompare(id);
   });
 });
+
+
+/* ================= 360° SPIN + 3D MODEL VIEWER (product page) =================
+   Admin → Edit Product → "360° / 3D view". Two optional media types:
+   - p.view360: ordered frame photos → drag to rotate (auto-spins until touched), wheel / pinch / +− to zoom.
+   - p.model3d: a .glb URL → Google <model-viewer>: orbit from any angle, zoom, auto-rotate.
+   Tabs (Photos / 360° / 3D) only appear when the product actually has that media. */
+function initProductViews(p){
+  const tabs = document.querySelector("#pdViewTabs"), viewer = document.querySelector("#pdViewer");
+  const grid = document.querySelector("#pdGalleryGrid"), dots = document.querySelector("#pdGalleryDots");
+  if(!tabs || !viewer) return;
+  const frames = Array.isArray(p.view360) ? p.view360.filter(Boolean) : [];
+  const model = p.model3d || "";
+  if(frames.length < 2 && !model) return;
+  const defs = [{id:"photos", label:"📷 Photos"}];
+  if(frames.length >= 2) defs.push({id:"spin", label:"🔄 360° View"});
+  if(model) defs.push({id:"model", label:"🧊 3D Model"});
+  tabs.hidden = false;
+  tabs.innerHTML = defs.map((d,i)=>`<button type="button" class="pd-view-tab${i===0?' active':''}" data-view="${d.id}">${d.label}</button>`).join("");
+  let cleanup = null;
+  function show(id){
+    tabs.querySelectorAll(".pd-view-tab").forEach(b=>b.classList.toggle("active", b.dataset.view===id));
+    if(cleanup){ cleanup(); cleanup = null; }
+    viewer.innerHTML = "";
+    const photos = id==="photos";
+    viewer.hidden = photos; grid.style.display = photos ? "" : "none"; if(dots) dots.style.display = photos ? "" : "none";
+    if(id==="spin") cleanup = mountSpinViewer(viewer, frames, p.name);
+    if(id==="model") cleanup = mountModelViewer(viewer, model, p.name);
+  }
+  tabs.addEventListener("click", (e)=>{ const b = e.target.closest(".pd-view-tab"); if(b) show(b.dataset.view); });
+}
+
+function mountSpinViewer(root, frames, alt){
+  root.innerHTML = `<div class="spin-stage" tabindex="0" aria-label="360 degree view of ${alt||'product'}">
+      <img class="spin-img" alt="${alt||''}" draggable="false">
+      <div class="spin-loading">Loading 360° view…</div>
+      <div class="spin-hint">⟷ Drag to rotate · scroll / pinch to zoom</div>
+      <div class="spin-ctrl">
+        <button type="button" data-a="zin" aria-label="Zoom in">＋</button>
+        <button type="button" data-a="zout" aria-label="Zoom out">－</button>
+        <button type="button" data-a="play" aria-label="Auto rotate">⏯</button>
+      </div>
+    </div>`;
+  const stage = root.querySelector(".spin-stage"), img = root.querySelector(".spin-img"), loading = root.querySelector(".spin-loading");
+  let idx = 0, zoom = 1, ox = 50, oy = 50, playing = true, dragging = false, startX = 0, startIdx = 0, timer = null, alive = true;
+  const n = frames.length;
+  const render = ()=>{ img.src = frames[((idx % n) + n) % n]; img.style.transform = `scale(${zoom})`; img.style.transformOrigin = `${ox}% ${oy}%`; };
+  // preload every frame so rotating is instant
+  let loaded = 0;
+  frames.forEach(u=>{ const im = new Image(); im.onload = im.onerror = ()=>{ if(++loaded >= n) loading.style.display = "none"; }; im.src = u; });
+  render();
+  const setZoom = (z, e)=>{
+    zoom = Math.min(4, Math.max(1, z));
+    if(e){ const r = stage.getBoundingClientRect(); ox = ((e.clientX - r.left)/r.width)*100; oy = ((e.clientY - r.top)/r.height)*100; }
+    if(zoom===1){ ox = 50; oy = 50; }
+    stage.classList.toggle("zoomed", zoom>1);
+    render();
+  };
+  const tick = ()=>{ if(!alive) return; if(playing && !dragging){ idx = (idx + 1) % n; render(); } timer = setTimeout(tick, 110); };
+  timer = setTimeout(tick, 600);
+  const stepPx = Math.max(6, 360 / n); // pixels of drag per frame
+  stage.addEventListener("pointerdown", (e)=>{ if(e.target.closest(".spin-ctrl")) return; dragging = true; playing = false; startX = e.clientX; startIdx = idx; stage.setPointerCapture(e.pointerId); stage.classList.add("grabbing"); root.querySelector(".spin-hint").style.opacity = 0; });
+  stage.addEventListener("pointermove", (e)=>{
+    if(zoom>1 && !dragging){ const r = stage.getBoundingClientRect(); ox = ((e.clientX - r.left)/r.width)*100; oy = ((e.clientY - r.top)/r.height)*100; render(); }
+    if(!dragging) return;
+    idx = startIdx - Math.round((e.clientX - startX)/stepPx); render();
+  });
+  const end = ()=>{ dragging = false; stage.classList.remove("grabbing"); };
+  stage.addEventListener("pointerup", end); stage.addEventListener("pointercancel", end);
+  stage.addEventListener("wheel", (e)=>{ e.preventDefault(); setZoom(zoom + (e.deltaY<0 ? .25 : -.25), e); }, {passive:false});
+  stage.addEventListener("dblclick", (e)=> setZoom(zoom>1 ? 1 : 2.2, e));
+  stage.addEventListener("keydown", (e)=>{ if(e.key==="ArrowLeft"){ playing=false; idx--; render(); } if(e.key==="ArrowRight"){ playing=false; idx++; render(); } });
+  // pinch-to-zoom (two pointers)
+  const pts = new Map(); let pinch0 = 0, zoom0 = 1;
+  stage.addEventListener("pointerdown", (e)=>{ pts.set(e.pointerId, e); if(pts.size===2){ const [a,b] = [...pts.values()]; pinch0 = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); zoom0 = zoom; dragging = false; } });
+  stage.addEventListener("pointermove", (e)=>{ if(!pts.has(e.pointerId)) return; pts.set(e.pointerId, e); if(pts.size===2 && pinch0){ const [a,b] = [...pts.values()]; setZoom(zoom0 * Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY)/pinch0); } });
+  const up = (e)=>{ pts.delete(e.pointerId); if(pts.size<2) pinch0 = 0; };
+  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  root.querySelector(".spin-ctrl").addEventListener("click", (e)=>{
+    const a = e.target.closest("button")?.dataset.a; if(!a) return;
+    if(a==="zin") setZoom(zoom + .5); if(a==="zout") setZoom(zoom - .5); if(a==="play") playing = !playing;
+  });
+  return ()=>{ alive = false; clearTimeout(timer); };
+}
+
+let _modelViewerLoading = null;
+function loadModelViewerLib(){
+  if(window.customElements && customElements.get("model-viewer")) return Promise.resolve();
+  if(_modelViewerLoading) return _modelViewerLoading;
+  _modelViewerLoading = new Promise((resolve, reject)=>{
+    const s = document.createElement("script");
+    s.type = "module";
+    s.src = "https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js";
+    s.onload = resolve; s.onerror = ()=>{ _modelViewerLoading = null; reject(new Error("3D viewer could not load")); };
+    document.head.appendChild(s);
+  });
+  return _modelViewerLoading;
+}
+function mountModelViewer(root, url, alt){
+  root.innerHTML = `<div class="model-stage"><div class="spin-loading">Loading 3D model…</div></div>`;
+  const stage = root.querySelector(".model-stage");
+  let dead = false;
+  loadModelViewerLib().then(()=>{
+    if(dead) return;
+    stage.innerHTML = `<model-viewer src="${url}" alt="3D model of ${alt||'product'}" camera-controls auto-rotate auto-rotate-delay="1500" touch-action="pan-y" shadow-intensity="1" exposure="1.05" interaction-prompt="auto" style="width:100%;height:100%;background:transparent"></model-viewer>
+      <div class="spin-hint">Drag to orbit · scroll / pinch to zoom · right-drag to pan</div>`;
+  }).catch(()=>{ stage.innerHTML = `<div class="spin-loading">Sorry — the 3D model could not be loaded.</div>`; });
+  return ()=>{ dead = true; };
+}
+
+
+/* ---------- homepage: "Trusted by" brand logos (Admin → Site Settings → Trusted by) ----------
+   When the admin has added brands, the strip shows their logos (or the name if no logo) in the same
+   auto-scrolling marquee. With none added it keeps the sample chips already in index.html. */
+function renderTrustedBrands(){
+  const strip = document.querySelector(".logostrip"); if(!strip) return;
+  const brands = (SETTINGS.trustedBrands || []).filter(b=>b && (b.logo || b.name));
+  if(!brands.length) return;
+  const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const chip = b => b.logo
+    ? `<div class="logochip logochip-img" title="${esc(b.name)}"><img src="${esc(b.logo)}" alt="${esc(b.name)}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc(b.name).replace(/'/g,"")}'))"></div>`
+    : `<div class="logochip"><span class="dot"></span>${esc(b.name)}</div>`;
+  // repeat the list until it is wide enough, then double it — the CSS animation scrolls exactly 50%
+  let seq = brands.slice();
+  while(seq.length < 8) seq = seq.concat(brands);
+  const html = seq.map(chip).join("");
+  strip.innerHTML = html + html;
+}
+
+/* ---------- homepage: "Trending Now" — products the admin starred (Edit Product → ★ Trending) ---------- */
+function renderTrendingNow(){
+  const sec = document.querySelector("#trendingSection"), grid = document.querySelector("#trendingGrid");
+  if(!sec || !grid) return;
+  const list = publishedProducts().filter(p=>p.trending);
+  if(!list.length){ sec.hidden = true; return; }
+  sec.hidden = false;
+  renderGrid("#trendingGrid", list.slice(0,8));
+}

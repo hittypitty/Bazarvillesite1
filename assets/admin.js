@@ -279,6 +279,44 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       }).join("");
   }
 
+  /* ---------- stock QUANTITY ----------
+     product.colorStock holds the numbers: one key per colour that has a quantity set, plus "_total" for
+     products tracked as a single number (no colour split). Missing = not tracked (plain in/out flag only). */
+  function stockTotal(p){
+    const vals = Object.values(p.colorStock||{}).filter(v=>v!=null && !isNaN(v)).map(Number);
+    return vals.length ? vals.reduce((s,v)=>s+v,0) : null;
+  }
+  /* Remove qty (negative qty = put back). Returns true if a tracked number was changed. Flips the
+     in/out flag automatically when the tracked total hits 0 (and back when stock returns). */
+  function deductStock(p, color, qty){
+    if(!p || !qty) return false;
+    const cs = p.colorStock || {};
+    const key = (color && cs[color]!=null) ? color : (cs._total!=null ? "_total" : null);
+    if(!key) return false;
+    const before = stockTotal(p);
+    p.colorStock = {...cs, [key]: Math.max(0, Number(cs[key]) - qty)};
+    const after = stockTotal(p);
+    if(after<=0) p.stock = false;
+    else if(before<=0 && after>0) p.stock = true;
+    return true;
+  }
+  function stockLeftLabel(p){
+    const t = stockTotal(p);
+    return t==null ? "" : ` · ${t} left`;
+  }
+  async function saveStockQty(id, key, value){
+    const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
+    const cs = {...(p.colorStock||{})};
+    if(value==="") delete cs[key]; else cs[key] = Math.max(0, Math.round(Number(value)||0));
+    p.colorStock = cs;
+    const t = stockTotal(p);
+    if(t!=null) p.stock = t>0;
+    try{ await BazDS.upsertProduct(p); posToast("Stock saved"); }
+    catch(err){ posToast("Could not save stock: " + (err.message||""), "error"); }
+    renderInventoryView(); renderProductsTable(); renderDashboard();
+    if(typeof renderPosProductList==="function") renderPosProductList();
+  }
+
   /* ================= INVENTORY ================= */
   // A faster, dedicated in-stock/out-of-stock control surface on top of the
   // same PRODUCTS array/`stock` boolean the Products tab and public site
@@ -305,7 +343,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(filter==="in") list = list.filter(p=>p.stock);
     if(filter==="out") list = list.filter(p=>!p.stock);
 
-    table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>MOQ</th><th>Stock</th></tr>` +
+    table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>MOQ</th><th>Available qty</th><th>Stock</th></tr>` +
       (list.length ? list.map(p=>`
         <tr>
           <td><input type="checkbox" class="inv-check" data-id="${p.id}" ${invChecked.has(p.id)?"checked":""}></td>
@@ -313,8 +351,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <td><b>${p.name}</b></td>
           <td>${p.cat}</td>
           <td>${p.moq} pcs</td>
+          <td class="inv-qty-cell">${invQtyCellHtml(p)}</td>
           <td><button type="button" class="ad-stock-toggle ${p.stock?'in':'out'}" data-id="${p.id}">${p.stock?'In stock':'Out of stock'}</button></td>
-        </tr>`).join("") : `<tr><td colspan="6"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
+        </tr>`).join("") : `<tr><td colspan="7"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
 
     table.querySelectorAll(".inv-check").forEach(cb=>{
       cb.addEventListener("change", ()=>{
@@ -323,10 +362,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         updateInvBulkButtons();
       });
     });
+    table.querySelectorAll(".inv-qty-input").forEach(inp=>{
+      inp.addEventListener("change", ()=> saveStockQty(Number(inp.dataset.id), inp.dataset.key, inp.value.trim()));
+    });
     table.querySelectorAll(".ad-stock-toggle").forEach(btn=>{
       btn.addEventListener("click", ()=> AdminUI.toggleStock(Number(btn.dataset.id)));
     });
     updateInvBulkButtons();
+  }
+  function invQtyCellHtml(p){
+    const cs = p.colorStock||{};
+    const colors = (p.colors||[]);
+    if(colors.length){
+      const total = stockTotal(p);
+      return `<div class="inv-qty-colors">` + colors.map(c=>`
+        <label class="inv-qty-row" title="${c}"><i class="pos-cart-dot" style="background:${c}"></i>
+          <input type="number" min="0" class="inv-qty-input" data-id="${p.id}" data-key="${c}" value="${cs[c]!=null?cs[c]:""}" placeholder="—"></label>`).join("") +
+        `</div>${total!=null?`<div class="inv-qty-total">${total} left</div>`:`<div class="inv-qty-total muted">Not tracked</div>`}`;
+    }
+    return `<input type="number" min="0" class="inv-qty-input inv-qty-single" data-id="${p.id}" data-key="_total" value="${cs._total!=null?cs._total:""}" placeholder="Qty">`;
   }
   function updateInvBulkButtons(){
     const any = invChecked.size > 0;
@@ -498,7 +552,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="pos-product-body">
           <b class="pos-product-name">${p.name}</b>
           <div class="pos-product-price">${money(t.price)}</div>
-          <div class="pos-product-stock ${p.stock?'in':'out'}"><i></i>${p.stock?'In Stock':'Out of Stock'}</div>
+          <div class="pos-product-stock ${p.stock?'in':'out'}"><i></i>${p.stock?'In Stock':'Out of Stock'}${stockLeftLabel(p)}</div>
           <button type="button" class="btn btn-outline btn-sm pos-product-addbtn" data-id="${p.id}">+ Add</button>
         </div>
       </div>`;
@@ -672,15 +726,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         subtotal,
         notes: [billNo?`Bill No: ${billNo}`:"", note].filter(Boolean).join(" — ")
       });
-      // Best-effort: deduct from tracked colour stock wherever a quantity has
-      // actually been set for that colour — never blocks the sale if it fails.
+      // Best-effort: take the sold qty off the tracked stock number (per colour, or the product's single
+      // total) — and flip to Out of stock automatically at 0. Never blocks the sale if it fails.
+      const soldTouched = new Set();
       for(const item of posCart){
-        const p = PRODUCTS.find(x=>x.id===item.productId); if(!p || !item.color) continue;
-        const current = (p.colorStock && p.colorStock[item.color]!=null) ? p.colorStock[item.color] : null;
-        if(current==null) continue;
-        p.colorStock = {...p.colorStock, [item.color]: Math.max(0, current-item.qty)};
+        const p = PRODUCTS.find(x=>x.id===item.productId);
+        if(deductStock(p, item.color, item.qty)) soldTouched.add(p);
+      }
+      for(const p of soldTouched){
         try{ await BazDS.upsertProduct(p); }catch(err){ console.error("POS stock deduction failed for", p.name, err); }
       }
+      renderInventoryView(); renderProductsTable();
       posCart = []; document.querySelector("#posCustomerName").value = "";
       if(noteInput) noteInput.value = "";
       const noteRow = document.querySelector("#posNoteRow"); if(noteRow) noteRow.style.display = "none";
@@ -858,7 +914,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.querySelector("#billEditBody").innerHTML = `
       <div class="ad-field"><label>Customer name</label><input id="be_name" value="${(b.customer||"").replace(/"/g,'&quot;')}" placeholder="Walk-in counter sale"></div>
       <div class="be-list">
-        <div class="be-head"><span>Product</span><span>Qty</span><span>Price ₹</span><span>Total</span><span></span></div>
+        <div class="be-head"><span>Product</span><span>Qty</span><span>Price</span><span>Total</span><span></span></div>
         ${b.rows.map((r,idx)=>{
           const it = b.orig[r.i];
           const p = findBillProduct(it);
@@ -872,7 +928,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           return `<div class="be-row ${r.removed?'removed':''}" data-idx="${idx}">
             <span class="be-name"><b>${it.name||"Item"}</b>${variant}${r.removed?`<small class="be-removed">Removed</small>`:""}</span>
             <input type="number" min="0" class="be-qty" value="${r.qty}" ${r.removed?"disabled":""}>
-            <input type="number" min="0" class="be-price" value="${r.price}" ${r.removed?"disabled":""}>
+            <span class="be-priceval">${money(Number(r.price)||0)}</span>
             <b class="be-line">${r.removed?"—":money((Number(r.qty)||0)*(Number(r.price)||0))}</b>
             <button type="button" class="ad-icon-btn ${r.removed?'':'danger'} be-toggle" title="${r.removed?'Restore line':'Remove line'}">${r.removed?"↩️":"🗑️"}</button>
           </div>`;}).join("")}
@@ -899,7 +955,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const row = e.target.closest(".be-row"); if(!row) return;
       const r = editingBill.rows[Number(row.dataset.idx)];
       if(e.target.classList.contains("be-qty")) r.qty = e.target.value;
-      if(e.target.classList.contains("be-price")) r.price = e.target.value;
       row.querySelector(".be-line").textContent = money((Number(r.qty)||0)*(Number(r.price)||0));
       document.querySelector("#be_total").textContent = money(billEditTotal());
     });
@@ -935,13 +990,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // stock: the original colour gets the old qty back, the (possibly new) colour is charged the new qty.
       // Only colours that have tracked stock are touched.
       const touched = new Set();
-      const bump = (p, color, delta)=>{
-        if(!p || !color || !delta) return;
-        const cur = (p.colorStock && p.colorStock[color]!=null) ? p.colorStock[color] : null;
-        if(cur==null) return;
-        p.colorStock = {...p.colorStock, [color]: Math.max(0, cur + delta)};
-        touched.add(p);
-      };
+      const bump = (p, color, delta)=>{ if(deductStock(p, color, -delta)) touched.add(p); };
       b.rows.forEach(r=>{
         const it = b.orig[r.i], p = findBillProduct(it);
         const newQty = (r.removed || !(Number(r.qty)>0)) ? 0 : Math.round(Number(r.qty));
@@ -1101,6 +1150,33 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <button class="btn btn-outline btn-sm" id="pf_addTier" type="button">+ Add price tier</button>
       </div>
       <div class="ad-field full">
+        <label>360° / 3D view <span class="ad-hint" style="display:inline;margin-left:6px">(optional — shoppers can rotate, view from every angle and zoom)</span></label>
+        <div class="ad-view360">
+          <div class="ad-view360-col">
+            <b>🔄 360° photos</b>
+            <p class="ad-hint" style="margin:4px 0 8px">Upload the frames of a turntable shoot (e.g. 24–36 photos, in order — files are sorted by name).</p>
+            <div class="ad-view360-strip" id="pf_spinStrip"></div>
+            <input type="file" id="pf_spinInput" accept="image/*" multiple style="display:none">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <button type="button" class="btn btn-outline btn-sm" id="pf_spinAddBtn">⬆ Upload frames</button>
+              <button type="button" class="btn btn-outline btn-sm" id="pf_spinClearBtn">Clear</button>
+            </div>
+            <p class="ad-hint" id="pf_spinStatus" style="margin-top:6px"></p>
+          </div>
+          <div class="ad-view360-col">
+            <b>🧊 3D model (.glb)</b>
+            <p class="ad-hint" style="margin:4px 0 8px">Upload a .glb file (or paste its link). Shoppers can orbit it with the mouse/finger and zoom.</p>
+            <input type="url" id="pf_modelUrl" placeholder="https://…/product.glb" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+            <input type="file" id="pf_modelInput" accept=".glb,.gltf,model/gltf-binary" style="display:none">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+              <button type="button" class="btn btn-outline btn-sm" id="pf_modelUploadBtn">⬆ Upload .glb</button>
+              <button type="button" class="btn btn-outline btn-sm" id="pf_modelClearBtn">Remove</button>
+            </div>
+            <p class="ad-hint" id="pf_modelStatus" style="margin-top:6px"></p>
+          </div>
+        </div>
+      </div>
+      <div class="ad-field full">
         <label>Product images</label>
         <div class="ad-img-grid" id="pf_imgGrid"></div>
         <input type="file" id="pf_imgInput" accept="image/*" multiple style="display:none">
@@ -1148,6 +1224,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   /* ---------- colour / size tag chips (product form) ---------- */
   let workingColors = [];
   let workingTrending = false;
+  let view360Frames = [];   // ordered image URLs of the 360° spin
+  let model3dUrl = "";      // optional .glb URL
   let workingSizes = [];
   let workingPrintOpts = [];
   let workingColorImages = {}; // {"#1a1a1a": ["url1","url2"]} — optional per-colour gallery override
@@ -1310,6 +1388,44 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <button class="ad-icon-btn danger" type="button" onclick="AdminUI.removeTierRow(${i})">✕</button>
       </div>`).join("");
   }
+  /* ---------- 360° / 3D view controls (product form) ---------- */
+  function renderSpinStrip(){
+    const strip = document.querySelector("#pf_spinStrip"); if(!strip) return;
+    strip.innerHTML = view360Frames.length
+      ? view360Frames.map((u,i)=>`<img src="${u}" alt="Frame ${i+1}" title="Frame ${i+1}">`).join("") + `<span class="ad-view360-count">${view360Frames.length} frames</span>`
+      : `<span class="ad-hint" style="margin:0">No 360° frames yet.</span>`;
+  }
+  function initView360Controls(){
+    renderSpinStrip();
+    const modelInput = document.querySelector("#pf_modelUrl"); if(modelInput) modelInput.value = model3dUrl;
+    const spinStatus = document.querySelector("#pf_spinStatus"), modelStatus = document.querySelector("#pf_modelStatus");
+    document.querySelector("#pf_spinAddBtn").addEventListener("click", ()=>document.querySelector("#pf_spinInput").click());
+    document.querySelector("#pf_spinInput").addEventListener("change", async (e)=>{
+      const files = Array.from(e.target.files||[]).sort((a,b)=>a.name.localeCompare(b.name, undefined, {numeric:true}));
+      e.target.value = "";
+      if(!files.length) return;
+      const urls = [];
+      for(let i=0;i<files.length;i++){
+        spinStatus.textContent = `Uploading frame ${i+1} of ${files.length}…`;
+        try{ urls.push(await BazDS.uploadImage(files[i], "view360")); }
+        catch(err){ spinStatus.textContent = "Upload failed: " + (err.message||""); return; }
+      }
+      view360Frames = view360Frames.concat(urls);
+      spinStatus.textContent = `${urls.length} frame(s) added.`;
+      renderSpinStrip();
+    });
+    document.querySelector("#pf_spinClearBtn").addEventListener("click", ()=>{ view360Frames = []; spinStatus.textContent = ""; renderSpinStrip(); });
+    modelInput.addEventListener("input", ()=>{ model3dUrl = modelInput.value.trim(); });
+    document.querySelector("#pf_modelUploadBtn").addEventListener("click", ()=>document.querySelector("#pf_modelInput").click());
+    document.querySelector("#pf_modelInput").addEventListener("change", async (e)=>{
+      const f = e.target.files && e.target.files[0]; e.target.value = "";
+      if(!f) return;
+      modelStatus.textContent = "Uploading 3D model…";
+      try{ model3dUrl = await BazDS.uploadFile(f, "models"); modelInput.value = model3dUrl; modelStatus.textContent = "3D model uploaded ✓"; }
+      catch(err){ modelStatus.textContent = "Upload failed: " + (err.message||"") + " (file too large? Supabase free plan allows ~50 MB)"; }
+    });
+    document.querySelector("#pf_modelClearBtn").addEventListener("click", ()=>{ model3dUrl = ""; modelInput.value = ""; modelStatus.textContent = ""; });
+  }
   let workingTiers = [];
   window.AdminUI = window.AdminUI || {};
   AdminUI.removeTierRow = (i)=>{ workingTiers.splice(i,1); renderTierRows(workingTiers); };
@@ -1363,6 +1479,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // Manual Trending override — same "lives in the header, not the
     // scrollable form body" reasoning as Status above.
     workingTrending = !!(p && p.trending);
+    view360Frames = (p && Array.isArray(p.view360)) ? p.view360.slice() : [];
+    model3dUrl = (p && p.model3d) || "";
     const trendingBtn = document.querySelector("#pf_trendingToggle");
     trendingBtn.classList.toggle("active", workingTrending);
     trendingBtn.onclick = ()=>{ workingTrending = !workingTrending; trendingBtn.classList.toggle("active", workingTrending); };
@@ -1372,6 +1490,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderColorChips();
     renderSizeChips();
     renderPrintOptChips();
+    initView360Controls();
     document.querySelector("#pf_addPrintOptBtn").addEventListener("click", ()=>{
       const input = document.querySelector("#pf_printOptInput");
       const val = input.value.trim();
@@ -1621,6 +1740,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         return valid.length ? valid : [{min:1, price:0}];
       })(),
       img: productImages,
+      // Not editable in this form — carry them over, otherwise every product edit would wipe the stock quantities.
+      colorStock: ((editingProductId && PRODUCTS.find(x=>x.id===editingProductId)) || {}).colorStock || {},
+      view360: view360Frames.slice(),
+      model3d: model3dUrl || "",
       metaTitle: document.querySelector("#pf_metaTitle").value.trim(),
       metaDescription: document.querySelector("#pf_metaDesc").value.trim(),
       slug: document.querySelector("#pf_slug").value.trim() || slugify(name)
@@ -1631,6 +1754,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(editingProductId) PRODUCTS = PRODUCTS.map(p=>p.id===editingProductId?saved:p);
       else PRODUCTS.push(saved);
       closeProductModal();
+      if(saved.__stripped && saved.__stripped.length){
+        const names = {trending:"Trending", view_360:"360° view", model_url:"3D model"};
+        const lost = saved.__stripped.filter(c=>names[c]).map(c=>names[c]);
+        if(lost.length) posToast(`Saved, but "${lost.join(", ")}" was NOT stored — run the matching SQL (supabase/add_trending.sql / add_360_view.sql) in Supabase first.`, "error");
+      }
       renderProductsTable();
       renderDashboard();
     }catch(err){
@@ -1763,6 +1891,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(waInput) waInput.value = SETTINGS.whatsappNumber || "";
     const homeQInput = document.querySelector("#settingsHomeQuestions");
     if(homeQInput) homeQInput.value = (SETTINGS.homepageQuestions || []).join("\n");
+    renderTrustedBrandsAdmin();
     const row = document.querySelector("#heroUploadRow"); if(!row) return;
     row.innerHTML = [0,1,2].map(i=>`
       <div class="ad-hero-slot">
@@ -1794,6 +1923,40 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try{ await BazDS.updateSettings(SETTINGS); alert("WhatsApp number saved."); }
     catch(err){ alert("Could not save: " + err.message); }
     finally{ busy(saveWaBtn, false); }
+  });
+
+  /* ---------- Trusted by: brands + logos (Settings) ---------- */
+  function renderTrustedBrandsAdmin(){
+    const el = document.querySelector("#trustedBrandsList"); if(!el) return;
+    const list = SETTINGS.trustedBrands || [];
+    el.innerHTML = list.length ? list.map((b,i)=>`
+      <div class="ad-brand-row">
+        ${b.logo ? `<img src="${b.logo}" alt="">` : `<span class="ad-brand-noimg">No logo</span>`}
+        <b>${b.name||""}</b>
+        <button type="button" class="ad-icon-btn danger" data-i="${i}" title="Remove">🗑️</button>
+      </div>`).join("") : `<p class="ad-hint" style="margin:0 0 10px">No brands added yet.</p>`;
+    el.querySelectorAll("button[data-i]").forEach(btn=>btn.addEventListener("click", async ()=>{
+      const next = (SETTINGS.trustedBrands||[]).filter((_,i)=>i!==Number(btn.dataset.i));
+      try{ await BazDS.updateTrustedBrands(next); SETTINGS.trustedBrands = next; renderTrustedBrandsAdmin(); posToast("Brand removed"); }
+      catch(err){ posToast(err.message||"Could not remove", "error"); }
+    }));
+  }
+  const addBrandBtn = document.querySelector("#addBrandBtn");
+  if(addBrandBtn) addBrandBtn.addEventListener("click", async ()=>{
+    const nameEl = document.querySelector("#addBrandName"), fileEl = document.querySelector("#addBrandLogo"), status = document.querySelector("#addBrandStatus");
+    const name = nameEl.value.trim(), file = fileEl.files && fileEl.files[0];
+    if(!name && !file){ status.textContent = "Brand ka naam ya logo daalo."; return; }
+    busy(addBrandBtn, true, "Saving…");
+    try{
+      let logo = "";
+      if(file){ status.textContent = "Uploading logo…"; logo = await BazDS.uploadImage(file, "brands"); }
+      const next = (SETTINGS.trustedBrands||[]).concat([{name, logo}]);
+      await BazDS.updateTrustedBrands(next);
+      SETTINGS.trustedBrands = next;
+      nameEl.value = ""; fileEl.value = ""; status.textContent = "";
+      renderTrustedBrandsAdmin(); posToast("✅ Brand added");
+    }catch(err){ status.textContent = err.message || "Could not add brand"; }
+    finally{ busy(addBrandBtn, false); }
   });
 
   const saveHomeQuestionsBtn = document.querySelector("#saveHomeQuestionsBtn");
@@ -2377,7 +2540,10 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
         // column says (stale/placeholder/blank values are common on re-upload
         // for something like a price change). Only a brand-new product (no
         // existing match by name) takes its images from the CSV.
-        img: existing ? existing.img : r.images.split("|").map(s=>s.trim()).filter(Boolean)
+        img: existing ? existing.img : r.images.split("|").map(s=>s.trim()).filter(Boolean),
+        colorStock: existing ? (existing.colorStock||{}) : {},
+        view360: existing ? (existing.view360||[]) : [],
+        model3d: existing ? (existing.model3d||"") : ""
       };
       try{
         const saved = await BazDS.upsertProduct(data);
