@@ -947,3 +947,17 @@ body.mnav-lock{overflow:hidden}
 .logostrip{opacity:1}
 .logochip{color:var(--green-ink);background:var(--green-soft);border:1px solid #e0edbb;border-radius:999px;padding:9px 18px;font-size:16px}
 .logochip .dot{background:var(--lime);box-shadow:0 0 0 3px rgba(159,196,0,.28);border-radius:50%}
+
+/* Footer social icons — real brand colours (Vikas: insta pink, Facebook blue) */
+.fsocial-ic{border:0;color:#fff;box-shadow:0 6px 14px -6px rgba(0,0,0,.5)}
+.fsocial-ic[aria-label="Instagram"]{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
+.fsocial-ic[aria-label="Facebook"]{background:#1877f2}
+.fsocial-ic[aria-label="LinkedIn"]{background:#0a66c2}
+.fsocial-ic:hover{border:0;color:#fff;transform:translateY(-3px) scale(1.08);filter:brightness(1.1);box-shadow:0 10px 20px -6px rgba(0,0,0,.55)}
+.fsocial-ic[aria-label="Instagram"]:hover{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
+.fsocial-ic[aria-label="Facebook"]:hover{background:#1877f2}
+.fsocial-ic[aria-label="LinkedIn"]:hover{background:#0a66c2}
+.contact-social a{display:inline-flex;align-items:center;gap:8px}
+.cs-ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none}
+.cs-fb{background:#1877f2}.cs-li{background:#0a66c2}
+.cs-ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
