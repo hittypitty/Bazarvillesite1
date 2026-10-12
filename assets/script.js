@@ -985,6 +985,9 @@ function openQuickView(id){
 function initMobileNav(){
   const menuBtn = document.querySelector(".menu-btn");
   if(!menuBtn || document.querySelector("#mobileNavDrawer")) return;
+  // Hamburger lives on the LEFT of the header on mobile (Vikas) — move it out of the right-hand actions group.
+  const navin = document.querySelector(".navin");
+  if(navin && menuBtn.parentElement !== navin) navin.insertBefore(menuBtn, navin.firstChild);
   const overlay = document.createElement("div");
   overlay.id = "mobileNavOverlay"; overlay.className = "mnav-overlay";
   const drawer = document.createElement("nav");

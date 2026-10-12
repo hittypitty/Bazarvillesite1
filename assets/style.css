@@ -1003,3 +1003,15 @@ body.mnav-lock{overflow:hidden}
 
 /* Vikas: Compare checkbox removed from product cards */
 .cmp-check,.compare-bar{display:none!important}
+
+/* Vikas (Oct 12): mobile — search is just the round icon (tap to expand), hamburger on the LEFT */
+@media(max-width:640px){
+  .nav-search{width:auto;padding:0;border-color:transparent;background:transparent;box-shadow:none}
+  .nav-search:hover,.nav-search:focus-within{box-shadow:none;transform:none}
+  .nav-search .nav-search-input{display:none}
+  .nav-search.open{width:min(56vw,210px);padding:4px 4px 4px 14px;background:#fff;border-color:var(--line)}
+  .nav-search.open .nav-search-input{display:block;flex:1;font-size:13px}
+}
+@media(max-width:1000px){
+  .navin>.menu-btn{order:-1;margin-right:-8px;display:grid;place-items:center;width:40px;height:40px;font-size:24px;line-height:1}
+}
