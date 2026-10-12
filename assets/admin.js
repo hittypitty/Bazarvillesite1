@@ -457,11 +457,24 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
   }
 
+  /* POS unit price. tierFor() returns the tier whose Min qty the quantity reaches, and falls back to
+     tiers[0] below the first Min qty. If that tier is ₹0 (e.g. a "1 pc → ₹0" placeholder row with the
+     real price starting at 10), POS showed ₹0 until qty hit 10. Here a ₹0 result falls back to the
+     nearest tier that actually has a price, so 1 pc is billed at the lowest real slab price. */
+  function posUnitPrice(p, qty){
+    const t = tierFor(p, qty);
+    if(t && t.price > 0) return t.price;
+    const priced = (p && Array.isArray(p.tiers) ? p.tiers : []).filter(x=>x.price>0).sort((a,b)=>a.min-b.min);
+    if(!priced.length) return 0;
+    let pick = priced[0];
+    for(const x of priced){ if(qty >= x.min) pick = x; }
+    return pick.price;
+  }
   function renderPosProductList(){
     const wrap = document.querySelector("#posProductList"); if(!wrap) return;
     const list = filteredPosProducts();
     wrap.innerHTML = list.length ? list.map(p=>{
-      const t = tierFor(p, p.moq);
+      const t = {price: posUnitPrice(p, 1)};
       return `
       <div class="pos-product-card" data-id="${p.id}">
         <div class="pos-product-img"><img src="${(p.img&&p.img[0])||''}" alt="" loading="lazy"></div>
@@ -481,7 +494,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function quickAddDirect(productId){
     const p = PRODUCTS.find(x=>x.id===productId); if(!p) return;
     const color = (p.colors&&p.colors[0])||"", size = (p.sizes&&p.sizes[0])||"";
-    const t = tierFor(p, 1);
+    const t = {price: posUnitPrice(p, 1)};
     posCart.push({productId:p.id, name:p.name, color, size, qty:1, price:t.price, img:(p.img&&p.img[0])||""});
     renderPosCart();
   }
@@ -499,7 +512,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   function renderPosQuickAdd(){
     const p = posQaProduct; if(!p) return;
-    const t = tierFor(p, posQaSel.qty);
+    const t = {price: posUnitPrice(p, posQaSel.qty)};
     const stockVal = (p.colorStock && posQaSel.color && p.colorStock[posQaSel.color]!=null) ? p.colorStock[posQaSel.color] : "";
     document.querySelector("#posQuickAddBody").innerHTML = `
       <div class="pos-qa-top">
@@ -543,7 +556,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if(posQaAddBtn) posQaAddBtn.addEventListener("click", ()=>{
     const p = posQaProduct; if(!p) return;
     const qty = Math.max(1, posQaSel.qty);
-    const t = tierFor(p, qty);
+    const t = {price: posUnitPrice(p, qty)};
     posCart.push({productId:p.id, name:p.name, color:posQaSel.color, size:posQaSel.size, qty, price:t.price, img:(p.img&&p.img[0])||""});
     renderPosCart();
     closePosQuickAdd();
@@ -597,7 +610,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(newQty === item.qty) return;
     const p = PRODUCTS.find(x=>x.id===item.productId);
     item.qty = newQty;
-    if(p) item.price = tierFor(p, newQty).price; // recompute bulk-tier price at the new qty
+    if(p) item.price = posUnitPrice(p, newQty); // recompute bulk-tier price at the new qty
     renderPosCart();
   }
   function clearCart(){
