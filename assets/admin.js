@@ -282,6 +282,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   /* ---------- stock QUANTITY ----------
      product.colorStock holds the numbers: one key per colour that has a quantity set, plus "_total" for
      products tracked as a single number (no colour split). Missing = not tracked (plain in/out flag only). */
+  const STOCK_SQL_MSG = "Stock quantity DB me save nahi hui — Supabase SQL Editor me supabase/add_pos.sql run karo (products.color_stock column missing hai).";
+  function stockWasStripped(saved){ return !!(saved && saved.__stripped && saved.__stripped.includes("color_stock")); }
   function stockTotal(p){
     const vals = Object.values(p.colorStock||{}).filter(v=>v!=null && !isNaN(v)).map(Number);
     return vals.length ? vals.reduce((s,v)=>s+v,0) : null;
@@ -311,7 +313,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     p.colorStock = cs;
     const t = stockTotal(p);
     if(t!=null) p.stock = t>0;
-    try{ await BazDS.upsertProduct(p); posToast("Stock saved"); }
+    try{ const sv = await BazDS.upsertProduct(p); if(stockWasStripped(sv)) posToast(STOCK_SQL_MSG,"error"); else posToast("Stock saved"); }
     catch(err){ posToast("Could not save stock: " + (err.message||""), "error"); }
     renderInventoryView(); renderProductsTable(); renderDashboard();
     if(typeof renderPosProductList==="function") renderPosProductList();
@@ -733,8 +735,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         const p = PRODUCTS.find(x=>x.id===item.productId);
         if(deductStock(p, item.color, item.qty)) soldTouched.add(p);
       }
+      let stockWarn = false;
       for(const p of soldTouched){
-        try{ await BazDS.upsertProduct(p); }catch(err){ console.error("POS stock deduction failed for", p.name, err); }
+        try{ const sv = await BazDS.upsertProduct(p); if(stockWasStripped(sv)) stockWarn = true; }catch(err){ console.error("POS stock deduction failed for", p.name, err); stockWarn = true; }
       }
       renderInventoryView(); renderProductsTable();
       posCart = []; document.querySelector("#posCustomerName").value = "";
@@ -745,6 +748,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       try{ allOrdersCache = await BazDS.getOrders(); }catch(err){ console.error(err); }
       renderDashboard();
       posToast("✅ Sale completed");
+      if(stockWarn) posToast("Sale ho gayi, par stock minus nahi hua — "+STOCK_SQL_MSG,"error");
+      else if(!soldTouched.size) posToast("Stock minus nahi hua: in products ki quantity Inventory me set nahi hai (Inventory → Qty bharo).","error");
     }catch(err){ posToast("Could not complete sale: " + (err.message||""), "error"); }
     finally{ busy(btn, false); }
   }
@@ -997,7 +1002,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         bump(p, it.color, +(it.qty||1));
         bump(p, r.color, -newQty);
       });
-      for(const p of touched){ try{ await BazDS.upsertProduct(p); }catch(e){ console.error("Stock adjust failed for", p.name, e); } }
+      for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(stockWasStripped(sv)) posToast(STOCK_SQL_MSG,"error"); }catch(e){ console.error("Stock adjust failed for", p.name, e); } }
       closeBillEdit();
       await loadHistory(); renderPosProductList();
       try{ renderDashboard(); }catch(e){}
