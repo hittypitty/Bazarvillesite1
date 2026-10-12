@@ -903,3 +903,47 @@ body.mnav-lock{overflow:hidden}
   .acct-visual{padding:34px 30px}
   .acct-panel{padding:34px 26px}
 }
+
+/* ===== Vikas feedback (Oct 12): green theme, curved AI search, trusted-by green, edge-to-edge card images ===== */
+:root{--green-deep:#3f7a00;--green-ink:#1f4d0c;--green-soft:#f1f9dc}
+
+/* product card image: fill the frame, no side gaps */
+.pimg img{object-fit:cover;padding:0}
+
+/* 3 gates — all green family */
+.gate.g1{background:linear-gradient(155deg,#eaffb0,var(--lime))}
+.gate.g2{background:linear-gradient(155deg,#ffffff,var(--green-soft));border:1.5px solid var(--lime)}
+.gate.g2 h3,.gate.g2 .go{color:var(--green-ink)}
+.gate.g3{background:linear-gradient(155deg,#2f6b12,var(--green-ink))}
+.gate.g3 h3,.gate.g3 .go{color:#fff}
+.gate.g3 p{color:#d6efb8}
+.gate:hover{box-shadow:0 26px 48px -16px rgba(63,122,0,.4)}
+
+/* nav search: green action button, softly curved pill */
+.nav-search{border-radius:999px;background:var(--green-soft);border-color:#dfeab8}
+.nav-search:hover{border-color:var(--lime-deep)}
+.nav-search:focus-within{border-color:var(--lime-deep);box-shadow:0 0 0 4px rgba(198,240,0,.35),0 8px 20px -10px rgba(63,122,0,.4)}
+.searchbtn{background:var(--lime);color:var(--green-ink);box-shadow:0 4px 12px -4px rgba(159,196,0,.7)}
+.searchbtn:hover{background:var(--lime-deep);color:var(--green-ink)}
+
+/* hero "AI search": big curved pill with glow + green Search button */
+.hq-search{max-width:680px;border-radius:999px;padding:7px 7px 7px 18px;border:1.5px solid #dfeab8;
+  background:linear-gradient(#fff,#fff) padding-box,linear-gradient(120deg,var(--lime),#7bd62b,var(--lime)) border-box;
+  box-shadow:0 18px 44px -18px rgba(95,150,0,.45),0 2px 6px rgba(0,0,0,.04)}
+.hq-search:hover{box-shadow:0 22px 50px -16px rgba(95,150,0,.55),0 2px 6px rgba(0,0,0,.05)}
+.hq-search:focus-within{border-color:transparent;box-shadow:0 0 0 5px rgba(198,240,0,.38),0 22px 50px -16px rgba(95,150,0,.55)}
+.hq-search-icon{display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:50%;background:var(--green-soft);color:var(--green-deep)}
+.hq-search:focus-within .hq-search-icon{color:var(--green-ink);transform:rotate(15deg) scale(1.08)}
+.hq-search-input{padding:14px 10px 14px 6px}
+.hq-search .btn{border-radius:999px;padding:0 28px;min-height:46px;font-weight:700;background:linear-gradient(135deg,var(--lime),#9be022);color:var(--green-ink)}
+@media(max-width:640px){
+  .hq-search{flex-wrap:nowrap;border-radius:999px;padding:6px 6px 6px 12px}
+  .hq-search .btn{flex:0 0 auto;width:auto;margin-top:0;padding:0 16px;min-height:42px;border-radius:999px}
+  .hq-search-input{font-size:14px;min-width:0}
+}
+
+/* Trusted by — green */
+.trusted p{color:var(--green-deep)}
+.logostrip{opacity:1}
+.logochip{color:var(--green-ink);background:var(--green-soft);border:1px solid #e0edbb;border-radius:999px;padding:9px 18px;font-size:16px}
+.logochip .dot{background:var(--lime);box-shadow:0 0 0 3px rgba(159,196,0,.28);border-radius:50%}

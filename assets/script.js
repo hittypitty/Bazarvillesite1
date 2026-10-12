@@ -385,7 +385,6 @@ function productCard(p){
       <div class="pprice-note">ask us on WhatsApp</div>`}
       <div class="pfoot">
         <span class="moqtag">MOQ ${p.moq} pcs</span>
-        ${p.stock? `<a class="wa-mini" title="Quick WhatsApp enquiry" target="_blank" href="${waLink(p, p.bulk)}">🟢</a>` : `<a class="wa-mini" title="Check availability" target="_blank" href="${waLink(p, p.moq)}">🟢</a>`}
       </div>
     </div>
   </div></div>`;
@@ -2016,6 +2015,11 @@ function relativeLuminance(hex){
 }
 function applyBrandColor(hex){
   if(!hex) return;
+  // Site theme is GREEN (Vikas). A saved monochrome/very dark accent (e.g. the old
+  // "Charcoal" preset) turned every button and the search bar black after load, so
+  // those are ignored here and the stylesheet's green stays in place.
+  const {r,g,b} = hexToRgb(hex);
+  if(Math.max(r,g,b)-Math.min(r,g,b) < 40 || relativeLuminance(hex) < .12) return;
   const root = document.documentElement.style;
   root.setProperty("--lime", hex);
   root.setProperty("--lime-deep", darken(hex, .2));
