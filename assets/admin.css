@@ -437,3 +437,22 @@ body.role-super .ad-super-only{display:block}
 .ad-perm-opt input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--ink);cursor:pointer}
 .ad-perms-disabled{opacity:.45;pointer-events:none}
 @media(max-width:560px){ .ad-perm-grid{grid-template-columns:1fr} }
+
+/* ---- Edit POS bill modal ---- */
+.be-list{margin-top:6px}
+.be-head,.be-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 92px 92px 38px;gap:10px;align-items:center}
+.be-head{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:0 0 8px;border-bottom:1px solid var(--line)}
+.be-row{padding:10px 0;border-bottom:1px solid var(--line)}
+.be-row input{width:100%;min-width:0;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;background:#fff}
+.be-row input:focus{outline:none;border-color:var(--lime-deep);box-shadow:0 0 0 3px rgba(198,240,0,.3)}
+.be-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.be-name b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.be-name small{color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.be-removed{color:#c0392b!important;font-weight:700}
+.be-row.removed{opacity:.55}
+.be-total{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:12px 14px;background:var(--soft);border-radius:12px;font-size:16px}
+@media(max-width:560px){
+  .be-head{display:none}
+  .be-row{grid-template-columns:1fr 1fr 38px;grid-template-areas:"name name name" "qty price del" "line line line"}
+  .be-name{grid-area:name}.be-qty{grid-area:qty}.be-price{grid-area:price}.be-toggle{grid-area:del}.be-line{grid-area:line;text-align:right}
+}

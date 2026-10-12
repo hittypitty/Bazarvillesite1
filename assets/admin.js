@@ -461,6 +461,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
      tiers[0] below the first Min qty. If that tier is ₹0 (e.g. a "1 pc → ₹0" placeholder row with the
      real price starting at 10), POS showed ₹0 until qty hit 10. Here a ₹0 result falls back to the
      nearest tier that actually has a price, so 1 pc is billed at the lowest real slab price. */
+  /* Image for a colour variant: the product's per-colour gallery (Admin → Products → colour images)
+     when that colour has one, else the main photo. */
+  function posItemImg(p, color){
+    const ci = p && p.colorImages && color ? p.colorImages[color] : null;
+    return (ci && ci.length && ci[0]) || (p && p.img && p.img[0]) || "";
+  }
   function posUnitPrice(p, qty){
     const t = tierFor(p, qty);
     if(t && t.price > 0) return t.price;
@@ -495,7 +501,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const p = PRODUCTS.find(x=>x.id===productId); if(!p) return;
     const color = (p.colors&&p.colors[0])||"", size = (p.sizes&&p.sizes[0])||"";
     const t = {price: posUnitPrice(p, 1)};
-    posCart.push({productId:p.id, name:p.name, color, size, qty:1, price:t.price, img:(p.img&&p.img[0])||""});
+    posCart.push({productId:p.id, name:p.name, color, size, qty:1, price:t.price, img:posItemImg(p,color)});
     renderPosCart();
   }
 
@@ -516,7 +522,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const stockVal = (p.colorStock && posQaSel.color && p.colorStock[posQaSel.color]!=null) ? p.colorStock[posQaSel.color] : "";
     document.querySelector("#posQuickAddBody").innerHTML = `
       <div class="pos-qa-top">
-        <img class="pos-qa-img" src="${(p.img&&p.img[0])||''}" alt="">
+        <img class="pos-qa-img" src="${posItemImg(p,posQaSel.color)}" alt="">
         <div>
           <h3 class="pos-qa-name">${p.name}</h3>
           <div class="pos-qa-price">${money(t.price)}<small> / pc</small></div>
@@ -557,7 +563,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const p = posQaProduct; if(!p) return;
     const qty = Math.max(1, posQaSel.qty);
     const t = {price: posUnitPrice(p, qty)};
-    posCart.push({productId:p.id, name:p.name, color:posQaSel.color, size:posQaSel.size, qty, price:t.price, img:(p.img&&p.img[0])||""});
+    posCart.push({productId:p.id, name:p.name, color:posQaSel.color, size:posQaSel.size, qty, price:t.price, img:posItemImg(p,posQaSel.color)});
     renderPosCart();
     closePosQuickAdd();
   });
@@ -652,7 +658,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try{
       await BazDS.createPosSale({
         customerName,
-        items: posCart.map(it=>({name:it.name, color:it.color, size:it.size, qty:it.qty, price:it.price})),
+        items: posCart.map(it=>({productId:it.productId, name:it.name, color:it.color, size:it.size, qty:it.qty, price:it.price})),
         subtotal,
         notes: [billNo?`Bill No: ${billNo}`:"", note].filter(Boolean).join(" — ")
       });
@@ -732,7 +738,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     return `<div class="pos-bill-row pos-bill-row-click" data-id="${o.id}">
       <div><b>${o.ref}</b><span class="ad-hint" style="margin:0;display:block">${o.customer_name||"Walk-in Customer"} · ${dateStr}</span></div>
       <div class="pos-bill-row-right">
-        <span class="ad-badge in">${(o.payment_status||"paid")==="paid" ? "Paid" : (o.payment_status||"Paid")}</span>
         <b>${money(o.subtotal||0)}</b>
         <span class="pos-bill-chevron">›</span>
       </div>
@@ -807,9 +812,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <td>${o.customer_name||"Walk-in Customer"}</td>
       <td>${itemCount} pcs</td>
       <td>${money(o.subtotal||0)}</td>
-      <td><span class="ad-badge in">${(o.payment_status||"paid")==="paid"?"Paid":(o.payment_status||"Paid")}</span></td>
       <td>${new Date(o.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}, ${new Date(o.created_at).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true})}</td>
-      <td><button class="ad-icon-btn" title="View bill" onclick="AdminUI.openOrder(${o.id})">👁️</button></td>
+      <td class="ad-row-actions"><button class="ad-icon-btn" title="View bill" onclick="AdminUI.openOrder(${o.id})">👁️</button><button class="ad-icon-btn" title="Edit bill" onclick="AdminUI.editBill(${o.id})">✏️</button></td>
     </tr>`;
   }
   function renderHistoryTable(){
@@ -826,14 +830,109 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       return;
     }
     const list = filteredHistory();
-    el.innerHTML = `<tr><th>Bill No.</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Date</th><th></th></tr>` +
-      (list.length ? list.map(historyRowHtml).join("") : `<tr><td colspan="7"><p class="ad-hint" style="margin:0;text-align:center;padding:20px 0">No bills match this filter.</p></td></tr>`);
+    el.innerHTML = `<tr><th>Bill No.</th><th>Customer</th><th>Items</th><th>Total</th><th>Date</th><th></th></tr>` +
+      (list.length ? list.map(historyRowHtml).join("") : `<tr><td colspan="6"><p class="ad-hint" style="margin:0;text-align:center;padding:20px 0">No bills match this filter.</p></td></tr>`);
   }
+
+  /* ---------- Edit a POS bill (Inventory → History → ✏️) ----------
+     For corrections after the sale — e.g. 10 diaries were billed and 5 came back. Qty / price can be
+     changed per line, a line can be removed, and the customer name edited. Colour stock is adjusted
+     by the difference (returned pieces go back into stock, extra pieces are deducted). */
+  let editingBill = null; // {id, orig:[items], rows:[{i,qty,price,removed}]}
+  function findBillProduct(it){
+    return PRODUCTS.find(x=>x.id===it.productId) || PRODUCTS.find(x=>x.name===it.name) || null;
+  }
+  function billEditTotal(){
+    return editingBill.rows.reduce((s,r)=> r.removed ? s : s + (Number(r.qty)||0)*(Number(r.price)||0), 0);
+  }
+  function renderBillEdit(){
+    const b = editingBill; if(!b) return;
+    document.querySelector("#billEditBody").innerHTML = `
+      <div class="ad-field"><label>Customer name</label><input id="be_name" value="${(b.customer||"").replace(/"/g,'&quot;')}" placeholder="Walk-in counter sale"></div>
+      <div class="be-list">
+        <div class="be-head"><span>Product</span><span>Qty</span><span>Price ₹</span><span>Total</span><span></span></div>
+        ${b.rows.map((r,idx)=>{
+          const it = b.orig[r.i];
+          const variant = [it.color?`<i class="pos-cart-dot" style="background:${it.color}"></i>`:"", it.size||""].filter(Boolean).join(" ");
+          return `<div class="be-row ${r.removed?'removed':''}" data-idx="${idx}">
+            <span class="be-name"><b>${it.name||"Item"}</b>${variant?`<small>${variant}</small>`:""}${r.removed?`<small class="be-removed">Removed</small>`:""}</span>
+            <input type="number" min="0" class="be-qty" value="${r.qty}" ${r.removed?"disabled":""}>
+            <input type="number" min="0" class="be-price" value="${r.price}" ${r.removed?"disabled":""}>
+            <b class="be-line">${r.removed?"—":money((Number(r.qty)||0)*(Number(r.price)||0))}</b>
+            <button type="button" class="ad-icon-btn ${r.removed?'':'danger'} be-toggle" title="${r.removed?'Restore line':'Remove line'}">${r.removed?"↩️":"🗑️"}</button>
+          </div>`;}).join("")}
+      </div>
+      <div class="be-total"><span>New total</span><b id="be_total">${money(billEditTotal())}</b></div>
+      <p class="ad-hint" style="margin:8px 0 0">Stock is adjusted automatically for colours that have tracked stock.</p>
+      <p class="ad-hint" id="be_error" style="color:#c0392b;display:none;margin:12px 0 0"></p>`;
+  }
+  AdminUI.editBill = (id)=>{
+    const o = (allOrdersCache||[]).find(x=>x.id===id); if(!o) return;
+    const orig = (o.items||[]).map(it=>({...it}));
+    editingBill = {id, ref:o.ref, customer:(o.customer_name==="Walk-in counter sale"?"":o.customer_name)||"", orig,
+      rows: orig.map((it,i)=>({i, qty:it.qty||1, price:it.price||0, removed:false}))};
+    document.querySelector("#billEditTitle").textContent = "Edit Bill " + (o.ref||"");
+    renderBillEdit();
+    document.querySelector("#billEditModalBackdrop").classList.add("show");
+  };
+  const closeBillEdit = ()=>{ document.querySelector("#billEditModalBackdrop").classList.remove("show"); editingBill = null; };
+  [document.querySelector("#closeBillEditModal"), document.querySelector("#cancelBillEditBtn")].forEach(b=>{ if(b) b.addEventListener("click", closeBillEdit); });
+  const billEditBody = document.querySelector("#billEditBody");
+  if(billEditBody){
+    billEditBody.addEventListener("input", (e)=>{
+      if(!editingBill) return;
+      const row = e.target.closest(".be-row"); if(!row) return;
+      const r = editingBill.rows[Number(row.dataset.idx)];
+      if(e.target.classList.contains("be-qty")) r.qty = e.target.value;
+      if(e.target.classList.contains("be-price")) r.price = e.target.value;
+      row.querySelector(".be-line").textContent = money((Number(r.qty)||0)*(Number(r.price)||0));
+      document.querySelector("#be_total").textContent = money(billEditTotal());
+    });
+    billEditBody.addEventListener("click", (e)=>{
+      const t = e.target.closest(".be-toggle"); if(!t || !editingBill) return;
+      editingBill.customer = document.querySelector("#be_name").value;
+      const r = editingBill.rows[Number(t.closest(".be-row").dataset.idx)];
+      r.removed = !r.removed; renderBillEdit();
+    });
+  }
+  const saveBillEditBtn = document.querySelector("#saveBillEditBtn");
+  if(saveBillEditBtn) saveBillEditBtn.addEventListener("click", async ()=>{
+    const b = editingBill; if(!b) return;
+    const err = document.querySelector("#be_error");
+    const kept = b.rows.filter(r=>!r.removed && Number(r.qty)>0);
+    if(!kept.length){ err.textContent = "Bill me kam se kam ek item rehna chahiye."; err.style.display = "block"; return; }
+    const items = kept.map(r=>({...b.orig[r.i], qty:Math.round(Number(r.qty)), price:Number(r.price)||0}));
+    const subtotal = items.reduce((s,it)=>s+it.qty*it.price,0);
+    const customerName = document.querySelector("#be_name").value.trim();
+    busy(saveBillEditBtn, true, "Saving…");
+    try{
+      await BazDS.updatePosSale(b.id, {customerName, items, subtotal});
+      // stock: diff per original line (removed / qty 0 lines count as fully returned)
+      const touched = new Set();
+      b.rows.forEach(r=>{
+        const it = b.orig[r.i];
+        const newQty = (r.removed || !(Number(r.qty)>0)) ? 0 : Math.round(Number(r.qty));
+        const delta = (it.qty||1) - newQty; // +ve = pieces came back
+        const p = findBillProduct(it);
+        if(!delta || !p || !it.color) return;
+        const cur = (p.colorStock && p.colorStock[it.color]!=null) ? p.colorStock[it.color] : null;
+        if(cur==null) return;
+        p.colorStock = {...p.colorStock, [it.color]: Math.max(0, cur + delta)};
+        touched.add(p);
+      });
+      for(const p of touched){ try{ await BazDS.upsertProduct(p); }catch(e){ console.error("Stock adjust failed for", p.name, e); } }
+      closeBillEdit();
+      await loadHistory(); renderPosProductList();
+      try{ renderDashboard(); }catch(e){}
+    }catch(e){ err.textContent = "Could not save: " + (e.message||e); err.style.display = "block"; }
+    finally{ busy(saveBillEditBtn, false); }
+  });
+
   function exportHistoryCsv(list){
-    const header = ["Bill No.","Customer","Items","Total","Payment Status","Date"];
+    const header = ["Bill No.","Customer","Items","Total","Date"];
     const rows = list.map(o=>{
       const itemCount = (o.items||[]).reduce((n,it)=>n+(it.qty||1),0);
-      return [o.ref, o.customer_name||"Walk-in Customer", itemCount, o.subtotal||0, (o.payment_status||"paid"), new Date(o.created_at).toLocaleString("en-IN")];
+      return [o.ref, o.customer_name||"Walk-in Customer", itemCount, o.subtotal||0, new Date(o.created_at).toLocaleString("en-IN")];
     });
     const csv = [header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
@@ -1910,7 +2009,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <p><b>${o.customer_name||"—"}</b> · ${o.customer_phone||""} ${o.customer_email?" · "+o.customer_email:""}</p>
       <p class="ad-hint">${o.shipping_address||""}</p>
       <div style="margin:14px 0">${itemsHtml}</div>
-      <p><b>Subtotal: ${money(o.subtotal||0)}</b> · Payment: ${(o.payment_method||"cod").replace("_"," ")}</p>
+      <p><b>Subtotal: ${money(o.subtotal||0)}</b>${o.source==="pos"?"":` · Payment: ${(o.payment_method||"cod").replace("_"," ")}`}</p>
       <div class="ad-field"><label>Order status</label>
         <select id="of_status">${ORDER_STATUSES.map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s[0].toUpperCase()+s.slice(1)}</option>`).join("")}</select>
       </div>

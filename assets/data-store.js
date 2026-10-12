@@ -530,6 +530,15 @@ const BazDS = (function(){
     if(error){ console.error("createPosSale:", error.message); throw error; }
     return data;
   }
+  /** Edit a completed POS bill (items / total / customer name). */
+  async function updatePosSale(id, fields){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const row = { items: fields.items, subtotal: fields.subtotal, updated_at: new Date().toISOString() };
+    row.customer_name = fields.customerName || "Walk-in counter sale";
+    const { error } = await sb.from("orders").update(row).eq("id", id);
+    if(error){ console.error("updatePosSale:", error.message); throw error; }
+    return true;
+  }
   async function getPosHolds(){
     const sb = getClient(); if(!sb) return [];
     const { data, error } = await sb.from("pos_holds").select("*").order("created_at",{ascending:false});
@@ -590,7 +599,7 @@ const BazDS = (function(){
     logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage,
     signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
-    createOrder, getOrders, updateOrderStatus,
+    createOrder, getOrders, updateOrderStatus, updatePosSale,
     createPosSale, getPosHolds, holdPosSale, deletePosHold,
     createQuote, getQuotes, getQuoteByRef, updateQuoteStatus
   };
