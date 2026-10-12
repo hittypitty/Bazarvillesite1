@@ -2083,7 +2083,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
-  const inits = [()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
+  const inits = [initTestimonialSlider, ()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
@@ -2258,4 +2258,21 @@ function renderTrendingNow(){
   if(!list.length){ sec.hidden = true; return; }
   sec.hidden = false;
   renderGrid("#trendingGrid", list.slice(0,8));
+}
+
+
+/* ---------- homepage: "What buyers say" — auto-sliding reviews (Vikas) ---------- */
+function initTestimonialSlider(){
+  const grid = document.querySelector(".tgrid");
+  if(!grid || grid.dataset.sliding) return;
+  const cards = [...grid.children]; if(!cards.length) return;
+  grid.dataset.sliding = "1";
+  cards.forEach(c=>c.classList.remove("reveal","in"));
+  const track = document.createElement("div");
+  track.className = "tslide-track";
+  let seq = cards.slice(); while(seq.length < 6) seq = seq.concat(cards);
+  const once = seq.map((c,i)=> i<cards.length ? c : c.cloneNode(true));
+  [...once, ...once.map(c=>c.cloneNode(true))].forEach(c=>track.appendChild(c));
+  grid.className = "tslider"; grid.innerHTML = ""; grid.appendChild(track);
+  track.style.animationDuration = (once.length * 6) + "s";
 }
