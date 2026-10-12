@@ -1987,6 +1987,31 @@ function initHeroImages(){
     const banner = document.querySelector("#hqBanner");
     if(id==="heroImg1" && banner) banner.classList.add("has-photo");
   });
+  buildBannerSlider();
+}
+/* Banner = big slider: every uploaded hero image (Settings → hero images) becomes a full-size slide,
+   shown uncropped, auto-advancing with dots + swipe. A single image just shows as one big banner. */
+function buildBannerSlider(){
+  const banner = document.querySelector("#hqBanner");
+  const urls = ((SETTINGS.heroImages)||[]).filter(Boolean).slice(0,3);
+  if(!banner || !urls.length || banner.dataset.slider) return;
+  banner.dataset.slider = "1"; banner.classList.add("has-photo","hq-slider");
+  banner.querySelectorAll("img").forEach(i=>i.remove());
+  const track = document.createElement("div"); track.className = "hqs-track";
+  urls.forEach((u,i)=>{ const im = document.createElement("img"); im.src = u; im.alt = "Bazarville banner "+(i+1); im.loading = i? "lazy":"eager"; track.appendChild(im); });
+  banner.insertBefore(track, banner.firstChild);
+  if(urls.length < 2) return;
+  const dots = document.createElement("div"); dots.className = "hqs-dots";
+  urls.forEach((_,i)=>{ const d = document.createElement("button"); d.type="button"; d.setAttribute("aria-label","Slide "+(i+1)); d.addEventListener("click",()=>go(i,true)); dots.appendChild(d); });
+  banner.appendChild(dots);
+  let cur = 0, timer = null;
+  const mark = ()=>[...dots.children].forEach((d,i)=>d.classList.toggle("on", i===cur));
+  function go(i, user){ cur = (i+urls.length)%urls.length; track.scrollTo({left: track.clientWidth*cur, behavior:"smooth"}); mark(); if(user) restart(); }
+  function restart(){ clearInterval(timer); timer = setInterval(()=>go(cur+1), 4500); }
+  track.addEventListener("scroll", ()=>{ const i = Math.round(track.scrollLeft/track.clientWidth); if(i!==cur){ cur = i; mark(); } }, {passive:true});
+  banner.addEventListener("pointerdown", ()=>clearInterval(timer));
+  banner.addEventListener("pointerup", restart);
+  mark(); restart();
 }
 
 /* ---------- brand colour theming (admin-editable via Settings) ----------

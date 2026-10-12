@@ -1024,3 +1024,14 @@ body.mnav-lock{overflow:hidden}
 .tslider .tcard:hover{transform:translateY(-4px)}
 @media(max-width:640px){.tslider .tcard{width:272px}.tslide-track{gap:14px}}
 @media(prefers-reduced-motion:reduce){.tslide-track{animation:none}.tslider{overflow-x:auto}}
+
+/* Vikas: banner is a BIGGER, uncropped slider */
+.hq-slider{position:relative;background:var(--soft)}
+.hqs-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.hqs-track::-webkit-scrollbar{display:none}
+.hq-slider .hqs-track img{flex:none;width:100%;max-height:none;height:auto;object-fit:contain;scroll-snap-align:center;display:block}
+.hqs-dots{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:8px}
+.hqs-dots button{width:9px;height:9px;border-radius:50%;border:0;padding:0;background:rgba(255,255,255,.65);box-shadow:0 0 0 1px rgba(0,0,0,.25);cursor:pointer;transition:.25s}
+.hqs-dots button.on{width:26px;border-radius:6px;background:var(--lime-deep)}
+@media(max-width:640px){.hq-slider{border-radius:20px;margin:0 -6px}}
+@media(max-width:640px){.hq-slider .hqs-track img{min-height:230px;object-fit:cover}}
