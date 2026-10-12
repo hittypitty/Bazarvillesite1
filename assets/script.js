@@ -2004,6 +2004,7 @@ function buildBannerSlider(){
   const dots = document.createElement("div"); dots.className = "hqs-dots";
   urls.forEach((_,i)=>{ const d = document.createElement("button"); d.type="button"; d.setAttribute("aria-label","Slide "+(i+1)); d.addEventListener("click",()=>go(i,true)); dots.appendChild(d); });
   banner.appendChild(dots);
+  ["prev","next"].forEach(dir=>{ const a = document.createElement("button"); a.type="button"; a.className="hqs-arrow hqs-"+dir; a.setAttribute("aria-label", dir==="prev"?"Previous slide":"Next slide"); a.textContent = dir==="prev"?"‹":"›"; a.addEventListener("click",()=>go(cur+(dir==="prev"?-1:1),true)); banner.appendChild(a); });
   let cur = 0, timer = null;
   const mark = ()=>[...dots.children].forEach((d,i)=>d.classList.toggle("on", i===cur));
   function go(i, user){ cur = (i+urls.length)%urls.length; track.scrollTo({left: track.clientWidth*cur, behavior:"smooth"}); mark(); if(user) restart(); }
@@ -2108,7 +2109,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
-  const inits = [initTestimonialSlider, ()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
+  const inits = [initTopbarSlider, initTestimonialSlider, ()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
@@ -2300,4 +2301,20 @@ function initTestimonialSlider(){
   [...once, ...once.map(c=>c.cloneNode(true))].forEach(c=>track.appendChild(c));
   grid.className = "tslider"; grid.innerHTML = ""; grid.appendChild(track);
   track.style.animationDuration = (once.length * 6) + "s";
+}
+
+
+/* ---------- top announcement bar: one message at a time, auto-rotating with arrows (Vikas: "upar wala bar") ---------- */
+function initTopbarSlider(){
+  const bar = document.querySelector(".topbar"); if(!bar || bar.dataset.slider) return;
+  const msgs = [...bar.querySelectorAll(".ticker > span")].map(x=>x.textContent.trim()).filter(Boolean);
+  if(!msgs.length) return;
+  bar.dataset.slider = "1";
+  bar.innerHTML = `<div class="container tb-in"><button type="button" class="tb-arrow" data-d="-1" aria-label="Previous">‹</button><div class="tb-msgs">${msgs.map((m,i)=>`<span class="tb-msg${i?"":" on"}">${m}</span>`).join("")}</div><button type="button" class="tb-arrow" data-d="1" aria-label="Next">›</button></div>`;
+  const els = [...bar.querySelectorAll(".tb-msg")]; let cur = 0, t = null;
+  const show = i=>{ cur = (i+els.length)%els.length; els.forEach((e,k)=>e.classList.toggle("on",k===cur)); };
+  const start = ()=>{ clearInterval(t); if(els.length>1) t = setInterval(()=>show(cur+1), 3500); };
+  bar.querySelectorAll(".tb-arrow").forEach(b=>b.addEventListener("click",()=>{ show(cur+Number(b.dataset.d)); start(); }));
+  bar.addEventListener("mouseenter",()=>clearInterval(t)); bar.addEventListener("mouseleave",start);
+  start();
 }
