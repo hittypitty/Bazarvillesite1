@@ -1049,3 +1049,11 @@ body.mnav-lock{overflow:hidden}
 .hqs-arrow:hover{background:var(--lime);}
 .hqs-prev{left:14px}.hqs-next{right:14px}
 @media(max-width:640px){.hqs-arrow{width:34px;height:34px;font-size:21px}.hqs-prev{left:8px}.hqs-next{right:8px}}
+
+/* Vikas (Oct 13): product photos fill the full height next to the details — no empty gap below them (desktop) */
+@media(min-width:1001px){
+  .pd-layout{align-items:stretch}
+  .pd-layout .reveal-left{position:static;max-height:none;overflow:visible;align-self:stretch;display:flex;flex-direction:column}
+  .pd-layout .reveal-left .pd-gallery-grid{flex:1 1 auto;grid-auto-rows:1fr;min-height:0}
+  .pd-layout .reveal-left .pd-gallery-cell,.pd-layout .reveal-left .pd-gallery-cell.span2{aspect-ratio:auto;min-height:260px}
+}
