@@ -1057,3 +1057,17 @@ body.mnav-lock{overflow:hidden}
   .pd-layout .reveal-left .pd-gallery-grid{flex:1 1 auto;grid-auto-rows:1fr;min-height:0}
   .pd-layout .reveal-left .pd-gallery-cell,.pd-layout .reveal-left .pd-gallery-cell.span2{aspect-ratio:auto;min-height:260px}
 }
+
+/* Vikas (Oct 14): ANY image ratio must work (e.g. 9:16 phone shots) — product page shows each photo in full at its own
+   ratio (no side gaps, no crop); catalogue cards use a portrait 4:5 box so tall photos aren't squashed into a strip. */
+.pd-gallery-cell,.pd-gallery-cell.span2{aspect-ratio:auto!important;min-height:140px}
+.pd-gallery-cell img{height:auto;object-fit:cover;display:block}
+@media(min-width:1001px){
+  .pd-layout{align-items:start}
+  .pd-layout .reveal-left{align-self:start;display:block}
+  .pd-layout .reveal-left .pd-gallery-grid{grid-auto-rows:auto;align-items:start}
+  .pd-layout .reveal-left .pd-gallery-cell,.pd-layout .reveal-left .pd-gallery-cell.span2{min-height:140px}
+}
+@media(max-width:640px){.pd-gallery-cell img{max-height:78vh;object-fit:contain;background:var(--soft)}}
+.pimg{height:auto!important;aspect-ratio:4/5}
+.pimg img{object-position:50% 30%}
