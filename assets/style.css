@@ -447,7 +447,8 @@ img{max-width:100%;display:block}
    price tag above the table and keeps the normal margin via this override. */
 .pd-price-box .tier-table{margin-top:0}
 .tier-table td,.tier-table th{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line)}
-.tier-table tr.active-tier{background:var(--lime);color:var(--on-accent);border-radius:8px}
+.tier-table tr.active-tier td{background:#fff;color:var(--ink);font-weight:800}
+.tier-table tr.active-tier td:first-child{box-shadow:inset 3px 0 0 var(--ink)}
 .opt-title{font-weight:700;margin:18px 0 10px;font-size:14px}
 .swatches{display:flex;gap:10px}
 .swatch{width:36px;height:36px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--line);cursor:pointer;transition:.2s}
