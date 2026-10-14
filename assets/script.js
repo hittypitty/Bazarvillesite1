@@ -254,6 +254,9 @@ function tierFor(p, qty){
   for(const t of tiers){ if(qty >= t.min) applicable = t; }
   return applicable;
 }
+/* Printing options may carry an extra per-piece price, stored as "Name::250" (admin → Edit Product → Printing options). */
+function printName(s){ return String(s).split("::")[0]; }
+function printExtra(s){ const n = Number(String(s).split("::")[1]); return n>0 ? n : 0; }
 function ref(){ return "BZV-" + Math.random().toString(36).slice(2,6).toUpperCase() + Date.now().toString().slice(-4); }
 
 /* ---------- broken image fallback ----------
@@ -388,12 +391,13 @@ function productCard(p){
     </div>
   </div></div>`;
 }
-function waLink(p, qty, printOpt, color, size){
+function waLink(p, qty, printOpt, color, size, extra){
   const t = tierFor(p, qty);
+  const unit = t.price + (Number(extra)||0);
   const colorLine = color ? `%0AColour: ${color}` : "";
   const sizeLine = size ? `%0ASize: ${size}` : "";
   const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
-  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(t.price)}/pc%0APlease share more details.`;
+  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(unit)}/pc%0APlease share more details.`;
   return `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${msg}`;
 }
 
@@ -1083,7 +1087,7 @@ function initComparePage(){
     {label:"Price", render:p=>money(tierFor(p,p.moq).price)+" / pc"},
     {label:"MOQ", render:p=>p.moq+" pcs"},
     {label:"Material / Brand", render:p=>p.brand||"—"},
-    {label:"Customization", render:p=>(p.printOptions&&p.printOptions.length)? p.printOptions.join(", ") : "Logo / Branding available"},
+    {label:"Customization", render:p=>(p.printOptions&&p.printOptions.length)? p.printOptions.map(printName).join(", ") : "Logo / Branding available"},
     {label:"Colours", render:p=>`<div class="swatches">${p.colors.map(c=>`<span class="swatch" style="background:${c}"></span>`).join("")}</div>`},
     {label:"Stock", render:p=>p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'},
     {label:"", render:p=>`<button type="button" class="btn btn-outline btn-sm cmp-remove" data-remove-id="${p.id}">Remove</button>`}
@@ -1398,14 +1402,14 @@ function initProductPage(){
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
-        <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}">${s}</span>`).join("")}</div>`:""}
+        <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}" data-name="${printName(s).replace(/"/g,'&quot;')}" data-extra="${printExtra(s)}">${printName(s)}${printExtra(s)?` <small>+₹${printExtra(s)}</small>`:""}</span>`).join("")}</div>`:""}
         <!-- Just the quantity-tier table now, no separate standalone price
              tag above it — Vikas's feedback was that having both up top felt
              redundant; the tier table (with the active row highlighted) is
              the real price. -->
         <div class="pd-price-box">
           <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
-          ${safeTiers(p).map(t=>`<tr data-min="${t.min}"><td>${t.min}+ pcs</td><td>${money(t.price)}</td></tr>`).join("")}
+          ${safeTiers(p).map(t=>`<tr data-min="${t.min}" data-base="${t.price}"><td>${t.min}+ pcs</td><td class="tier-price">${money(t.price)}</td></tr>`).join("")}
           </table>
         </div>
         <div class="opt-title">Quantity</div>
@@ -1458,12 +1462,8 @@ function initProductPage(){
       const spanFull = (galleryImages.length % 2 === 1) && (i === galleryImages.length - 1);
       return `<div class="pd-gallery-cell${spanFull?' span2':''}" data-i="${i}">
         <img src="${src}" alt="${p.name}" loading="${i<2?'eager':'lazy'}" onerror="imgFallback(this)">
-        <span class="pd-gallery-zoom">🔍</span>
       </div>`;
     }).join("");
-    grid.querySelectorAll(".pd-gallery-cell").forEach(cell=>{
-      cell.addEventListener("click", ()=>openLightbox(Number(cell.dataset.i)));
-    });
     // Mobile only (see .pd-gallery-grid's max-width:640px rule in style.css):
     // the grid becomes a one-photo-per-screen scroll-snap slider there, so
     // these dots are the "which photo am I on" indicator a slider needs —
@@ -1549,7 +1549,11 @@ function initProductPage(){
     let qty = Math.max(1, Number(qtyInput.value)||1);
     qtyInput.value = qty;
     const t = tierFor(p, qty);
-    document.querySelector("#liveCalc").innerHTML = `${qty} pcs × ${money(t.price)} = <b>${money(qty*t.price)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
+    const pEl = document.querySelector("#printOptRow .sizebtn.active");
+    const extra = pEl ? Number(pEl.dataset.extra)||0 : 0;
+    const unit = t.price + extra;
+    document.querySelectorAll("#tierTable tr[data-base]").forEach(r=>{ r.querySelector(".tier-price").textContent = money(Number(r.dataset.base)+extra); });
+    document.querySelector("#liveCalc").innerHTML = `${qty} pcs × ${money(unit)} = <b>${money(qty*unit)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
     document.querySelectorAll("#tierTable tr[data-min]").forEach(row=>{
       row.classList.toggle("active-tier", Number(row.dataset.min)===t.min);
     });
@@ -1565,7 +1569,7 @@ function initProductPage(){
     const colorEl = document.querySelector(".swatches .swatch.active");
     const sizeEl = document.querySelector(".sizerow:not(#printOptRow) .sizebtn.active");
     const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)] || "") : "";
-    waBtn.href = waLink(p, qty, printOptEl ? printOptEl.textContent : "", colorVal, sizeEl ? sizeEl.textContent : "");
+    waBtn.href = waLink(p, qty, printOptEl ? (printOptEl.dataset.name||printOptEl.textContent) : "", colorVal, sizeEl ? sizeEl.textContent : "", printOptEl ? printOptEl.dataset.extra : 0);
     waBtn.textContent = p.stock ? "🟢 Send WhatsApp Enquiry" : "🟢 Check Availability on WhatsApp";
   }
   // +/- just nudge by 1 piece now — for a bigger jump, type the number

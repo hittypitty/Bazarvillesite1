@@ -496,3 +496,6 @@ body.role-super .ad-super-only{display:block}
 .ad-brand-noimg{width:54px;font-size:11px;color:var(--muted);flex:none}
 .ad-brand-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .ad-brand-add input[type=text],.ad-brand-add input:not([type]){flex:1;min-width:180px;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit}
+
+.po-extra{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:12px;font-weight:700;color:var(--muted,#666)}
+.po-extra input{width:58px;border:1.5px solid var(--line,#ddd);border-radius:7px;padding:3px 6px;font:inherit;font-size:12px}

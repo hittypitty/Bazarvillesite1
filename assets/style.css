@@ -1071,3 +1071,9 @@ body.mnav-lock{overflow:hidden}
 @media(max-width:640px){.pd-gallery-cell img{max-height:78vh;object-fit:contain;background:var(--soft)}}
 .pimg{height:auto!important;aspect-ratio:4/5}
 .pimg img{object-position:50% 30%}
+
+/* Vikas: no click-to-zoom on product photos; printing option extra price chips */
+.pd-gallery-cell{cursor:default!important}
+.pd-gallery-cell:hover img{transform:none!important}
+.pd-gallery-zoom{display:none!important}
+.sizebtn small{font-weight:700;opacity:.75;margin-left:3px}

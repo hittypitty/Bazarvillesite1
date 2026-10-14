@@ -1137,7 +1137,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
       <div class="ad-field full">
-        <label>Printing options <span class="ad-hint" style="display:inline">(optional — shown as a variant selector on the product page, e.g. Screen Print / Embroidery)</span></label>
+        <label>Printing options <span class="ad-hint" style="display:inline">(optional — shown on the product page, e.g. No Print / Custom Print. Type an extra ₹ per piece next to an option and the price on the product page goes up automatically when the customer picks it)</span></label>
         <div class="ad-tag-group" id="pf_printOptChips"></div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <input type="text" id="pf_printOptInput" placeholder="e.g. Embroidery" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
@@ -1312,10 +1312,14 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     el.innerHTML = workingSizes.map((s,i)=>`
       <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removeSize(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No sizes added yet</span>`;
   }
+  // A printing option may carry an extra per-piece price, stored inside the same string as "Name::250" (no DB change needed).
+  const poName = s=>String(s).split("::")[0];
+  const poExtra = s=>{ const n = Number(String(s).split("::")[1]); return n>0 ? n : 0; };
+  AdminUI.setPrintExtra = (i, v)=>{ const n = Math.max(0, Math.round(Number(v)||0)); workingPrintOpts[i] = poName(workingPrintOpts[i]) + (n? "::"+n : ""); };
   function renderPrintOptChips(){
     const el = document.querySelector("#pf_printOptChips"); if(!el) return;
     el.innerHTML = workingPrintOpts.map((s,i)=>`
-      <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removePrintOpt(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">None yet — leave empty if this product only has one printing method</span>`;
+      <span class="ad-tag-chip ad-tag-chip-plain">${poName(s)}<span class="po-extra">+ ₹<input type="number" min="0" value="${poExtra(s)||""}" placeholder="0" title="Extra price per piece for this option" onchange="AdminUI.setPrintExtra(${i},this.value)"> /pc</span><b onclick="AdminUI.removePrintOpt(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">None yet — leave empty if this product only has one printing method</span>`;
   }
   window.AdminUI = window.AdminUI || {};
   AdminUI.removeColor = (i)=>{
@@ -1327,7 +1331,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   };
   AdminUI.removeColorImg = (ci, i)=>{
     const c = workingColors[ci];
-    if(!confirm("Remove this photo from this colour? This can't be undone unless you re-add it, and it won't take effect until you click Save.")) return;
     workingColorImages[c].splice(i,1);
     renderColorImageGroups();
   };
@@ -1452,7 +1455,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
   }
   AdminUI.removeImg = (i)=>{
-    if(!confirm("Remove this photo from the product? This can't be undone unless you re-add the image link/file, and it won't take effect until you click Save.")) return;
     productImages.splice(i,1); productImageColors.splice(i,1); renderImgGrid();
   };
 
@@ -1500,7 +1502,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const input = document.querySelector("#pf_printOptInput");
       const val = input.value.trim();
       if(!val) return;
-      if(!workingPrintOpts.some(s=>s.toLowerCase()===val.toLowerCase())) workingPrintOpts.push(val);
+      if(!workingPrintOpts.some(s=>String(s).split("::")[0].toLowerCase()===val.toLowerCase())) workingPrintOpts.push(val);
       input.value = "";
       renderPrintOptChips();
     });
