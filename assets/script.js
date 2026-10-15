@@ -1404,7 +1404,7 @@ function initProductPage(){
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
-        <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}" data-name="${printName(s).replace(/"/g,'&quot;')}" data-extra="${printExtra(s)}">${printName(s)}${printExtra(s)?` <small>+₹${printExtra(s)}</small>`:""}</span>`).join("")}</div>`:""}
+        <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}" data-name="${printName(s).replace(/"/g,'&quot;')}" data-extra="${printExtra(s)}">${printName(s)}</span>`).join("")}</div>`:""}
         <!-- Just the quantity-tier table now, no separate standalone price
              tag above it — Vikas's feedback was that having both up top felt
              redundant; the tier table (with the active row highlighted) is
