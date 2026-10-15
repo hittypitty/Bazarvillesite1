@@ -499,3 +499,5 @@ body.role-super .ad-super-only{display:block}
 
 .po-extra{display:inline-flex;align-items:center;gap:3px;margin-left:8px;font-size:12px;font-weight:700;color:var(--muted,#666)}
 .po-extra input{width:58px;border:1.5px solid var(--line,#ddd);border-radius:7px;padding:3px 6px;font:inherit;font-size:12px}
+
+.ad-color-name{width:110px;margin:0 6px 0 8px;border:0;border-radius:6px;padding:3px 7px;font:inherit;font-size:12px;background:rgba(255,255,255,.92);color:#222}

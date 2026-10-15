@@ -257,6 +257,7 @@ function tierFor(p, qty){
 /* Printing options may carry an extra per-piece price, stored as "Name::250" (admin → Edit Product → Printing options). */
 function printName(s){ return String(s).split("::")[0]; }
 function printExtra(s){ const n = Number(String(s).split("::")[1]); return n>0 ? n : 0; }
+function colorName(p, hex){ return (p && p.colorNames && p.colorNames[hex]) || ""; }
 function ref(){ return "BZV-" + Math.random().toString(36).slice(2,6).toUpperCase() + Date.now().toString().slice(-4); }
 
 /* ---------- broken image fallback ----------
@@ -394,7 +395,7 @@ function productCard(p){
 function waLink(p, qty, printOpt, color, size, extra){
   const t = tierFor(p, qty);
   const unit = t.price + (Number(extra)||0);
-  const colorLine = color ? `%0AColour: ${color}` : "";
+  const colorLine = color ? `%0AColour: ${colorName(p,color)||color}` : "";
   const sizeLine = size ? `%0ASize: ${size}` : "";
   const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
   const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(unit)}/pc%0APlease share more details.`;
@@ -949,7 +950,7 @@ function openQuickView(id){
         <div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
         <table class="tier-table">${safeTiers(p).map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
         <div class="opt-title">Colour</div>
-        <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
+        <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
         <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
@@ -1088,7 +1089,7 @@ function initComparePage(){
     {label:"MOQ", render:p=>p.moq+" pcs"},
     {label:"Material / Brand", render:p=>p.brand||"—"},
     {label:"Customization", render:p=>(p.printOptions&&p.printOptions.length)? p.printOptions.map(printName).join(", ") : "Logo / Branding available"},
-    {label:"Colours", render:p=>`<div class="swatches">${p.colors.map(c=>`<span class="swatch" style="background:${c}"></span>`).join("")}</div>`},
+    {label:"Colours", render:p=>`<div class="swatches">${p.colors.map(c=>`<span class="swatch" style="background:${c}" title="${colorName(p,c)}"></span>${colorName(p,c)?`<small class="swatch-name">${colorName(p,c)}</small>`:""}`).join("")}</div>`},
     {label:"Stock", render:p=>p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'},
     {label:"", render:p=>`<button type="button" class="btn btn-outline btn-sm cmp-remove" data-remove-id="${p.id}">Remove</button>`}
   ];
@@ -1398,7 +1399,8 @@ function initProductPage(){
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating">★★★★★ 4.7 (${18+p.id} reviews) &nbsp;•&nbsp; ${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
         <div class="opt-title">Colour</div>
-        <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}"></span>`).join("")}</div>
+        <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
+        <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>
         <div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
@@ -1531,6 +1533,7 @@ function initProductPage(){
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
     // images), swap the gallery to show them; otherwise keep showing the main photos.
     const colorHex = p.colors[Number(s.dataset.c)];
+    const cnEl = document.querySelector("#pdColorName"); if(cnEl) cnEl.textContent = colorName(p, colorHex);
     const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
     renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
     recalc(); // selected colour is part of the WhatsApp enquiry message — keep it in sync

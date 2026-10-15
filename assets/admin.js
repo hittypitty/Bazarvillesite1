@@ -1121,6 +1121,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="ad-tag-group" id="pf_colorChips"></div>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
           <input type="color" id="pf_colorPicker" value="#1a1a1a" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer">
+          <input type="text" id="pf_colorName" maxlength="30" placeholder="Colour name (e.g. Black) — shown on the site" style="flex:1;min-width:140px;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
           <button class="btn btn-outline btn-sm" type="button" id="pf_addColorBtn">+ Add colour</button>
         </div>
       </div>
@@ -1228,6 +1229,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   /* ---------- colour / size tag chips (product form) ---------- */
   let workingColors = [];
+  let workingColorNames = {}; // {"#1a1a1a": "Black"} — shown to customers on the site
   let workingTrending = false;
   let view360Frames = [];   // ordered image URLs of the 360° spin
   let model3dUrl = "";      // optional .glb URL
@@ -1237,7 +1239,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function renderColorChips(){
     const el = document.querySelector("#pf_colorChips"); if(!el) return;
     el.innerHTML = workingColors.map((c,i)=>`
-      <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
+      <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<input class="ad-color-name" type="text" maxlength="30" placeholder="Colour name" value="${(workingColorNames[c]||"").replace(/"/g,"&quot;")}" onchange="AdminUI.setColorName(${i},this.value)"><b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
     renderColorImageGroups();
     // The main Product images grid's per-photo colour-tag dropdown lists the
     // current colours too, so it needs refreshing whenever the colour list
@@ -1322,8 +1324,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <span class="ad-tag-chip ad-tag-chip-plain">${poName(s)}<span class="po-extra">+ ₹<input type="number" min="0" value="${poExtra(s)||""}" placeholder="0" title="Extra price per piece for this option" onchange="AdminUI.setPrintExtra(${i},this.value)"> /pc</span><b onclick="AdminUI.removePrintOpt(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">None yet — leave empty if this product only has one printing method</span>`;
   }
   window.AdminUI = window.AdminUI || {};
+  AdminUI.setColorName = (i, v)=>{ const c = workingColors[i]; if(!c) return; v = String(v||'').trim(); if(v) workingColorNames[c] = v; else delete workingColorNames[c]; };
   AdminUI.removeColor = (i)=>{
     const c = workingColors[i];
+    delete workingColorNames[c];
     workingColors.splice(i,1);
     delete workingColorImages[c]; // drop that colour's images too — nothing to show them for any more
     productImageColors = productImageColors.map(tag=>tag===c?"":tag); // untag any main-gallery photo tagged with it
@@ -1475,6 +1479,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     // for editing shouldn't crash the admin panel either).
     workingTiers = (p && Array.isArray(p.tiers) && p.tiers.length) ? p.tiers.map(t=>({...t})) : [{min:p?p.moq||10:10, price:0}];
     workingColors = p ? p.colors.slice() : ["#1a1a1a","#c6f000"];
+    workingColorNames = p && p.colorNames ? {...p.colorNames} : {};
     workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
     workingSizes = p ? p.sizes.slice() : ["Standard"];
     workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
@@ -1580,7 +1585,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
     document.querySelector("#pf_addColorBtn").addEventListener("click", ()=>{
       const hex = document.querySelector("#pf_colorPicker").value;
+      const nameEl = document.querySelector("#pf_colorName");
       if(!workingColors.includes(hex)) workingColors.push(hex);
+      if(nameEl && nameEl.value.trim()){ workingColorNames[hex] = nameEl.value.trim(); }
+      if(nameEl) nameEl.value = "";
       renderColorChips();
     });
     document.querySelector("#pf_addSizeBtn").addEventListener("click", ()=>{
@@ -1717,6 +1725,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       status: document.querySelector("#pf_status").value,
       trending: workingTrending,
       colors: workingColors.slice(),
+      colorNames: Object.fromEntries(Object.entries(workingColorNames).filter(([k,v])=>workingColors.includes(k)&&v)),
       // Only keep entries for colours that are still selected and that
       // actually have at least one image — an empty/orphaned entry would
       // otherwise linger and mean nothing (renderGallery falls back to the
