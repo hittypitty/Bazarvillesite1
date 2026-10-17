@@ -2116,7 +2116,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderAccountBadge();
   renderWishBadge();
   renderCompareBar();
-  const inits = [initTopbarSlider, initTestimonialSlider, ()=>renderGrid("#bestGrid", publishedProducts().slice(0,4)), renderTrendingNow, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
+  const inits = [initTopbarSlider, initTestimonialSlider, renderTrustedBrands, ()=>renderCollections("#collGrid"), initCollSlider,
     initFilters, initProductPage, initGalaxy, initDashboard, initTrack, initCollectionPage,
     initFaq, initParallax, initHeroTilt, initHeroImages, renderHeroQuestions, initHeroSearch, initReveal, initCounters,
     initCartPage, initCheckoutPage, initOrderConfirmPage, initAccountPage, initQuotePage, initNavSearch,
@@ -2273,14 +2273,37 @@ function renderTrustedBrands(){
   const brands = (SETTINGS.trustedBrands || []).filter(b=>b && (b.logo || b.name));
   if(!brands.length) return;
   const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-  const chip = b => b.logo
-    ? `<div class="logochip logochip-img" title="${esc(b.name)}"><img src="${esc(b.logo)}" alt="${esc(b.name)}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc(b.name).replace(/'/g,"")}'))"></div>`
-    : `<div class="logochip"><span class="dot"></span>${esc(b.name)}</div>`;
+  const clickable = b => !!(b.details || b.link);
+  const chip = (b,i) => {
+    const cls = "logochip" + (b.logo?" logochip-img":"") + (clickable(b)?" logochip-click":"");
+    const attrs = clickable(b) ? ` data-bi="${i}" role="button" tabindex="0"` : "";
+    return b.logo
+      ? `<div class="${cls}"${attrs} title="${esc(b.name)}"><img src="${esc(b.logo)}" alt="${esc(b.name)}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc(b.name).replace(/'/g,"")}'))"></div>`
+      : `<div class="${cls}"${attrs}><span class="dot"></span>${esc(b.name)}</div>`;
+  };
   // repeat the list until it is wide enough, then double it — the CSS animation scrolls exactly 50%
-  let seq = brands.slice();
-  while(seq.length < 8) seq = seq.concat(brands);
-  const html = seq.map(chip).join("");
+  let idx = brands.map((_,i)=>i);
+  while(idx.length < 8) idx = idx.concat(brands.map((_,i)=>i));
+  const html = idx.map(i=>chip(brands[i], i)).join("");
   strip.innerHTML = html + html;
+  if(strip.dataset.bound) return; strip.dataset.bound = "1";
+  const open = el=>{
+    const b = brands[Number(el.dataset.bi)]; if(!b) return;
+    if(!b.details){ window.open(/^https?:\/\//i.test(b.link)?b.link:"https://"+b.link, "_blank", "noopener"); return; }
+    let m = document.querySelector("#brandModal");
+    if(!m){ m = document.createElement("div"); m.id = "brandModal"; m.className = "brand-modal"; document.body.appendChild(m);
+      m.addEventListener("click", e=>{ if(e.target===m || e.target.closest(".bm-close")) m.classList.remove("open"); });
+      document.addEventListener("keydown", e=>{ if(e.key==="Escape") m.classList.remove("open"); }); }
+    const safeLink = /^https?:\/\//i.test(b.link||"") ? b.link : (b.link ? "https://"+b.link : "");
+    m.innerHTML = `<div class="bm-card"><button type="button" class="bm-close" aria-label="Close">✕</button>
+      ${b.logo?`<img class="bm-logo" src="${esc(b.logo)}" alt="${esc(b.name)}">`:""}
+      <h3>${esc(b.name)}</h3>
+      <p>${esc(b.details).replace(/\n/g,"<br>")}</p>
+      ${safeLink?`<a class="btn btn-lime" href="${esc(safeLink)}" target="_blank" rel="noopener">Visit website →</a>`:""}</div>`;
+    m.classList.add("open");
+  };
+  strip.addEventListener("click", e=>{ const el = e.target.closest("[data-bi]"); if(el) open(el); });
+  strip.addEventListener("keydown", e=>{ if(e.key==="Enter"){ const el = e.target.closest("[data-bi]"); if(el) open(el); } });
 }
 
 /* ---------- homepage: "Trending Now" — products the admin starred (Edit Product → ★ Trending) ---------- */
@@ -2311,17 +2334,12 @@ function initTestimonialSlider(){
 }
 
 
-/* ---------- top announcement bar: one message at a time, auto-rotating with arrows (Vikas: "upar wala bar") ---------- */
+/* ---------- top announcement bar: seamless scrolling marquee (Vikas) ---------- */
 function initTopbarSlider(){
   const bar = document.querySelector(".topbar"); if(!bar || bar.dataset.slider) return;
   const msgs = [...bar.querySelectorAll(".ticker > span")].map(x=>x.textContent.trim()).filter(Boolean);
   if(!msgs.length) return;
   bar.dataset.slider = "1";
-  bar.innerHTML = `<div class="container tb-in"><button type="button" class="tb-arrow" data-d="-1" aria-label="Previous">‹</button><div class="tb-msgs">${msgs.map((m,i)=>`<span class="tb-msg${i?"":" on"}">${m}</span>`).join("")}</div><button type="button" class="tb-arrow" data-d="1" aria-label="Next">›</button></div>`;
-  const els = [...bar.querySelectorAll(".tb-msg")]; let cur = 0, t = null;
-  const show = i=>{ cur = (i+els.length)%els.length; els.forEach((e,k)=>e.classList.toggle("on",k===cur)); };
-  const start = ()=>{ clearInterval(t); if(els.length>1) t = setInterval(()=>show(cur+1), 3500); };
-  bar.querySelectorAll(".tb-arrow").forEach(b=>b.addEventListener("click",()=>{ show(cur+Number(b.dataset.d)); start(); }));
-  bar.addEventListener("mouseenter",()=>clearInterval(t)); bar.addEventListener("mouseleave",start);
-  start();
+  const half = [...msgs, ...msgs].map(m=>`<span>${m}</span>`).join("");
+  bar.innerHTML = `<div class="tb-track">${half}${half}</div>`;
 }

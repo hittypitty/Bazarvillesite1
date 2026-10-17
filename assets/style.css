@@ -1082,3 +1082,27 @@ body.mnav-lock{overflow:hidden}
 /* colour names (Vikas) */
 .pd-colorname{font-size:13px;font-weight:700;color:var(--ink-soft);margin:6px 0 0;min-height:18px}
 .swatch-name{font-size:12px;color:var(--muted);margin:0 8px 0 -2px;align-self:center}
+
+/* Vikas (Oct 17): top bar back to a smooth marquee; footer social icons on white chips */
+.topbar{height:auto;padding:9px 0;overflow:hidden}
+.tb-track{display:flex;gap:46px;white-space:nowrap;width:max-content;animation:tick 40s linear infinite}
+.topbar:hover .tb-track{animation-play-state:paused}
+.fsocial-ic,.fsocial-ic:hover{background:#fff!important;box-shadow:0 4px 12px -4px rgba(0,0,0,.45)}
+.fsocial-ic[aria-label="Instagram"]{color:#d6249f}
+.fsocial-ic[aria-label="Facebook"]{color:#1877f2}
+.fsocial-ic[aria-label="LinkedIn"]{color:#0a66c2}
+.fsocial-ic:hover{color:inherit}
+.fsocial-ic[aria-label="Instagram"]:hover{color:#d6249f}.fsocial-ic[aria-label="Facebook"]:hover{color:#1877f2}.fsocial-ic[aria-label="LinkedIn"]:hover{color:#0a66c2}
+.cs-ic{background:#fff!important;box-shadow:0 0 0 1px #e4e4de}
+.cs-fb{color:#1877f2}.cs-li{color:#0a66c2}.cs-ig{color:#d6249f}
+
+/* Trusted-by brand chips: click for full details + link */
+.logochip-click{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+.logochip-click:hover{transform:translateY(-2px);box-shadow:0 8px 18px -8px rgba(63,122,0,.5)}
+.brand-modal{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
+.brand-modal.open{display:flex}
+.bm-card{position:relative;background:#fff;border-radius:22px;padding:30px 28px 26px;max-width:440px;width:100%;text-align:center;box-shadow:0 30px 70px -20px rgba(0,0,0,.5)}
+.bm-card h3{font-size:22px;margin:8px 0 10px}
+.bm-card p{color:var(--ink-soft);font-size:14.5px;line-height:1.7;margin-bottom:18px;text-align:left}
+.bm-logo{max-height:70px;max-width:200px;object-fit:contain;margin:0 auto 6px;display:block}
+.bm-close{position:absolute;top:12px;right:14px;border:0;background:var(--soft);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px}

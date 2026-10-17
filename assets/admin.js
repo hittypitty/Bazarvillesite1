@@ -1942,35 +1942,55 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   });
 
   /* ---------- Trusted by: brands + logos (Settings) ---------- */
+  let editingBrand = -1;
   function renderTrustedBrandsAdmin(){
     const el = document.querySelector("#trustedBrandsList"); if(!el) return;
     const list = SETTINGS.trustedBrands || [];
+    const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
     el.innerHTML = list.length ? list.map((b,i)=>`
       <div class="ad-brand-row">
-        ${b.logo ? `<img src="${b.logo}" alt="">` : `<span class="ad-brand-noimg">No logo</span>`}
-        <b>${b.name||""}</b>
+        ${b.logo ? `<img src="${esc(b.logo)}" alt="">` : `<span class="ad-brand-noimg">No logo</span>`}
+        <b>${esc(b.name)}${b.link?` <small class="ad-brand-link">🔗 ${esc(b.link)}</small>`:""}${b.details?`<small class="ad-brand-det">${esc(b.details)}</small>`:""}</b>
+        <button type="button" class="ad-icon-btn" data-edit="${i}" title="Edit">✏️</button>
         <button type="button" class="ad-icon-btn danger" data-i="${i}" title="Remove">🗑️</button>
       </div>`).join("") : `<p class="ad-hint" style="margin:0 0 10px">No brands added yet.</p>`;
     el.querySelectorAll("button[data-i]").forEach(btn=>btn.addEventListener("click", async ()=>{
       const next = (SETTINGS.trustedBrands||[]).filter((_,i)=>i!==Number(btn.dataset.i));
-      try{ await BazDS.updateTrustedBrands(next); SETTINGS.trustedBrands = next; renderTrustedBrandsAdmin(); posToast("Brand removed"); }
+      try{ await BazDS.updateTrustedBrands(next); SETTINGS.trustedBrands = next; editingBrand = -1; renderTrustedBrandsAdmin(); posToast("Brand removed"); }
       catch(err){ posToast(err.message||"Could not remove", "error"); }
+    }));
+    el.querySelectorAll("button[data-edit]").forEach(btn=>btn.addEventListener("click", ()=>{
+      const b = (SETTINGS.trustedBrands||[])[Number(btn.dataset.edit)]; if(!b) return;
+      editingBrand = Number(btn.dataset.edit);
+      document.querySelector("#addBrandName").value = b.name||"";
+      document.querySelector("#addBrandLink").value = b.link||"";
+      document.querySelector("#addBrandDetails").value = b.details||"";
+      document.querySelector("#addBrandBtn").textContent = "Save changes";
+      document.querySelector("#addBrandStatus").textContent = "Editing — logo badalna ho to nayi file chuno, warna purana rahega.";
+      document.querySelector("#addBrandName").focus();
     }));
   }
   const addBrandBtn = document.querySelector("#addBrandBtn");
   if(addBrandBtn) addBrandBtn.addEventListener("click", async ()=>{
     const nameEl = document.querySelector("#addBrandName"), fileEl = document.querySelector("#addBrandLogo"), status = document.querySelector("#addBrandStatus");
+    const linkEl = document.querySelector("#addBrandLink"), detEl = document.querySelector("#addBrandDetails");
     const name = nameEl.value.trim(), file = fileEl.files && fileEl.files[0];
-    if(!name && !file){ status.textContent = "Brand ka naam ya logo daalo."; return; }
+    const link = linkEl.value.trim(), details = detEl.value.trim();
+    const editing = editingBrand >= 0 && (SETTINGS.trustedBrands||[])[editingBrand];
+    if(!name && !file && !editing){ status.textContent = "Brand ka naam ya logo daalo."; return; }
     busy(addBrandBtn, true, "Saving…");
     try{
-      let logo = "";
+      let logo = editing ? (editing.logo||"") : "";
       if(file){ status.textContent = "Uploading logo…"; logo = await BazDS.uploadImage(file, "brands"); }
-      const next = (SETTINGS.trustedBrands||[]).concat([{name, logo}]);
-      await BazDS.updateTrustedBrands(next);
-      SETTINGS.trustedBrands = next;
-      nameEl.value = ""; fileEl.value = ""; status.textContent = "";
-      renderTrustedBrandsAdmin(); posToast("✅ Brand added");
+      const entry = {name, logo, link, details};
+      const cur = (SETTINGS.trustedBrands||[]).slice();
+      if(editing) cur[editingBrand] = entry; else cur.push(entry);
+      await BazDS.updateTrustedBrands(cur);
+      SETTINGS.trustedBrands = cur;
+      editingBrand = -1;
+      nameEl.value = ""; fileEl.value = ""; linkEl.value = ""; detEl.value = ""; status.textContent = "";
+      addBrandBtn.textContent = "+ Add brand";
+      renderTrustedBrandsAdmin(); posToast(editing ? "✅ Brand updated" : "✅ Brand added");
     }catch(err){ status.textContent = err.message || "Could not add brand"; }
     finally{ busy(addBrandBtn, false); }
   });
@@ -2652,3 +2672,20 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
 
   window.addEventListener("hashchange", ()=>switchView(location.hash.replace("#","")||"dashboard"));
 });
+
+/* Mobile: give every admin table cell its column title (data-label) so the CSS can show tables as stacked cards. */
+(function(){
+  function label(t){
+    const heads = [...t.querySelectorAll("tr:first-child th, thead th")].map(h=>h.textContent.trim());
+    if(!heads.length) return;
+    t.querySelectorAll("tr").forEach(tr=>{
+      [...tr.children].forEach((td,i)=>{ if(td.tagName==="TD" && td.dataset.label===undefined) td.dataset.label = heads[i]||""; });
+    });
+  }
+  function run(){ document.querySelectorAll("table.ad-table").forEach(label); }
+  document.addEventListener("DOMContentLoaded", ()=>{
+    run();
+    let t = null;
+    new MutationObserver(()=>{ clearTimeout(t); t = setTimeout(run, 60); }).observe(document.body, {childList:true, subtree:true});
+  });
+})();
