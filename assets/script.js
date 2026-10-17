@@ -1422,11 +1422,11 @@ function initProductPage(){
           <button type="button" class="wish-btn pd-wish ${isWishlisted(p.id)?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${isWishlisted(p.id)?'❤️':'🤍'}</span><span class="wish-label">${isWishlisted(p.id)?'Wishlisted':'Add to Wishlist'}</span></button>
           <a id="waBtn" class="btn btn-wa" target="_blank" href="#">🟢 Send WhatsApp Enquiry</a>
         </div>
-        <div class="pd-specs">
-          <div class="pd-spec"><span>Customization</span><span>Logo / Branding available</span></div>
-          <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
-          <div class="pd-spec"><span>Bulk enquiry from</span><span>${p.bulk} pcs</span></div>
-          <div class="pd-spec"><span>GST</span><span>Exclusive</span></div>
+        ${(p.details&&p.details.length)?`<div class="pd-details open" id="pdDetails">
+          <button type="button" class="pd-details-head" id="pdDetailsToggle" aria-expanded="true"><span>Additional Details</span><span class="pd-details-car">⌃</span></button>
+          <div class="pd-details-body">${p.details.map(r=>`<div class="pd-detail-row"><span>${String(r.k).replace(/</g,"&lt;")}</span><span>${String(r.v).replace(/</g,"&lt;")}</span></div>`).join("")}</div>
+        </div>`:""}
+        <div class="pd-specs pd-specs-suit">
           <div class="pd-spec pd-spec-tags">
             <span>Suitable for</span>
             <div class="pd-tags-wrap" id="pdSuitableTags" data-expanded="0">
@@ -1435,10 +1435,12 @@ function initProductPage(){
             ${suitableMoreHtml}
           </div>
         </div>
-        ${(p.details&&p.details.length)?`<div class="pd-details open" id="pdDetails">
-          <button type="button" class="pd-details-head" id="pdDetailsToggle" aria-expanded="true"><span>Additional Details</span><span class="pd-details-car">⌃</span></button>
-          <div class="pd-details-body">${p.details.map(r=>`<div class="pd-detail-row"><span>${String(r.k).replace(/</g,"&lt;")}</span><span>${String(r.v).replace(/</g,"&lt;")}</span></div>`).join("")}</div>
-        </div>`:""}
+        <div class="pd-specs">
+          <div class="pd-spec"><span>Customization</span><span>Logo / Branding available</span></div>
+          <div class="pd-spec"><span>MOQ</span><span>${p.moq} pcs</span></div>
+          <div class="pd-spec"><span>Bulk enquiry from</span><span>${p.bulk} pcs</span></div>
+          <div class="pd-spec"><span>GST</span><span>Exclusive</span></div>
+        </div>
       </div>
     </div>
     <div class="pd-related" id="relatedSection" style="display:none">
