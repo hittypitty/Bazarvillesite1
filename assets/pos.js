@@ -451,7 +451,7 @@ $("#btnReport").addEventListener("click", async () => {
 function applySettingsUI(){
   $("#shopNameTop").textContent = S.name; $("#shopTagTop").textContent = S.tag || "Counter billing";
   document.title = S.name + " POS";
-  $("#gstOn").checked = !!S.gstOn; $("#gstRate").value = S.gstRate; $("#gstMode").value = S.gstMode;
+  $("#gstOn").checked = false; $("#discVal").value = ""; // Subtotal / Discount / GST rows are hidden — bill total = sum of items
   document.body.className = "paper-" + S.paper;
 }
 $("#btnSettings").addEventListener("click", () => {

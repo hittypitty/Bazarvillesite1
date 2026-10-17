@@ -275,3 +275,6 @@ body.paper-a4 .px-receipt{max-width:640px;font-family:Inter,system-ui,sans-serif
   .px-top{position:relative;flex-shrink:0}
 }
 .px-vopt .px-dot{border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+
+/* subtotal, discount, GST and round-off rows removed from the bill panel — only TOTAL is shown */
+.px-calc .px-row:not(.px-grand){display:none!important}
