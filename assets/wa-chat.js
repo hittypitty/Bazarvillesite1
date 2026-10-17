@@ -39,6 +39,14 @@
   + '.bzwa-ic:hover{background:#f0f2f7}.bzwa-ic svg{width:22px;height:22px;fill:currentColor}'
   + '.bzwa-emo{position:absolute;right:12px;bottom:62px;background:#fff;border:1px solid #e6e8ee;border-radius:12px;padding:8px;display:none;grid-template-columns:repeat(6,1fr);gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.15)}'
   + '.bzwa-emo.on{display:grid}.bzwa-emo button{border:0;background:none;font-size:22px;cursor:pointer;border-radius:8px;padding:4px}.bzwa-emo button:hover{background:#f0f2f7}'
+  + '.bzwa-msgs{max-height:250px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}'
+  + '.bzwa-row{display:flex;gap:10px;align-items:flex-end}.bzwa-row.me{justify-content:flex-end}'
+  + '.bzwa-row .bzwa-av{width:34px;height:34px}.bzwa-row .bzwa-av svg{width:19px;height:19px}'
+  + '.bzwa-bub{max-width:80%}.bzwa-row.me .bzwa-bub{background:#dcf8c6;border-bottom-right-radius:3px}.bzwa-row:not(.me) .bzwa-bub{border-bottom-left-radius:3px}'
+  + '.bzwa-dots{display:inline-flex;gap:4px;padding:2px 0}.bzwa-dots i{width:7px;height:7px;border-radius:50%;background:#9aa1b4;animation:bzwaDot 1.1s infinite}.bzwa-dots i:nth-child(2){animation-delay:.18s}.bzwa-dots i:nth-child(3){animation-delay:.36s}'
+  + '@keyframes bzwaDot{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-4px);opacity:1}}'
+  + '.bzwa-chips{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 0 44px}.bzwa-chips button{border:1.5px solid #25d366;color:#0b8793;background:#fff;border-radius:99px;padding:7px 13px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}.bzwa-chips button:hover{background:#25d366;color:#fff}'
+  + '.bzwa-go{display:block;width:calc(100% - 28px);margin:0 14px 12px;border:0;background:#25d366;color:#fff;border-radius:10px;padding:11px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}.bzwa-go:hover{background:#1ebe5b}'
   + '.bzwa-by{text-align:center;font-size:11px;color:#8a90a2;padding:0 0 8px}'
   + '@media(max-width:700px){.bzwa{right:14px;bottom:84px}.bzwa-fab{width:56px;height:56px}.bzwa-card{bottom:70px}}'
   + '@media print{.bzwa{display:none}}';
@@ -47,42 +55,97 @@
   var WA = '<svg viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21c5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.8 14.12c-.25.69-1.45 1.32-2 1.4-.51.08-1.15.11-1.86-.12-.43-.14-.98-.32-1.69-.63-2.97-1.28-4.9-4.27-5.05-4.47-.15-.2-1.2-1.6-1.2-3.05 0-1.45.76-2.16 1.03-2.46.27-.3.59-.37.79-.37h.57c.18 0 .43-.07.67.51.25.6.84 2.05.91 2.2.08.15.13.32.03.52-.1.2-.15.32-.3.5-.15.17-.31.39-.45.52-.15.15-.3.31-.13.6.17.3.77 1.27 1.65 2.05 1.13 1 2.09 1.31 2.39 1.46.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.73.82 2.03.97.3.15.5.22.57.35.07.12.07.72-.18 1.41z"/></svg>';
   var EMOJI = ["😀","😊","😍","👍","🙏","🎁","🎉","🔥","👋","👌","💼","📦"];
 
+  /* ---- tiny rule-based assistant (only states things the site itself promises) ---- */
+  var CHIPS = ["Bulk order", "Custom printing / logo", "Price & MOQ", "Delivery", "Talk to a person"];
+  var KB = [
+    {k:/\b(hi|hello|hey|namaste|hii+)\b/, a:"Namaste! 👋 Main Bazarville ka assistant hu. Bulk order, logo printing, price ya delivery — jo poochna ho poochiye."},
+    {k:/(bulk|order|gifting|corporate|company|event|wedding|diwali)/, a:"Bulk aur corporate gifting hamara main kaam hai. Aap product, quantity aur kab tak chahiye bata dijiye — team quote aur design approval ke saath confirm karegi. 🎁"},
+    {k:/(print|logo|brand|custom|embroider|design|uv)/, a:"Logo / branding har product pe available hai (printing options product page pe diye hote hain). Dispatch se pehle design approval aapko bheja jata hai. 🎨 Logo file WhatsApp pe bhej dijiye."},
+    {k:/(price|rate|cost|kitna|kimat|moq|minimum|quantity|qty|pcs)/, a:"Price quantity ke hisaab se badalta hai — product page pe bulk tier table hota hai (jitna zyada quantity, utna kam rate). MOQ bhi har product pe likha hota hai. Prices GST ke bina hain. 💰"},
+    {k:/(deliver|shipping|ship|dispatch|kab|time|days|courier|track)/, a:"Pan-India bulk shipping hoti hai. Exact timeline quantity aur design approval pe depend karti hai — team order confirm karte waqt bata degi. 🚚"},
+    {k:/(gst|invoice|bill|tax)/, a:"Site pe dikhayi gayi prices GST exclusive hain. GST invoice order ke saath milta hai; details team confirm karegi. 🧾"},
+    {k:/(sample|mockup|preview)/, a:"Sample / mockup ke liye apni requirement WhatsApp pe bhej dijiye, team batayegi. ✨"},
+    {k:/(pay|payment|upi|bank|cod|cash|advance)/, a:"Payment ke tareeke (UPI / bank transfer / COD) order confirm karte waqt team batayegi. 💳"},
+    {k:/(thank|thanks|shukriya|dhanyavad|ok|okay|theek|thik)/, a:"Aapka swagat hai! 😊 Aur kuch poochna ho to likhiye, ya neeche se WhatsApp pe seedha baat kar lijiye."},
+    {k:/(person|human|call|talk|baat|agent|team|whatsapp|contact|number)/, a:"Zaroor! Neeche hare button se WhatsApp pe seedha team se baat kar sakte hain. 💬"}
+  ];
+  var DEFAULT_A = "Thik hai, note kar liya. 🙏 Is baare me poori detail ke liye neeche \"Continue on WhatsApp\" dabaiye — team seedha reply degi.";
+  var CHIP_Q = {"Bulk order":"I want to place a bulk order", "Custom printing / logo":"Custom printing with my logo", "Price & MOQ":"What are the price and MOQ?", "Delivery":"How is the delivery?", "Talk to a person":"I want to talk to a person"};
+  function reply(t){
+    var low = t.toLowerCase();
+    for(var i = 0; i < KB.length; i++) if(KB[i].k.test(low)) return KB[i].a;
+    return DEFAULT_A;
+  }
+
   var root = document.createElement("div"); root.className = "bzwa";
   root.innerHTML = ''
-    + '<div class="bzwa-card" role="dialog" aria-label="Chat on WhatsApp">'
+    + '<div class="bzwa-card" role="dialog" aria-label="Chat with ' + SHOP + '">'
     +   '<div class="bzwa-head"><button class="bzwa-close" aria-label="Close">×</button>'
     +     '<h4>Hi there 👋</h4><p>Welcome to ' + SHOP + '. Ask us anything 🎉</p><p class="bzwa-reply">We typically reply within a few minutes</p>'
     +     '<svg class="bzwa-wave" viewBox="0 0 350 22" preserveAspectRatio="none"><path d="M0 22V8c60 14 120 14 175 4S290-2 350 8v14z" fill="#fff"/></svg></div>'
-    +   '<div class="bzwa-body"><div class="bzwa-msg"><div class="bzwa-av">' + WA + '</div><div class="bzwa-bub">Hello! 👋<br>Bulk order, custom printing ya gifting ke baare me poochhein.</div></div></div>'
+    +   '<div class="bzwa-body"><div class="bzwa-msgs"></div></div>'
     +   '<div class="bzwa-foot"><textarea class="bzwa-in" rows="1" placeholder="Type your message…"></textarea>'
     +     '<button class="bzwa-ic bzwa-emoji" type="button" aria-label="Emoji">☺</button>'
-    +     '<button class="bzwa-ic bzwa-send" type="button" aria-label="Send on WhatsApp"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>'
+    +     '<button class="bzwa-ic bzwa-send" type="button" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>'
     +     '<div class="bzwa-emo">' + EMOJI.map(function(e){ return '<button type="button">' + e + '</button>'; }).join("") + '</div></div>'
-    +   '<div class="bzwa-by">Chat opens in WhatsApp</div>'
+    +   '<button class="bzwa-go" type="button">💬 Continue on WhatsApp</button>'
     + '</div>'
-    + '<button class="bzwa-fab" type="button" aria-label="Chat with us on WhatsApp">' + WA + '<span class="bzwa-x">×</span></button>';
+    + '<button class="bzwa-fab" type="button" aria-label="Chat with us">' + WA + '<span class="bzwa-x">×</span></button>';
   document.body.appendChild(root);
 
-  var input = root.querySelector(".bzwa-in"), emo = root.querySelector(".bzwa-emo");
+  var input = root.querySelector(".bzwa-in"), emo = root.querySelector(".bzwa-emo"), msgs = root.querySelector(".bzwa-msgs");
+  var log = [], started = false, chipsEl = null;
+  function esc(t){ return String(t).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+  function scroll(){ msgs.scrollTop = msgs.scrollHeight; }
+  function add(who, text){
+    var r = document.createElement("div"); r.className = "bzwa-row" + (who === "me" ? " me" : "");
+    r.innerHTML = (who === "me" ? "" : '<div class="bzwa-av">' + WA + '</div>') + '<div class="bzwa-bub">' + esc(text).replace(/\n/g, "<br>") + '</div>';
+    msgs.appendChild(r); log.push((who === "me" ? "Me: " : SHOP + ": ") + text); scroll(); return r;
+  }
+  function botSay(text, delay){
+    var r = document.createElement("div"); r.className = "bzwa-row";
+    r.innerHTML = '<div class="bzwa-av">' + WA + '</div><div class="bzwa-bub"><span class="bzwa-dots"><i></i><i></i><i></i></span></div>';
+    msgs.appendChild(r); scroll();
+    setTimeout(function(){ r.remove(); add("bot", text); }, delay || 700);
+  }
+  function showChips(){
+    chipsEl = document.createElement("div"); chipsEl.className = "bzwa-chips";
+    chipsEl.innerHTML = CHIPS.map(function(c){ return '<button type="button">' + c + '</button>'; }).join("");
+    chipsEl.addEventListener("click", function(e){ var b = e.target.closest("button"); if(b) userSay(CHIP_Q[b.textContent] || b.textContent); });
+    msgs.appendChild(chipsEl); scroll();
+  }
+  function userSay(text){
+    if(chipsEl){ chipsEl.remove(); chipsEl = null; }
+    add("me", text); botSay(reply(text));
+  }
   function open(on){
     root.classList.toggle("open", on);
     if(on){
-      if(!input.value){
-        var t = (document.title || "").split("|")[0].trim();
-        input.value = "Hi " + SHOP + "! " + (t && !/^home$/i.test(t) ? "I'm looking at \"" + t + "\" — " + location.href : "I'd like to know more.");
+      if(!started){
+        started = true;
+        add("bot", "Hello! 👋\nMain Bazarville ka assistant hu. Aap kis cheez me madad chahte hain?");
+        setTimeout(showChips, 300);
       }
-      setTimeout(function(){ input.focus(); fit(); }, 220);
+      setTimeout(function(){ input.focus(); }, 220);
     } else emo.classList.remove("on");
   }
   function fit(){ input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 110) + "px"; }
   function send(){
-    var msg = input.value.trim() || ("Hi " + SHOP + "!");
-    window.open("https://wa.me/" + number() + "?text=" + encodeURIComponent(msg), "_blank", "noopener");
-    input.value = ""; fit(); open(false);
+    var t = input.value.trim(); if(!t) return;
+    input.value = ""; fit(); userSay(t);
+  }
+  function toWhatsApp(){
+    var t = (document.title || "").split("|")[0].trim();
+    var lines = ["Hi " + SHOP + "!"];
+    if(log.length){ lines.push("", "(Website chat)"); log.forEach(function(l){ if(/^Me: /.test(l)) lines.push(l.slice(4)); }); }
+    else lines.push("I'd like to know more.");
+    if(t && !/^home$/i.test(t) && /product|collection/i.test(location.pathname)) lines.push("", "Page: " + t + " — " + location.href);
+    window.open("https://wa.me/" + number() + "?text=" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
   }
   root.querySelector(".bzwa-fab").addEventListener("click", function(){ open(!root.classList.contains("open")); });
   root.querySelector(".bzwa-close").addEventListener("click", function(){ open(false); });
   root.querySelector(".bzwa-send").addEventListener("click", send);
+  root.querySelector(".bzwa-go").addEventListener("click", toWhatsApp);
   root.querySelector(".bzwa-emoji").addEventListener("click", function(){ emo.classList.toggle("on"); });
   emo.addEventListener("click", function(e){ var b = e.target.closest("button"); if(!b) return; input.value += b.textContent; input.focus(); fit(); emo.classList.remove("on"); });
   input.addEventListener("input", fit);

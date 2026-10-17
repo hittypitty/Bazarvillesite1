@@ -1397,7 +1397,7 @@ function initProductPage(){
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
-        <div class="pd-rating">★★★★★ 4.7 (${18+p.id} reviews) &nbsp;•&nbsp; ${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
+        <div class="pd-rating">${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
         <div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
         <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>
