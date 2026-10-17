@@ -425,6 +425,11 @@ function attachTilt(nodes){
 /* ---------- collections ---------- */
 function renderCollections(target, list=COLLECTIONS){
   const el = document.querySelector(target); if(!el) return;
+  if(target === "#collGrid"){
+    const sec = document.querySelector("#collections");
+    const hp = (typeof SETTINGS !== "undefined" && SETTINGS && SETTINGS.homepage) || {};
+    if(sec) sec.style.display = (!list || !list.length || hp.showCollections === false) ? "none" : "";
+  }
   el.innerHTML = list.map(c=>`<a class="coll" href="collection.html?name=${encodeURIComponent(c.name)}"><img src="${c.img}" alt="${c.name}" loading="lazy"><div class="ov"><b>${c.name}</b><span>${c.tag}</span></div></a>`).join("");
 }
 
@@ -2125,7 +2130,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       BazDS.getProducts(), BazDS.getCollections(), BazDS.getSettings()
     ]);
     PRODUCTS = products.length ? products : DEFAULT_PRODUCTS;
-    COLLECTIONS = collections.length ? collections : DEFAULT_COLLECTIONS;
+    COLLECTIONS = collections || [];
     SETTINGS = (settings && settings.whatsappNumber) ? settings : DEFAULT_SETTINGS;
   }catch(err){
     console.error("Could not load live data from Supabase — showing built-in demo data instead.", err);
