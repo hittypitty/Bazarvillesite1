@@ -134,8 +134,16 @@ function openProduct(p){
   if(colors.length<=1 && sizes.length<=1 && prints.length<=1){
     addLine(p, {color:colors[0]||"", size:sizes[0]||"", print:prints[0]?pName(prints[0]):"", extra:prints[0]?pExtra(prints[0]):0, qty:1}); return;
   }
-  vSel = {p, color:colors[0]||"", size:sizes[0]||"", pi:0, qty:Math.max(1,p.moq?1:1)};
-  $("#vName").textContent = p.name; renderVariant(); show("mVariant");
+  vSel = {p, color:colors[0]||"", size:sizes[0]||"", pi:0, qty:1};
+  $("#vName").textContent = p.name; $("#vAdd").textContent = "Add to bill"; renderVariant(); show("mVariant");
+}
+function openLineEdit(i){
+  const l = cart[i]; if(!l) return;
+  const p = PRODUCTS.find(x=>x.id===l.productId);
+  if(!p){ toast("Ye product ab catalogue me nahi hai","err"); return; }
+  const pi = Math.max(0, (p.printOptions||[]).findIndex(o=>pName(o)===l.print));
+  vSel = {p, color:l.color||"", size:l.size||"", pi, qty:l.qty, line:i, origPrint:l.print||"", origQty:l.qty};
+  $("#vName").textContent = "✏️ " + p.name; $("#vAdd").textContent = "Update item"; renderVariant(); show("mVariant");
 }
 function renderVariant(){
   const {p} = vSel, colors = p.colors||[], sizes = p.sizes||[], prints = p.printOptions||[];
@@ -161,6 +169,20 @@ $("#vBody").addEventListener("click", e => {
 $("#vBody").addEventListener("input", e => { if(e.target.id==="vQty"){ vSel.qty = Math.max(1, Math.floor(num(e.target.value))||1); const k = $("#vBody .px-vtotal"); const pr = (vSel.p.printOptions||[])[vSel.pi]; const u = (tierPrice(vSel.p,vSel.qty)||0)+(pr?pExtra(pr):0); k.innerHTML = `${money(u)} × ${vSel.qty} = <b>${money(u*vSel.qty)}</b>`; } });
 $("#vAdd").addEventListener("click", () => {
   const {p} = vSel, pr = (p.printOptions||[])[vSel.pi];
+  if(vSel.line != null){ // updating an existing bill line
+    const l = cart[vSel.line]; if(l){
+      const printName = pr ? pName(pr) : "";
+      const changed = printName !== vSel.origPrint || vSel.qty !== vSel.origQty;
+      l.color = vSel.color; l.size = vSel.size; l.print = printName; l.extra = pr ? pExtra(pr) : 0; l.qty = vSel.qty;
+      l.img = imgOf(p, l.color); l.key = [l.productId,l.color,l.size,l.print].join("|");
+      if(changed) l.manual = false;
+      l.price = lineRate(l);
+      const dup = cart.findIndex((x,k)=>k!==vSel.line && x.key===l.key); // same variant already on the bill -> merge
+      if(dup>=0){ cart[dup].qty += l.qty; cart[dup].price = lineRate(cart[dup]); cart.splice(vSel.line,1); }
+      renderCart();
+    }
+    vSel.line = null; hide("mVariant"); return;
+  }
   addLine(p, {color:vSel.color, size:vSel.size, print:pr&&(p.printOptions.length>1)?pName(pr):(pr?pName(pr):""), extra:pr?pExtra(pr):0, qty:vSel.qty});
   hide("mVariant");
 });
@@ -190,7 +212,7 @@ function renderCart(){
         <div class="px-line-rate">${money(l.price)} /pc</div></div>
       <div class="px-line-right"><b>${money(l.qty*l.price)}</b>
         <div class="px-step"><button data-dec="${i}">−</button><input type="number" min="1" data-qty="${i}" value="${l.qty}"><button data-inc="${i}">+</button></div>
-        <button class="px-rm" data-rm="${i}" title="Remove">🗑</button></div></div>`;
+        <div class="px-line-btns"><button class="px-rm" data-editline="${i}" title="Colour / size / printing badlo">✏️</button><button class="px-rm" data-rm="${i}" title="Remove">🗑</button></div></div></div>`;
   }).join("") : '<div class="px-line-empty">Bill khali hai — left se product chuno ya search karke Enter dabao.</div>';
   totals();
 }
@@ -200,6 +222,8 @@ $("#lines").addEventListener("click", e => {
   if(b = g("data-inc")) setQty(+b.dataset.inc, cart[+b.dataset.inc].qty+1);
   else if(b = g("data-dec")) setQty(+b.dataset.dec, cart[+b.dataset.dec].qty-1);
   else if(b = g("data-rm")){ cart.splice(+b.dataset.rm,1); renderCart(); }
+  else if(b = g("data-editline")) openLineEdit(+b.dataset.editline);
+  else if(b = e.target.closest(".px-line-name,.px-line-var")){ const ln = b.closest(".px-line"); const idx = $$(".px-line").indexOf(ln); if(idx>=0) openLineEdit(idx); }
 });
 $("#lines").addEventListener("change", e => {
   if(e.target.dataset.qty!=null) setQty(+e.target.dataset.qty, Math.floor(num(e.target.value)));
@@ -271,7 +295,7 @@ function setEditing(o){
 function loadForEdit(o){
   if(cart.length && !editing && !confirm("Current bill replace ho jayega. Continue?")) return;
   const r = receiptFromOrder(o);
-  cart = r.items.map(i => ({...i, key:[i.productId,i.color,i.size,i.print].join("|"), manual:true, extra:0, img:imgOf(PRODUCTS.find(x=>x.id===i.productId)||{}, i.color)}));
+  cart = r.items.map(i => ({...i, key:[i.productId,i.color,i.size,i.print].join("|"), manual:true, extra:(()=>{const pp=PRODUCTS.find(x=>x.id===i.productId); const o=pp&&(pp.printOptions||[]).find(q=>pName(q)===i.print); return o?pExtra(o):0;})(), img:imgOf(PRODUCTS.find(x=>x.id===i.productId)||{}, i.color)}));
   setEditing(o);
   $("#billNo").textContent = r.billNo;
   $("#custName").value = r.customer || ""; $("#custPhone").value = r.phone || "";
