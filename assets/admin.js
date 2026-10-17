@@ -2705,9 +2705,59 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
     });
   }
   function run(){ document.querySelectorAll("table.ad-table").forEach(label); }
-  document.addEventListener("DOMContentLoaded", ()=>{
+  function start(){
     run();
     let t = null;
     new MutationObserver(()=>{ clearTimeout(t); t = setTimeout(run, 60); }).observe(document.body, {childList:true, subtree:true});
-  });
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", start); else start();
+})();
+
+/* ---------- Typing helpers (Vikas/Arjun: spelling mistakes + wrong URLs in admin) ----------
+   1) Every text box / text area gets the browser's spell-checker turned ON (red underline + right-click suggestions) in English.
+   2) Link boxes (image links, 3D model, brand website…) are cleaned when you leave them: spaces removed, "htp://" / "http//"
+      typos repaired, "www.site.com" gets https://, and a red hint shows if it still isn't a valid link. */
+(function(){
+  const isUrlField = el => /(url|link)/i.test(el.id||"") && !/Btn|Toggle|Row/i.test(el.id||"");
+  function fixUrl(raw){
+    let v = String(raw||"").trim().replace(/\s+/g,"");
+    if(!v) return "";
+    v = v.replace(/^h?tt?ps{0,2}:?\/{0,3}(?=[a-z0-9])/i, m=>/^http:/i.test(m)?"http://":"https://");
+    if(!/^https?:\/\//i.test(v)) v = "https://" + v.replace(/^\/+/,"");
+    return v;
+  }
+  function validUrl(v){ try{ const u = new URL(v); return /^https?:$/.test(u.protocol) && /\.[a-z]{2,}$/i.test(u.hostname); }catch(e){ return false; } }
+  function setHint(el, msg){
+    let h = el.nextElementSibling && el.nextElementSibling.classList && el.nextElementSibling.classList.contains("ad-url-hint") ? el.nextElementSibling : null;
+    if(!msg){ if(h) h.remove(); el.style.borderColor = ""; return; }
+    if(!h){ h = document.createElement("div"); h.className = "ad-url-hint"; el.insertAdjacentElement("afterend", h); }
+    h.textContent = msg; el.style.borderColor = "#d93025";
+  }
+  function prep(root){
+    root.querySelectorAll("input,textarea").forEach(el=>{
+      if(el.dataset.typingPrepped) return;
+      const t = (el.getAttribute("type")||"text").toLowerCase();
+      if(!["text","search","textarea",""].includes(t) && el.tagName!=="TEXTAREA") return;
+      el.dataset.typingPrepped = "1";
+      if(isUrlField(el)){
+        el.spellcheck = false; el.setAttribute("autocapitalize","off"); el.setAttribute("autocorrect","off");
+        el.addEventListener("blur", ()=>{
+          const raw = el.value; if(!raw.trim()){ setHint(el,""); return; }
+          if(el.id==="pf_imgUrlInput"||el.id==="cf_imgUrlInput") { /* existing Dropbox/Google-link helper runs on its own button */ }
+          const fixed = fixUrl(raw); if(fixed!==raw) el.value = fixed;
+          setHint(el, validUrl(el.value) ? "" : "Ye link sahi nahi lag raha — poora link daalo (jaise https://example.com/photo.jpg)");
+        });
+        el.addEventListener("input", ()=>setHint(el,""));
+      }else{
+        el.spellcheck = true; el.setAttribute("lang","en"); el.setAttribute("autocorrect","on");
+        if(!el.getAttribute("autocapitalize")) el.setAttribute("autocapitalize", el.tagName==="TEXTAREA"?"sentences":"words");
+      }
+    });
+  }
+  function start(){
+    prep(document);
+    let t = null;
+    new MutationObserver(()=>{ clearTimeout(t); t = setTimeout(()=>prep(document), 80); }).observe(document.body, {childList:true, subtree:true});
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

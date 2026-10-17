@@ -532,3 +532,4 @@ body.role-super .ad-super-only{display:block}
 .ad-detail-row{display:grid;grid-template-columns:1fr 1.3fr auto;gap:8px;align-items:center}
 .ad-detail-row input{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;min-width:0}
 @media(max-width:560px){.ad-detail-row{grid-template-columns:1fr auto}.ad-detail-row input[data-f="v"]{grid-column:1/2}}
+.ad-url-hint{color:#d93025;font-size:12px;font-weight:600;margin:5px 2px 0}
