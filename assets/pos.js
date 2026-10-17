@@ -399,8 +399,7 @@ function receiptHTML(r){
     <hr><table><tr><th>Item</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Amt</th></tr>${rows}</table><hr>
     ${line("Subtotal", r2(r.sub))}${r.disc?line("Discount","−"+r2(r.disc)):""}
     ${r.gstOn?line(`GST ${r.gstRate}% ${r.gstMode==="excl"?"":"(incl.)"}`, r2(r.gst)):""}${r.round?line("Round off",(r.round>0?"+":"")+r2(r.round)):""}
-    <hr>${line("TOTAL","₹"+r2(r.total),"g")}<hr>
-    ${line("Paid by", mode)}${r.received?line("Received","₹"+r2(r.received))+line("Change","₹"+r2(Math.max(0,r.received-r.total))):""}
+    <hr>${line("TOTAL","₹"+r2(r.total),"g")}
     ${r.note?`<div class="s">Note: ${esc(r.note)}</div>`:""}
     <hr><div class="c s">${esc(S.foot||"")}</div><div class="c s">Bill by Bazarville POS</div>`;
 }
