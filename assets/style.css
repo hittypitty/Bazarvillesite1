@@ -1169,3 +1169,13 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .pprice-row{min-height:30px}
 /* idle float keeps cards level (no rotation) so rows stay straight */
 @keyframes pcard-float3d{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+/* Trusted-by strip: smaller, tighter logos */
+.trusted{padding:20px 0}
+.trusted p{font-size:11.5px;margin-bottom:12px}
+.logochip{font-size:14px}
+.logochip-img{gap:3px;padding:6px 14px 5px;min-width:70px;border-radius:14px}
+.logochip-img img{height:26px;max-width:90px}
+.logochip-img .lc-name{font-size:10.5px;max-width:90px}
+.logostrip{gap:14px}
+@media(max-width:700px){.trusted{padding:14px 0}.logochip-img img{height:22px;max-width:76px}.logochip-img .lc-name{font-size:10px;max-width:76px}}

@@ -1929,7 +1929,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(waInput) waInput.value = SETTINGS.whatsappNumber || "";
     const homeQInput = document.querySelector("#settingsHomeQuestions");
     if(homeQInput) homeQInput.value = (SETTINGS.homepageQuestions || []).join("\n");
-    renderTrustedBrandsAdmin();
+    renderTrustedBrandsAdmin(); if(typeof renderHpAdmin === "function") renderHpAdmin();
     const row = document.querySelector("#heroUploadRow"); if(!row) return;
     row.innerHTML = [0,1,2].map(i=>`
       <div class="ad-hero-slot">
@@ -2015,6 +2015,64 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       renderTrustedBrandsAdmin(); posToast(editing ? "✅ Brand updated" : "✅ Brand added");
     }catch(err){ status.textContent = err.message || "Could not add brand"; }
     finally{ busy(addBrandBtn, false); }
+  });
+
+  /* ---------- Homepage sections: on/off + FAQ editor (Settings) ---------- */
+  const DEFAULT_FAQS = [
+    {q:"Is there a minimum order quantity?", a:"Yes — MOQ is set per product/SKU and shown clearly on every product page, alongside the quantity at which bulk enquiry support kicks in."},
+    {q:"How does bulk pricing work?", a:"Pricing is quantity-aware — as you increase quantity on a product page, pricing automatically recalculates to the applicable slab, and the total updates live."},
+    {q:"Can I pay online?", a:"Not in this phase. Bazarville is a discovery and enquiry platform — commercial discussion, customization and payment happen over WhatsApp with our team."},
+    {q:"What if a product is out of stock?", a:"Out-of-stock pages stay live with similar product suggestions, and you can still raise a WhatsApp enquiry for availability or replenishment."}
+  ];
+  let hpFaqs = [];
+  function renderHpAdmin(){
+    const hp = SETTINGS.homepage || {};
+    const set = (id,v)=>{ const el = document.querySelector(id); if(el) el.checked = v; };
+    set("#hpShowCollections", hp.showCollections !== false); set("#hpShowTrusted", hp.showTrusted !== false); set("#hpShowFaq", hp.showFaq !== false);
+    hpFaqs = (hp.faqs && hp.faqs.length ? hp.faqs : DEFAULT_FAQS).map(x=>({q:x.q, a:x.a}));
+    drawHpFaqs();
+  }
+  function drawHpFaqs(){
+    const el = document.querySelector("#hpFaqList"); if(!el) return;
+    const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    el.innerHTML = hpFaqs.length ? hpFaqs.map((f,i)=>`
+      <div class="ad-faq-row">
+        <div class="ad-faq-fields">
+          <input data-hq="${i}" value="${esc(f.q)}" placeholder="Question">
+          <textarea data-ha="${i}" rows="2" placeholder="Answer">${esc(f.a)}</textarea>
+        </div>
+        <button type="button" class="ad-icon-btn danger" data-hdel="${i}" title="Remove question">🗑️</button>
+      </div>`).join("") : `<p class="ad-hint">Koi question nahi — website par default FAQs dikhenge.</p>`;
+  }
+  const hpList = document.querySelector("#hpFaqList");
+  if(hpList){
+    hpList.addEventListener("input", e=>{
+      if(e.target.dataset.hq!=null) hpFaqs[+e.target.dataset.hq].q = e.target.value;
+      if(e.target.dataset.ha!=null) hpFaqs[+e.target.dataset.ha].a = e.target.value;
+    });
+    hpList.addEventListener("click", e=>{
+      const d = e.target.closest("[data-hdel]"); if(!d) return;
+      hpFaqs.splice(+d.dataset.hdel, 1); drawHpFaqs();
+    });
+  }
+  const hpAdd = document.querySelector("#hpFaqAdd");
+  if(hpAdd) hpAdd.addEventListener("click", ()=>{ hpFaqs.push({q:"", a:""}); drawHpFaqs(); const ins = document.querySelectorAll("#hpFaqList [data-hq]"); if(ins.length) ins[ins.length-1].focus(); });
+  const hpSave = document.querySelector("#hpSave");
+  if(hpSave) hpSave.addEventListener("click", async ()=>{
+    const cfg = {
+      showCollections: document.querySelector("#hpShowCollections").checked,
+      showTrusted: document.querySelector("#hpShowTrusted").checked,
+      showFaq: document.querySelector("#hpShowFaq").checked,
+      faqs: hpFaqs.map(f=>({q:f.q.trim(), a:f.a.trim()})).filter(f=>f.q && f.a)
+    };
+    const st = document.querySelector("#hpStatus");
+    busy(hpSave, true, "Saving…");
+    try{
+      await BazDS.updateHomepage(cfg, SETTINGS.trustedBrands||[]);
+      SETTINGS.homepage = cfg; renderHpAdmin();
+      st.textContent = ""; posToast("✅ Homepage settings save ho gayi");
+    }catch(err){ st.textContent = err.message || "Could not save"; posToast(err.message || "Could not save", "error"); }
+    finally{ busy(hpSave, false); }
   });
 
   const saveHomeQuestionsBtn = document.querySelector("#saveHomeQuestionsBtn");

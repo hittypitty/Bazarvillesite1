@@ -195,10 +195,26 @@ const BazDS = (function(){
     "How can we help you today?"
   ];
 
+  /* Homepage section switches + FAQ list ride inside settings.trusted_brands as one reserved element {_config:{...}}
+     (that column already exists after add_360_view.sql) — so no extra SQL is needed. */
+  let HP_CACHE = {};
+  function splitTrusted(arr){
+    const brands = []; let cfg = {};
+    (Array.isArray(arr) ? arr : []).forEach(x => { if(x && x._config) cfg = x._config; else brands.push(x); });
+    return {brands, cfg};
+  }
+  function normHomepage(cfg){
+    cfg = cfg || {};
+    return {
+      showCollections: cfg.showCollections !== false, showTrusted: cfg.showTrusted !== false, showFaq: cfg.showFaq !== false,
+      faqs: Array.isArray(cfg.faqs) ? cfg.faqs.filter(x => x && x.q && x.a) : []
+    };
+  }
+
   const SETTINGS_FALLBACK = {
     whatsappNumber:"919827869031", heroImages:[], brandColor:"#c6f000", brandFont:"inter", animationLevel:"subtle",
     purposes: DEFAULT_PURPOSES_FALLBACK, occasions: DEFAULT_OCCASIONS_FALLBACK, customProfessions: [],
-    homepageQuestions: DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK
+    homepageQuestions: DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK, homepage: normHomepage({})
   };
 
   async function getSettings(){
@@ -218,7 +234,8 @@ const BazDS = (function(){
       customProfessions: data.custom_professions || [],
       homepageQuestions: (data.homepage_questions && data.homepage_questions.length) ? data.homepage_questions : DEFAULT_HOMEPAGE_QUESTIONS_FALLBACK,
       // [{name, logo}] shown in the homepage "Trusted by" strip (add_360_view.sql adds the column)
-      trustedBrands: Array.isArray(data.trusted_brands) ? data.trusted_brands : []
+      trustedBrands: splitTrusted(data.trusted_brands).brands,
+      homepage: (HP_CACHE = splitTrusted(data.trusted_brands).cfg, normHomepage(HP_CACHE))
     };
   }
 
@@ -260,13 +277,20 @@ const BazDS = (function(){
       never breaks the other settings saves. */
   async function updateTrustedBrands(list){
     const sb = getClient(); if(!sb) return false;
-    const { error } = await sb.from("settings").update({ trusted_brands: list }).eq("id",1);
+    const payload = list.slice(); if(Object.keys(HP_CACHE||{}).length) payload.push({_config: HP_CACHE});
+    const { error } = await sb.from("settings").update({ trusted_brands: payload }).eq("id",1);
     if(error){
       console.error("updateTrustedBrands:", error.message);
       if(/trusted_brands/i.test(error.message)) throw new Error("Pehle supabase/add_360_view.sql Supabase SQL Editor me run karo, phir brands save honge.");
       throw error;
     }
     return true;
+  }
+
+  /** Show/hide homepage sections + custom FAQ list (see HP_CACHE note above). `brands` = the current trusted-brand list. */
+  async function updateHomepage(cfg, brands){
+    HP_CACHE = cfg || {};
+    return updateTrustedBrands(brands || []);
   }
 
   async function logEnquiry({ref, productId, productName, quantity}){
@@ -635,7 +659,7 @@ const BazDS = (function(){
   return {
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
-    getSettings, updateSettings, updateTrustedBrands,
+    getSettings, updateSettings, updateTrustedBrands, updateHomepage,
     logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage, uploadFile,
     signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,

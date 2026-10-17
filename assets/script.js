@@ -1802,6 +1802,20 @@ function initHeroTilt(){
   hero.addEventListener("mouseleave", ()=>{ stack.style.transform = "rotateY(0deg) rotateX(0deg)"; });
 }
 
+/* ---------- homepage sections: admin on/off switches + admin-written FAQs (Admin → Site Settings → Homepage sections) ---------- */
+function applyHomepage(){
+  const hp = (SETTINGS && SETTINGS.homepage) || {};
+  const toggle = (sel, off)=>{ const el = document.querySelector(sel); if(el) el.style.display = off ? "none" : ""; };
+  toggle("#collections", hp.showCollections === false);
+  toggle("#trustedSection", hp.showTrusted === false);
+  toggle("#faqSection", hp.showFaq === false);
+  const box = document.querySelector("#faqSection .faq");
+  if(box && Array.isArray(hp.faqs) && hp.faqs.length){
+    const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    box.innerHTML = hp.faqs.map(f=>`<div class="faqitem"><div class="faqq">${esc(f.q)}<span class="plus">+</span></div><div class="faqa">${esc(f.a).replace(/\n/g,"<br>")}</div></div>`).join("");
+  }
+}
+
 /* ---------- FAQ accordion ---------- */
 function initFaq(){
   document.querySelectorAll(".faqitem").forEach(item=>{
@@ -2111,6 +2125,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   applyBrandColor(SETTINGS.brandColor);
   applyBrandFont(SETTINGS.brandFont);
   applyAnimationLevel(SETTINGS.animationLevel);
+  applyHomepage();
   const footerWaLink = document.querySelector("#footerWaLink");
   if(footerWaLink) footerWaLink.href = `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${encodeURIComponent("Hi Bazarville! I'd like to know more.")}`;
   // #ctaWaLink used to be set here too, back when the "Send WhatsApp Enquiry"
