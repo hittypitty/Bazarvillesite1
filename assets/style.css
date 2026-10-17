@@ -1138,3 +1138,13 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .collection-hero img{display:block;width:100%;height:auto;max-height:560px;object-fit:cover;object-position:center top}
 .collection-hero .ov{background:linear-gradient(0deg,rgba(0,0,0,.7) 0%,rgba(0,0,0,.25) 28%,rgba(0,0,0,0) 55%)}
 @media(max-width:640px){.collection-hero .ov{padding:16px}.collection-hero .ov h1{font-size:22px}}
+
+/* Additional Details table (per-product, admin-editable) */
+.pd-details{margin-top:26px;border-top:1px solid var(--line);padding-top:6px}
+.pd-details-head{display:flex;width:100%;justify-content:space-between;align-items:center;background:none;border:0;padding:14px 0;font:inherit;font-size:18px;font-weight:800;color:var(--ink);cursor:pointer;text-align:left}
+.pd-details-car{font-size:22px;line-height:1;transition:transform .25s ease}
+.pd-details:not(.open) .pd-details-car{transform:rotate(180deg)}
+.pd-details:not(.open) .pd-details-body{display:none}
+.pd-detail-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;padding:11px 0;font-size:14.5px;border-bottom:1px solid var(--line)}
+.pd-detail-row span:first-child{color:var(--muted)}
+.pd-detail-row span:last-child{color:var(--ink);font-weight:600;overflow-wrap:anywhere}

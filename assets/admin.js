@@ -1145,6 +1145,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <button class="btn btn-outline btn-sm" type="button" id="pf_addPrintOptBtn">+ Add option</button>
         </div>
       </div>
+      <div class="ad-field full">
+        <label>Additional details <span class="ad-hint" style="display:inline">(optional — a "label : value" table shown on the product page, e.g. Material : Cotton, Capacity : 100 ml, Country of Origin : India)</span></label>
+        <div id="pf_detailRows" class="ad-detail-rows"></div>
+        <button class="btn btn-outline btn-sm" type="button" id="pf_addDetailBtn" style="margin-top:8px">+ Add detail row</button>
+      </div>
       <div class="ad-field full"><h4 style="margin:6px 0 -4px">SEO (optional — shown in Google search results and the browser tab)</h4></div>
       <div class="ad-field full"><label>Meta title</label><input id="pf_metaTitle" value="${p&&p.metaTitle?p.metaTitle.replace(/"/g,'&quot;'):''}" placeholder="Defaults to the product name if left blank" maxlength="70"></div>
       <div class="ad-field full"><label>Meta description</label><input id="pf_metaDesc" value="${p&&p.metaDescription?p.metaDescription.replace(/"/g,'&quot;'):''}" placeholder="1-2 line summary shown under the title in Google" maxlength="160"></div>
@@ -1235,6 +1240,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   let model3dUrl = "";      // optional .glb URL
   let workingSizes = [];
   let workingPrintOpts = [];
+  let workingDetails = []; // [{k:"Flavour", v:"Apricot"}] — the product page's "Additional Details" table
   let workingColorImages = {}; // {"#1a1a1a": ["url1","url2"]} — optional per-colour gallery override
   function renderColorChips(){
     const el = document.querySelector("#pf_colorChips"); if(!el) return;
@@ -1318,6 +1324,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const poName = s=>String(s).split("::")[0];
   const poExtra = s=>{ const n = Number(String(s).split("::")[1]); return n>0 ? n : 0; };
   AdminUI.setPrintExtra = (i, v)=>{ const n = Math.max(0, Math.round(Number(v)||0)); workingPrintOpts[i] = poName(workingPrintOpts[i]) + (n? "::"+n : ""); };
+  function renderDetailRows(){
+    const el = document.querySelector("#pf_detailRows"); if(!el) return;
+    const esc = t=>String(t||"").replace(/"/g,"&quot;");
+    el.innerHTML = workingDetails.map((r,i)=>`
+      <div class="ad-detail-row">
+        <input type="text" placeholder="Label (e.g. Material)" value="${esc(r.k)}" data-i="${i}" data-f="k" maxlength="60">
+        <input type="text" placeholder="Value (e.g. Cotton)" value="${esc(r.v)}" data-i="${i}" data-f="v" maxlength="160">
+        <button type="button" class="ad-icon-btn danger" data-del="${i}" title="Remove row">✕</button>
+      </div>`).join("") || `<span class="ad-hint" style="margin:0">No extra details yet — click "+ Add detail row"</span>`;
+    el.querySelectorAll("input").forEach(inp=>inp.addEventListener("input", ()=>{ workingDetails[Number(inp.dataset.i)][inp.dataset.f] = inp.value; }));
+    el.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click", ()=>{ workingDetails.splice(Number(b.dataset.del),1); renderDetailRows(); }));
+  }
   function renderPrintOptChips(){
     const el = document.querySelector("#pf_printOptChips"); if(!el) return;
     el.innerHTML = workingPrintOpts.map((s,i)=>`
@@ -1483,6 +1501,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
     workingSizes = p ? p.sizes.slice() : ["Standard"];
     workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
+    workingDetails = p && Array.isArray(p.details) ? p.details.map(x=>({k:x.k,v:x.v})) : [];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
     // Status lives in the modal's header line (next to the title), not in the
     // scrollable form body, so it's visible immediately without scrolling —
@@ -1502,6 +1521,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderColorChips();
     renderSizeChips();
     renderPrintOptChips();
+    renderDetailRows();
+    document.querySelector("#pf_addDetailBtn").addEventListener("click", ()=>{ workingDetails.push({k:"",v:""}); renderDetailRows(); const ins = document.querySelectorAll("#pf_detailRows input"); if(ins.length>1) ins[ins.length-2].focus(); });
     initView360Controls();
     document.querySelector("#pf_addPrintOptBtn").addEventListener("click", ()=>{
       const input = document.querySelector("#pf_printOptInput");
@@ -1747,6 +1768,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       })(),
       sizes: workingSizes.slice(),
       printOptions: workingPrintOpts.slice(),
+      details: workingDetails.map(x=>({k:String(x.k||'').trim(),v:String(x.v||'').trim()})).filter(x=>x.k&&x.v),
       // Never save a product with zero valid tiers — every price display,
       // sort-by-price and the budget filter on the public site reads
       // tiers[0], and an empty array used to crash those features for

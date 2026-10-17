@@ -34,8 +34,9 @@ const BazDS = (function(){
       // colour missing here (or predating the add_color_images.sql migration)
       // just falls back to `img` above, so nothing changes for any existing
       // product until an admin deliberately assigns colour-specific photos.
-      colorImages: Object.fromEntries(Object.entries(color_images || {}).filter(([k])=>k!=="_names")),
+      colorImages: Object.fromEntries(Object.entries(color_images || {}).filter(([k])=>k!=="_names"&&k!=="_details")),
       colorNames: (color_images && color_images._names) || {},
+      details: (color_images && Array.isArray(color_images._details)) ? color_images._details : [],
       // Per-colour stock QUANTITY — POS-only (see add_pos.sql). A colour
       // missing here just means its quantity hasn't been set in POS yet;
       // it's unrelated to the plain in-stock/out-of-stock `stock` flag used
@@ -59,12 +60,12 @@ const BazDS = (function(){
     };
   }
   function appToDb(p){
-    const {img, printOptions, metaTitle, metaDescription, colorImages, colorNames, colorStock, view360, model3d, ...rest} = p;
+    const {img, printOptions, metaTitle, metaDescription, colorImages, colorNames, details, colorStock, view360, model3d, ...rest} = p;
     return {
       ...rest,
       images: img || [],
       // colour display names ride along inside the existing color_images jsonb under a reserved "_names" key (no new column / SQL needed)
-      color_images: {...(colorImages || {}), ...(colorNames && Object.keys(colorNames).length ? {_names: colorNames} : {})},
+      color_images: {...(colorImages || {}), ...(colorNames && Object.keys(colorNames).length ? {_names: colorNames} : {}), ...(details && details.length ? {_details: details} : {})},
       color_stock: colorStock || {},
       view_360: view360 || [],
       model_url: model3d || "",

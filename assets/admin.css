@@ -527,3 +527,8 @@ body.role-super .ad-super-only{display:block}
   .ad-form-grid,.ad-brand-add{grid-template-columns:1fr}
   .ad-brand-add input,.ad-brand-add .btn{flex:1 1 100%}
 }
+
+.ad-detail-rows{display:flex;flex-direction:column;gap:8px}
+.ad-detail-row{display:grid;grid-template-columns:1fr 1.3fr auto;gap:8px;align-items:center}
+.ad-detail-row input{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;min-width:0}
+@media(max-width:560px){.ad-detail-row{grid-template-columns:1fr auto}.ad-detail-row input[data-f="v"]{grid-column:1/2}}

@@ -1435,6 +1435,10 @@ function initProductPage(){
             ${suitableMoreHtml}
           </div>
         </div>
+        ${(p.details&&p.details.length)?`<div class="pd-details open" id="pdDetails">
+          <button type="button" class="pd-details-head" id="pdDetailsToggle" aria-expanded="true"><span>Additional Details</span><span class="pd-details-car">⌃</span></button>
+          <div class="pd-details-body">${p.details.map(r=>`<div class="pd-detail-row"><span>${String(r.k).replace(/</g,"&lt;")}</span><span>${String(r.v).replace(/</g,"&lt;")}</span></div>`).join("")}</div>
+        </div>`:""}
       </div>
     </div>
     <div class="pd-related" id="relatedSection" style="display:none">
@@ -1582,6 +1586,9 @@ function initProductPage(){
   document.querySelector("#qPlus").addEventListener("click",()=>{ qtyInput.value = (Number(qtyInput.value)||1)+1; recalc(); });
   qtyInput.addEventListener("input", ()=>recalc());
   recalc();
+
+  const detToggle = document.querySelector("#pdDetailsToggle");
+  if(detToggle) detToggle.addEventListener("click", ()=>{ const box = document.querySelector("#pdDetails"); const o = box.classList.toggle("open"); detToggle.setAttribute("aria-expanded", o?"true":"false"); });
 
   const suitableToggle = document.querySelector("#pdSuitableToggle");
   if(suitableToggle){
