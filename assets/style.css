@@ -1127,3 +1127,8 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
   .pd-price-box,.livecalc,.threshold-msg,.tier-table{max-width:100%;box-sizing:border-box}
   .tier-table{width:100%;table-layout:fixed}
 }
+
+/* Vikas: no light-greenish background behind Collections and the price table */
+#collections,.section.alt#collections{background:#fff}
+.pd-price-box{background:#fff;border:1px solid var(--line)}
+.tier-table tr:nth-child(odd),.tier-table td{background:transparent}
