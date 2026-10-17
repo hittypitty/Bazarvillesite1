@@ -283,7 +283,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
      product.colorStock holds the numbers: one key per colour that has a quantity set, plus "_total" for
      products tracked as a single number (no colour split). Missing = not tracked (plain in/out flag only). */
   const STOCK_SQL_MSG = "Stock quantity DB me save nahi hui — Supabase SQL Editor me supabase/add_pos.sql run karo (products.color_stock column missing hai).";
-  function stockWasStripped(saved){ return !!(saved && saved.__stripped && saved.__stripped.includes("color_stock")); }
+  function stockWasStripped(saved){ return !!(saved && saved.__stripped && saved.__stripped.includes("color_stock") && saved.__stripped.includes("color_images")); }
   function stockTotal(p){
     const vals = Object.values(p.colorStock||{}).filter(v=>v!=null && !isNaN(v)).map(Number);
     return vals.length ? vals.reduce((s,v)=>s+v,0) : null;

@@ -364,9 +364,9 @@ async function completeSale(){
     for(const [k,d] of Object.entries(delta)){ if(!d) continue; const [pid,color] = k.split("|"); const p = PRODUCTS.find(x=>String(x.id)===pid); if(deductStock(p, color, d)) touched.add(p); }
   } else for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty)) touched.add(p); }
   let warn = false;
-  for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(sv && sv.__stripped && sv.__stripped.includes("color_stock")) warn = true; }catch(e){ warn = true; console.error(e); } }
-  if(warn) toast("Sale ho gayi, par stock minus nahi hua — Supabase me supabase/add_pos.sql run karo","err");
-  else if(!touched.size && !old) toast("Stock minus nahi hua: Inventory me in products ki quantity set nahi hai","err");
+  for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(sv && sv.__stripped && sv.__stripped.includes("color_stock") && sv.__stripped.includes("color_images")) warn = true; }catch(e){ warn = true; console.error(e); } }
+  if(warn) toast("Sale ho gayi, par stock minus nahi hua — internet/Supabase check karo","err");
+  else if(!touched.size && !old) toast("Is product ki stock quantity set nahi hai, isliye minus nahi hua — Admin → Inventory me Qty bharo","err");
   busy(btn, false);
   await refreshOrders(); resetBill(); renderGrid();
   if(old) toast("✅ Bill update ho gaya","ok");
@@ -423,8 +423,11 @@ $("#rWa").addEventListener("click", () => {
 $("#btnRecent").addEventListener("click", async () => {
   await refreshOrders();
   $("#lTitle").textContent = "🧾 Recent bills";
-  $("#lBody").innerHTML = posOrders.length ? posOrders.slice(0,40).map(o=>`<div class="px-li"><div><b>${esc((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1]||o.ref)}</b> · ${money(o.subtotal)}<small>${esc(o.customer_name||"")} · ${esc(o.payment_method||"cash")} · ${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>
-    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button></div></div>`).join("") : '<div class="px-empty">Abhi koi POS bill nahi bana</div>';
+  const billRows = list => list.length ? list.map(o=>`<div class="px-li"><div><b>${esc((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1]||o.ref)}</b> · ${money(o.subtotal)}<small>${esc(o.customer_name||"")} · ${esc(o.payment_method||"cash")} · ${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>
+    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button></div></div>`).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
+  $("#lBody").innerHTML = '<input id="billSearch" placeholder="Bill no. ya customer search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
+  const draw = () => { const q = $("#billSearch").value.trim().toLowerCase(); $("#billRows").innerHTML = billRows(posOrders.filter(o => !q || ((o.notes||"")+" "+(o.customer_name||"")+" "+(o.ref||"")).toLowerCase().includes(q)).slice(0,60)); };
+  $("#billSearch").addEventListener("input", draw); draw();
   show("mList");
 });
 $("#btnReport").addEventListener("click", async () => {

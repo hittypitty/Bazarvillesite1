@@ -34,14 +34,16 @@ const BazDS = (function(){
       // colour missing here (or predating the add_color_images.sql migration)
       // just falls back to `img` above, so nothing changes for any existing
       // product until an admin deliberately assigns colour-specific photos.
-      colorImages: Object.fromEntries(Object.entries(color_images || {}).filter(([k])=>k!=="_names"&&k!=="_details")),
+      colorImages: Object.fromEntries(Object.entries(color_images || {}).filter(([k])=>k!=="_names"&&k!=="_details"&&k!=="_stock")),
       colorNames: (color_images && color_images._names) || {},
       details: (color_images && Array.isArray(color_images._details)) ? color_images._details : [],
       // Per-colour stock QUANTITY — POS-only (see add_pos.sql). A colour
       // missing here just means its quantity hasn't been set in POS yet;
       // it's unrelated to the plain in-stock/out-of-stock `stock` flag used
       // everywhere else on the site.
-      colorStock: color_stock || {},
+      // Stock quantities live in products.color_stock; a copy also rides inside color_images._stock so tracking still works
+      // even before add_pos.sql has been run (the column is then simply missing).
+      colorStock: (color_stock && Object.keys(color_stock).length) ? color_stock : ((color_images && color_images._stock) || {}),
       // 360° spin frames (ordered image URLs) and an optional 3D model (.glb) URL — see add_360_view.sql.
       view360: Array.isArray(view_360) ? view_360 : [],
       model3d: model_url || "",
@@ -65,7 +67,7 @@ const BazDS = (function(){
       ...rest,
       images: img || [],
       // colour display names ride along inside the existing color_images jsonb under a reserved "_names" key (no new column / SQL needed)
-      color_images: {...(colorImages || {}), ...(colorNames && Object.keys(colorNames).length ? {_names: colorNames} : {}), ...(details && details.length ? {_details: details} : {})},
+      color_images: {...(colorImages || {}), ...(colorNames && Object.keys(colorNames).length ? {_names: colorNames} : {}), ...(details && details.length ? {_details: details} : {}), ...(colorStock && Object.keys(colorStock).length ? {_stock: colorStock} : {})},
       color_stock: colorStock || {},
       view_360: view360 || [],
       model_url: model3d || "",
