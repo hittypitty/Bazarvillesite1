@@ -570,6 +570,9 @@ const BazDS = (function(){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
     const row = { items: fields.items, subtotal: fields.subtotal, updated_at: new Date().toISOString() };
     row.customer_name = fields.customerName || "Walk-in counter sale";
+    if(fields.customerPhone !== undefined) row.customer_phone = fields.customerPhone;
+    if(fields.paymentMethod) row.payment_method = fields.paymentMethod;
+    if(fields.notes !== undefined) row.notes = fields.notes;
     const { error } = await sb.from("orders").update(row).eq("id", id);
     if(error){ console.error("updatePosSale:", error.message); throw error; }
     return true;

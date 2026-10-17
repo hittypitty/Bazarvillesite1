@@ -11,7 +11,7 @@ const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 
 /* ---------------- state ---------------- */
 let PRODUCTS = [], cart = [], payMode = "cash", activeCat = "", holds = [], posOrders = [];
-let me = null, vSel = null, lastReceipt = null;
+let me = null, vSel = null, lastReceipt = null, editing = null;
 const SKEY = "bz_pos_settings";
 const DEFAULTS = {name:"Bazarville", tag:"Corporate gifting & custom printing", addr:"", phone:"9827869031", gstin:"", foot:"Thank you! Visit again.", paper:"80", gstOn:false, gstRate:"18", gstMode:"excl"};
 let S = Object.assign({}, DEFAULTS);
@@ -187,7 +187,7 @@ function renderCart(){
     return `<div class="px-line">
       ${l.img?`<img src="${esc(l.img)}" alt="">`:'<div class="ph"></div>'}
       <div><div class="px-line-name">${esc(l.name)}</div>${v?`<div class="px-line-var">${v}</div>`:""}
-        <div class="px-line-rate">₹<input type="number" min="0" inputmode="decimal" data-rate="${i}" value="${l.price}"> /pc</div></div>
+        <div class="px-line-rate">${money(l.price)} /pc</div></div>
       <div class="px-line-right"><b>${money(l.qty*l.price)}</b>
         <div class="px-step"><button data-dec="${i}">−</button><input type="number" min="1" data-qty="${i}" value="${l.qty}"><button data-inc="${i}">+</button></div>
         <button class="px-rm" data-rm="${i}" title="Remove">🗑</button></div></div>`;
@@ -203,9 +203,9 @@ $("#lines").addEventListener("click", e => {
 });
 $("#lines").addEventListener("change", e => {
   if(e.target.dataset.qty!=null) setQty(+e.target.dataset.qty, Math.floor(num(e.target.value)));
-  else if(e.target.dataset.rate!=null){ const l = cart[+e.target.dataset.rate]; l.price = Math.max(0, num(e.target.value)); l.manual = true; renderCart(); }
 });
 function setQty(i, q){ const l = cart[i]; if(!l) return; if(q<1){ cart.splice(i,1); renderCart(); return; } l.qty = q; l.price = lineRate(l); renderCart(); }
+$("#editCancel").addEventListener("click", () => { resetBill(); toast("Edit cancel kiya"); });
 $("#btnClear").addEventListener("click", () => { if(!cart.length) return; if(confirm("Poora bill clear karna hai?")){ resetBill(false); } });
 $("#btnNote").addEventListener("click", () => { const n = $("#note"); n.hidden = !n.hidden; if(!n.hidden) n.focus(); });
 
@@ -262,7 +262,29 @@ function newBillNo(){
   max = Math.max(max, posOrders.length);
   $("#billNo").textContent = "POS-" + String(max+1).padStart(6,"0");
 }
+function setEditing(o){
+  editing = o;
+  $("#editBar").hidden = !o;
+  if(o) $("#editLabel").textContent = "Editing " + ((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1] || o.ref);
+  $("#btnPay").innerHTML = o ? "💾 Save changes <small>F12</small>" : "✅ Complete Sale <small>F12</small>";
+}
+function loadForEdit(o){
+  if(cart.length && !editing && !confirm("Current bill replace ho jayega. Continue?")) return;
+  const r = receiptFromOrder(o);
+  cart = r.items.map(i => ({...i, key:[i.productId,i.color,i.size,i.print].join("|"), manual:true, extra:0, img:imgOf(PRODUCTS.find(x=>x.id===i.productId)||{}, i.color)}));
+  setEditing(o);
+  $("#billNo").textContent = r.billNo;
+  $("#custName").value = r.customer || ""; $("#custPhone").value = r.phone || "";
+  $("#discType").value = "amt"; $("#discVal").value = r.disc || "";
+  $("#gstOn").checked = r.gstOn; if(r.gstOn){ $("#gstRate").value = String(r.gstRate); $("#gstMode").value = r.gstMode; }
+  payMode = r.mode || "cash"; $$("#modes button").forEach(x=>x.classList.toggle("active", x.dataset.m===payMode)); $("#cashBox").hidden = payMode!=="cash";
+  $("#received").value = r.received || "";
+  renderCart(); hide("mList");
+  if(window.innerWidth<=820) $("#billPanel").classList.add("open");
+  toast("✏️ Bill edit mode — badlav karke 'Save changes' dabao");
+}
 function resetBill(){
+  setEditing(null);
   cart = []; $("#custName").value = $("#custPhone").value = $("#note").value = $("#discVal").value = $("#received").value = "";
   $("#note").hidden = true; $("#billPanel").classList.remove("open");
   renderCart(); newBillNo();
@@ -296,7 +318,7 @@ function openHolds(){
 }
 $("#btnHolds").addEventListener("click", openHolds);
 $("#lBody").addEventListener("click", async e => {
-  const rc = e.target.closest("[data-recall]"), dl = e.target.closest("[data-del]"), rp = e.target.closest("[data-reprint]");
+  const rc = e.target.closest("[data-recall]"), dl = e.target.closest("[data-del]"), rp = e.target.closest("[data-reprint]"), ed = e.target.closest("[data-edit]");
   if(rc){
     const h = holds.find(x=>String(x.id)===rc.dataset.recall); if(!h) return;
     if(cart.length && !confirm("Current bill replace ho jayega. Continue?")) return;
@@ -308,6 +330,8 @@ $("#lBody").addEventListener("click", async e => {
     if(!confirm("Ye held bill delete karna hai?")) return;
     try{ await BazDS.deletePosHold(dl.dataset.del); }catch(err){ toast("Delete nahi hua","err"); }
     await refreshHolds(); openHolds();
+  }else if(ed){
+    const o = posOrders.find(x=>String(x.id)===ed.dataset.edit); if(o) loadForEdit(o);
   }else if(rp){
     const o = posOrders.find(x=>String(x.id)===rp.dataset.reprint); if(o){ hide("mList"); showReceipt(receiptFromOrder(o)); }
   }
@@ -326,18 +350,26 @@ async function completeSale(){
     mode:payMode, received:payMode==="cash"?num($("#received").value):0, note:$("#note").value.trim()};
   rec.change = rec.received ? Math.max(0, rec.received - rec.total) : 0;
   const notes = [`Bill No: ${billNo}`, rec.disc?`Discount: ₹${r2(rec.disc)}`:"", rec.gstOn?`GST ${rec.gstRate}% (${rec.gstMode==="excl"?"extra":"incl"}): ₹${r2(rec.gst)}`:"", rec.round?`Round: ₹${r2(rec.round)}`:"", rec.received?`Received: ₹${r2(rec.received)}`:"", rec.note].filter(Boolean).join(" | ");
+  const old = editing;
   try{
-    await BazDS.createPosSale({customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes});
-  }catch(e){ toast("Sale save nahi hui: " + (e.message||""), "err"); busy(btn,false); return; }
+    if(old) await BazDS.updatePosSale(old.id, {customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes});
+    else await BazDS.createPosSale({customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes});
+  }catch(e){ toast((old?"Bill save nahi hua: ":"Sale save nahi hui: ") + (e.message||""), "err"); busy(btn,false); return; }
   /* stock: best-effort, never blocks the sale */
   const touched = new Set();
-  for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty)) touched.add(p); }
+  if(old){ // only the difference vs the old bill moves stock
+    const delta = {};
+    const add = (it, sgn) => { const k = it.productId+"|"+(it.color||""); delta[k] = (delta[k]||0) + sgn*it.qty; };
+    (Array.isArray(old.items)?old.items:[]).forEach(i=>add(i,-1)); rec.items.forEach(i=>add(i,1));
+    for(const [k,d] of Object.entries(delta)){ if(!d) continue; const [pid,color] = k.split("|"); const p = PRODUCTS.find(x=>String(x.id)===pid); if(deductStock(p, color, d)) touched.add(p); }
+  } else for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty)) touched.add(p); }
   let warn = false;
   for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(sv && sv.__stripped && sv.__stripped.includes("color_stock")) warn = true; }catch(e){ warn = true; console.error(e); } }
   if(warn) toast("Sale ho gayi, par stock minus nahi hua — Supabase me supabase/add_pos.sql run karo","err");
-  else if(!touched.size) toast("Stock minus nahi hua: Inventory me in products ki quantity set nahi hai","err");
+  else if(!touched.size && !old) toast("Stock minus nahi hua: Inventory me in products ki quantity set nahi hai","err");
   busy(btn, false);
   await refreshOrders(); resetBill(); renderGrid();
+  if(old) toast("✅ Bill update ho gaya","ok");
   showReceipt(rec);
 }
 const r2 = n => Math.round(n*100)/100;
@@ -393,7 +425,7 @@ $("#btnRecent").addEventListener("click", async () => {
   await refreshOrders();
   $("#lTitle").textContent = "🧾 Recent bills";
   $("#lBody").innerHTML = posOrders.length ? posOrders.slice(0,40).map(o=>`<div class="px-li"><div><b>${esc((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1]||o.ref)}</b> · ${money(o.subtotal)}<small>${esc(o.customer_name||"")} · ${esc(o.payment_method||"cash")} · ${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>
-    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button></div></div>`).join("") : '<div class="px-empty">Abhi koi POS bill nahi bana</div>';
+    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button></div></div>`).join("") : '<div class="px-empty">Abhi koi POS bill nahi bana</div>';
   show("mList");
 });
 $("#btnReport").addEventListener("click", async () => {
