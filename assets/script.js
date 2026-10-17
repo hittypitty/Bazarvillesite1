@@ -377,7 +377,7 @@ function productCard(p){
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
-      <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
+      <h3><a href="product.html?id=${p.id}" title="${String(p.name).replace(/"/g,'&quot;')}">${p.name}</a></h3>
       ${hasPricing ? `
       <div class="pprice-row">
         <span class="pprice">${money(t.price)}</span><small class="pprice-unit">/ pc</small>
