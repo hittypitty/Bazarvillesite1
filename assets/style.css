@@ -1087,14 +1087,17 @@ body.mnav-lock{overflow:hidden}
 .topbar{height:auto;padding:9px 0;overflow:hidden}
 .tb-track{display:flex;gap:46px;white-space:nowrap;width:max-content;animation:tick 40s linear infinite}
 .topbar:hover .tb-track{animation-play-state:paused}
-.fsocial-ic,.fsocial-ic:hover{background:#fff!important;box-shadow:0 4px 12px -4px rgba(0,0,0,.45)}
-.fsocial-ic[aria-label="Instagram"]{color:#d6249f}
-.fsocial-ic[aria-label="Facebook"]{color:#1877f2}
-.fsocial-ic[aria-label="LinkedIn"]{color:#0a66c2}
-.fsocial-ic:hover{color:inherit}
+/* Original brand badges (brand-colour background, white glyph); on hover the badge turns white and the glyph takes the brand colour */
+.fsocial-ic,.cs-ic{transition:background .2s ease,color .2s ease,transform .2s ease,box-shadow .2s ease}
+.fsocial-ic{color:#fff}
+.fsocial-ic[aria-label="Instagram"]{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fdf497 5%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
+.fsocial-ic[aria-label="Facebook"]{background:#1877f2}
+.fsocial-ic[aria-label="LinkedIn"]{background:#0a66c2}
+.fsocial-ic:hover{background:#fff!important;box-shadow:0 8px 18px -6px rgba(0,0,0,.5)}
 .fsocial-ic[aria-label="Instagram"]:hover{color:#d6249f}.fsocial-ic[aria-label="Facebook"]:hover{color:#1877f2}.fsocial-ic[aria-label="LinkedIn"]:hover{color:#0a66c2}
-.cs-ic{background:#fff!important;box-shadow:0 0 0 1px #e4e4de}
-.cs-fb{color:#1877f2}.cs-li{color:#0a66c2}.cs-ig{color:#d6249f}
+.cs-ic{color:#fff;box-shadow:none}
+a:hover>.cs-ic{background:#fff!important;box-shadow:0 0 0 1px #e4e4de}
+a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#d6249f}
 
 /* Trusted-by brand chips: click for full details + link */
 .logochip-click{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
