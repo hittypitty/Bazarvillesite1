@@ -37,12 +37,12 @@
       <span class="px-net" id="net">● Online</span>
     </div>
     <div class="px-top-actions">
-      <button class="px-btn px-btn-ghost" id="btnHolds" title="Held bills (F5)">⏸ Held <span class="px-pill" id="holdsCount" hidden>0</span></button>
-      <button class="px-btn px-btn-ghost" id="btnRecent" title="Recent bills (F6)">🧾 Bills</button>
-      <button class="px-btn px-btn-ghost" id="btnReport" title="Today's report (F7)">📊 Today</button>
-      <button class="px-btn px-btn-ghost" id="btnSettings" title="Shop settings (F9)">⚙ Shop</button>
+      <button class="px-btn px-btn-ghost" id="btnHolds" title="Held bills (F5)">⏸<span class="px-lbl"> Held</span> <span class="px-pill" id="holdsCount" hidden>0</span></button>
+      <button class="px-btn px-btn-ghost" id="btnRecent" title="Recent bills (F6)">🧾<span class="px-lbl"> Bills</span></button>
+      <button class="px-btn px-btn-ghost" id="btnReport" title="Today's report (F7)">📊<span class="px-lbl"> Today</span></button>
+      <button class="px-btn px-btn-ghost" id="btnSettings" title="Shop settings (F9)">⚙<span class="px-lbl"> Shop</span></button>
       <button class="px-btn px-btn-ghost" id="btnFull" title="Full screen">⛶</button>
-      <a class="px-btn px-btn-ghost" href="admin.html" title="Back to admin">← Admin</a>
+      <a class="px-btn px-btn-ghost" href="admin.html" title="Back to admin">←<span class="px-lbl"> Admin</span></a>
     </div>
   </header>
 
@@ -51,7 +51,7 @@
     <section class="px-cat">
       <div class="px-search">
         <span>🔍</span>
-        <input id="search" type="search" placeholder="Search product, category…  (F2)  — Enter adds the first match" autocomplete="off">
+        <input id="search" type="search" placeholder="Search products…" title="F2 = focus, Enter = add first match" autocomplete="off">
       </div>
       <div class="px-cats" id="cats"></div>
       <div class="px-grid" id="grid"></div>
@@ -59,7 +59,9 @@
 
     <!-- bill -->
     <aside class="px-bill" id="billPanel">
+      <div class="px-sheet-grip" aria-hidden="true"></div>
       <div class="px-bill-head">
+        <button class="px-bill-close" id="billClose" aria-label="Close bill">✕</button>
         <div><label>Bill No.</label><b id="billNo">POS-000001</b></div>
         <div class="px-right"><label>Date</label><b id="billDate"></b></div>
       </div>
@@ -120,7 +122,7 @@
   </main>
 
   <!-- mobile bottom bar -->
-  <button class="px-mbar" id="mbar" hidden><span><b id="mCount">0</b> items</span><span>View bill</span><b id="mTotal">₹0</b></button>
+  <button class="px-mbar" id="mbar" hidden><span class="px-mbar-l"><i id="mCount">0</i> items</span><span class="px-mbar-m">View bill ›</span><b id="mTotal">₹0</b></button>
 </div>
 
 <!-- ============ MODALS ============ -->

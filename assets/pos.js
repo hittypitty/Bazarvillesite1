@@ -118,7 +118,7 @@ function renderGrid(){
       <div class="px-prod-img" style="background-image:url('${esc(imgOf(p))}')">${out?'<span class="px-prod-badge out">Out of stock</span>':low?`<span class="px-prod-badge low">${t} left</span>`:""}</div>
       <div class="px-prod-info"><div class="px-prod-name">${esc(p.name)}</div>
       <div class="px-prod-meta">${esc(p.cat||"")}${t!=null&&!out&&!low?` · ${t} in stock`:""}</div>
-      <div class="px-prod-price">${price?money(price):"Set price"}</div></div></button>`;
+      <div class="px-prod-price">${price?money(price):"Set price"}</div></div><span class="px-prod-add" aria-hidden="true">+</span></button>`;
   }).join("") : '<div class="px-empty">Koi product nahi mila</div>';
 }
 $("#search").addEventListener("input", renderGrid);
@@ -468,6 +468,7 @@ function show(id){ $("#"+id).hidden = false; }
 function hide(id){ $("#"+id).hidden = true; }
 $$(".px-modal").forEach(m => { m.addEventListener("click", e => { if(e.target===m || e.target.closest("[data-close]")) m.hidden = true; }); });
 $("#mbar").addEventListener("click", () => $("#billPanel").classList.add("open"));
+$("#billClose").addEventListener("click", () => $("#billPanel").classList.remove("open"));
 $("#btnFull").addEventListener("click", () => { if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); });
 window.addEventListener("resize", totals);
 document.addEventListener("keydown", e => {
