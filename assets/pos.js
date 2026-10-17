@@ -13,7 +13,7 @@ const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 let PRODUCTS = [], cart = [], payMode = "cash", activeCat = "", holds = [], posOrders = [];
 let me = null, vSel = null, lastReceipt = null, editing = null;
 const SKEY = "bz_pos_settings";
-const DEFAULTS = {name:"Bazarville", tag:"Corporate gifting & custom printing", addr:"", phone:"9827869031", gstin:"", foot:"Thank you! Visit again.", paper:"80", gstOn:false, gstRate:"18", gstMode:"excl"};
+const DEFAULTS = {name:"Bazarville", tag:"Corporate gifting & custom printing", addr:"", phone:"9827869031", gstin:"", foot:"Thank you! Visit again.", paper:"80", autoReceipt:false, gstOn:false, gstRate:"18", gstMode:"excl"};
 let S = Object.assign({}, DEFAULTS);
 try{ Object.assign(S, JSON.parse(localStorage.getItem(SKEY)||"{}")); }catch(e){}
 function saveS(){ try{ localStorage.setItem(SKEY, JSON.stringify(S)); }catch(e){} }
@@ -366,11 +366,11 @@ async function completeSale(){
   let warn = false;
   for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(sv && sv.__stripped && sv.__stripped.includes("color_stock") && sv.__stripped.includes("color_images")) warn = true; }catch(e){ warn = true; console.error(e); } }
   if(warn) toast("Sale ho gayi, par stock minus nahi hua — internet/Supabase check karo","err");
-  else if(!touched.size && !old) toast("Is product ki stock quantity set nahi hai, isliye minus nahi hua — Admin → Inventory me Qty bharo","err");
   busy(btn, false);
   await refreshOrders(); resetBill(); renderGrid();
-  if(old) toast("✅ Bill update ho gaya","ok");
-  showReceipt(rec);
+  lastReceipt = rec;
+  if(S.autoReceipt) showReceipt(rec);
+  else toast((old?"✅ Bill update ho gaya — ":"✅ Sale complete — ")+rec.billNo+" · "+money(rec.total),"ok");
 }
 const r2 = n => Math.round(n*100)/100;
 
@@ -455,11 +455,11 @@ function applySettingsUI(){
   document.body.className = "paper-" + S.paper;
 }
 $("#btnSettings").addEventListener("click", () => {
-  $("#sName").value = S.name; $("#sTag").value = S.tag; $("#sAddr").value = S.addr; $("#sPhone").value = S.phone; $("#sGstin").value = S.gstin; $("#sFoot").value = S.foot; $("#sPaper").value = S.paper;
+  $("#sName").value = S.name; $("#sTag").value = S.tag; $("#sAddr").value = S.addr; $("#sPhone").value = S.phone; $("#sGstin").value = S.gstin; $("#sFoot").value = S.foot; $("#sPaper").value = S.paper; $("#sAuto").checked = !!S.autoReceipt;
   show("mSettings");
 });
 $("#sSave").addEventListener("click", () => {
-  S = Object.assign(S, {name:$("#sName").value.trim()||"Bazarville", tag:$("#sTag").value.trim(), addr:$("#sAddr").value.trim(), phone:$("#sPhone").value.trim(), gstin:$("#sGstin").value.trim(), foot:$("#sFoot").value.trim(), paper:$("#sPaper").value});
+  S = Object.assign(S, {name:$("#sName").value.trim()||"Bazarville", tag:$("#sTag").value.trim(), addr:$("#sAddr").value.trim(), phone:$("#sPhone").value.trim(), gstin:$("#sGstin").value.trim(), foot:$("#sFoot").value.trim(), paper:$("#sPaper").value, autoReceipt:$("#sAuto").checked});
   saveS(); applySettingsUI(); hide("mSettings"); toast("✅ Shop details save ho gayi","ok");
 });
 
