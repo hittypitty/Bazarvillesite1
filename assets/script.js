@@ -2278,7 +2278,7 @@ function renderTrustedBrands(){
     const cls = "logochip" + (b.logo?" logochip-img":"") + (clickable(b)?" logochip-click":"");
     const attrs = clickable(b) ? ` data-bi="${i}" role="button" tabindex="0"` : "";
     return b.logo
-      ? `<div class="${cls}"${attrs} title="${esc(b.name)}"><img src="${esc(b.logo)}" alt="${esc(b.name)}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${esc(b.name).replace(/'/g,"")}'))"></div>`
+      ? `<div class="${cls}"${attrs} title="${esc(b.name)}"><img src="${esc(b.logo)}" alt="${esc(b.name)}" loading="lazy" onerror="this.style.display='none'">${b.name?`<span class="lc-name">${esc(b.name)}</span>`:""}</div>`
       : `<div class="${cls}"${attrs}><span class="dot"></span>${esc(b.name)}</div>`;
   };
   // repeat the list until it is wide enough, then double it — the CSS animation scrolls exactly 50%
