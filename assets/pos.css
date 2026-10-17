@@ -281,3 +281,8 @@ body.paper-a4 .px-receipt{max-width:640px;font-family:Inter,system-ui,sans-serif
 
 .px-line-btns{display:flex;gap:10px}.px-line-name,.px-line-var{cursor:pointer}
 .px-line-btns .px-rm{font-size:15px;padding:2px}
+
+.px-line-btns .px-rm{opacity:1;min-width:34px;min-height:34px;border-radius:8px}
+.px-line-btns .px-rm-del{background:#fee2e2;color:#b91c1c}
+.px-line-btns .px-rm-del:hover{background:#fecaca}
+.px-step button[data-dec]:disabled{opacity:.35}

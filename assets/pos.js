@@ -212,7 +212,7 @@ function renderCart(){
         <div class="px-line-rate">${money(l.price)} /pc</div></div>
       <div class="px-line-right"><b>${money(l.qty*l.price)}</b>
         <div class="px-step"><button data-dec="${i}">−</button><input type="number" min="1" data-qty="${i}" value="${l.qty}"><button data-inc="${i}">+</button></div>
-        <div class="px-line-btns"><button class="px-rm" data-editline="${i}" title="Colour / size / printing badlo">✏️</button><button class="px-rm" data-rm="${i}" title="Remove">🗑</button></div></div></div>`;
+        <div class="px-line-btns"><button class="px-rm" data-editline="${i}" title="Colour / size / printing badlo">✏️</button><button class="px-rm px-rm-del" data-rm="${i}" title="Item hatao" aria-label="Item hatao">🗑</button></div></div></div>`;
   }).join("") : '<div class="px-line-empty">Bill khali hai — left se product chuno ya search karke Enter dabao.</div>';
   totals();
 }
@@ -228,7 +228,7 @@ $("#lines").addEventListener("click", e => {
 $("#lines").addEventListener("change", e => {
   if(e.target.dataset.qty!=null) setQty(+e.target.dataset.qty, Math.floor(num(e.target.value)));
 });
-function setQty(i, q){ const l = cart[i]; if(!l) return; if(q<1){ cart.splice(i,1); renderCart(); return; } l.qty = q; l.price = lineRate(l); renderCart(); }
+function setQty(i, q){ const l = cart[i]; if(!l) return; if(!(q>=1)) q = 1; l.qty = q; l.price = lineRate(l); renderCart(); }
 $("#editCancel").addEventListener("click", () => { resetBill(); toast("Edit cancel kiya"); });
 $("#btnClear").addEventListener("click", () => { if(!cart.length) return; if(confirm("Poora bill clear karna hai?")){ resetBill(false); } });
 $("#btnNote").addEventListener("click", () => { const n = $("#note"); n.hidden = !n.hidden; if(!n.hidden) n.focus(); });
