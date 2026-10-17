@@ -533,3 +533,11 @@ body.role-super .ad-super-only{display:block}
 .ad-detail-row input{border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;min-width:0}
 @media(max-width:560px){.ad-detail-row{grid-template-columns:1fr auto}.ad-detail-row input[data-f="v"]{grid-column:1/2}}
 .ad-url-hint{color:#d93025;font-size:12px;font-weight:600;margin:5px 2px 0}
+
+/* Typing assistant suggestion bar */
+.bz-suggest{position:fixed;z-index:9999;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;background:#fff;border:1px solid #d9dce3;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);font-size:13px}
+.bz-suggest[hidden]{display:none}
+.bz-s-label{color:#555;margin-right:2px}
+.bz-s-chip{border:0;background:#111;color:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
+.bz-s-chip:hover{background:#333}
+.bz-s-act{border:1px solid #d0d3da;background:#f6f7f9;color:#444;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
