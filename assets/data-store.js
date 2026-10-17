@@ -206,7 +206,8 @@ const BazDS = (function(){
   function normHomepage(cfg){
     cfg = cfg || {};
     return {
-      showCollections: cfg.showCollections !== false, showTrusted: cfg.showTrusted !== false, showFaq: cfg.showFaq !== false,
+      showCollections: cfg.showCollections !== false, showTrusted: cfg.showTrusted !== false, showFaq: cfg.showFaq !== false, showReviews: cfg.showReviews !== false,
+      reviews: Array.isArray(cfg.reviews) ? cfg.reviews.filter(x => x && x.name && x.text) : [],
       faqs: Array.isArray(cfg.faqs) ? cfg.faqs.filter(x => x && x.q && x.a) : []
     };
   }

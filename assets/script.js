@@ -1809,6 +1809,16 @@ function applyHomepage(){
   toggle("#collections", hp.showCollections === false);
   toggle("#trustedSection", hp.showTrusted === false);
   toggle("#faqSection", hp.showFaq === false);
+  toggle("#reviewsSection", hp.showReviews === false);
+  const tg = document.querySelector("#reviewsSection .tgrid");
+  if(tg && Array.isArray(hp.reviews) && hp.reviews.length && !tg.dataset.sliding){
+    const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    const safeUrl = u=>/^https?:\/\//i.test(u||"") ? u : "";
+    tg.innerHTML = hp.reviews.map(r=>{
+      const nm = safeUrl(r.link) ? `<a class="twho-name" href="${esc(safeUrl(r.link))}" target="_blank" rel="noopener">${esc(r.name)}</a>` : `<b class="twho-name">${esc(r.name)}</b>`;
+      return `<div class="tcard"><div class="stars">★★★★★</div><p>"${esc(r.text)}"</p><div class="twho"><div class="tav">${esc(r.name.trim().charAt(0).toUpperCase())}</div><div>${nm}<span>${esc(r.role||"")}</span></div></div></div>`;
+    }).join("");
+  }
   const box = document.querySelector("#faqSection .faq");
   if(box && Array.isArray(hp.faqs) && hp.faqs.length){
     const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

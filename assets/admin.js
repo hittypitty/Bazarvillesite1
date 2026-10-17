@@ -2024,13 +2024,34 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     {q:"Can I pay online?", a:"Not in this phase. Bazarville is a discovery and enquiry platform — commercial discussion, customization and payment happen over WhatsApp with our team."},
     {q:"What if a product is out of stock?", a:"Out-of-stock pages stay live with similar product suggestions, and you can still raise a WhatsApp enquiry for availability or replenishment."}
   ];
-  let hpFaqs = [];
+  const DEFAULT_REVIEWS = [
+    {name:"Riya Sharma", role:"HR Lead, Clearline IT", text:"We ordered 300 onboarding kits in two days flat — the WhatsApp enquiry with the reference number made follow-up painless.", link:"https://in.linkedin.com/company/bazarville"},
+    {name:"Anil Mehta", role:"Procurement, Summit Edu", text:"The quantity-based pricing is exactly what procurement needs — no more back-and-forth on slab pricing.", link:"https://in.linkedin.com/company/bazarville"},
+    {name:"Sana Iyer", role:"Admin Head, Vertex Health", text:"Shop by Profession helped us find relevant gifting options for our hospital staff in minutes.", link:"https://in.linkedin.com/company/bazarville"}
+  ];
+  let hpFaqs = [], hpRevs = [];
   function renderHpAdmin(){
     const hp = SETTINGS.homepage || {};
     const set = (id,v)=>{ const el = document.querySelector(id); if(el) el.checked = v; };
-    set("#hpShowCollections", hp.showCollections !== false); set("#hpShowTrusted", hp.showTrusted !== false); set("#hpShowFaq", hp.showFaq !== false);
+    set("#hpShowCollections", hp.showCollections !== false); set("#hpShowTrusted", hp.showTrusted !== false); set("#hpShowFaq", hp.showFaq !== false); set("#hpShowReviews", hp.showReviews !== false);
+    hpRevs = (hp.reviews && hp.reviews.length ? hp.reviews : DEFAULT_REVIEWS).map(x=>({name:x.name, role:x.role||"", text:x.text, link:x.link||""}));
+    drawHpRevs();
     hpFaqs = (hp.faqs && hp.faqs.length ? hp.faqs : DEFAULT_FAQS).map(x=>({q:x.q, a:x.a}));
     drawHpFaqs();
+  }
+  function drawHpRevs(){
+    const el = document.querySelector("#hpRevList"); if(!el) return;
+    const esc = t=>String(t||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    el.innerHTML = hpRevs.length ? hpRevs.map((r,i)=>`
+      <div class="ad-faq-row">
+        <div class="ad-faq-fields">
+          <input data-rn="${i}" value="${esc(r.name)}" placeholder="Name">
+          <input data-rr="${i}" value="${esc(r.role)}" placeholder="Role, company">
+          <textarea data-rt="${i}" rows="2" placeholder="Review text">${esc(r.text)}</textarea>
+          <input data-rl="${i}" value="${esc(r.link)}" placeholder="LinkedIn link (optional)">
+        </div>
+        <button type="button" class="ad-icon-btn danger" data-rdel="${i}" title="Remove review">🗑️</button>
+      </div>`).join("") : `<p class="ad-hint">Koi review nahi — website par default reviews dikhenge.</p>`;
   }
   function drawHpFaqs(){
     const el = document.querySelector("#hpFaqList"); if(!el) return;
@@ -2055,6 +2076,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       hpFaqs.splice(+d.dataset.hdel, 1); drawHpFaqs();
     });
   }
+  const revList = document.querySelector("#hpRevList");
+  if(revList){
+    revList.addEventListener("input", e=>{
+      const d = e.target.dataset, f = {rn:"name", rr:"role", rt:"text", rl:"link"};
+      for(const k in f) if(d[k]!=null) hpRevs[+d[k]][f[k]] = e.target.value;
+    });
+    revList.addEventListener("click", e=>{
+      const d = e.target.closest("[data-rdel]"); if(!d) return;
+      hpRevs.splice(+d.dataset.rdel, 1); drawHpRevs();
+    });
+  }
+  const revAdd = document.querySelector("#hpRevAdd");
+  if(revAdd) revAdd.addEventListener("click", ()=>{ hpRevs.push({name:"", role:"", text:"", link:""}); drawHpRevs(); const ins = document.querySelectorAll("#hpRevList [data-rn]"); if(ins.length) ins[ins.length-1].focus(); });
   const hpAdd = document.querySelector("#hpFaqAdd");
   if(hpAdd) hpAdd.addEventListener("click", ()=>{ hpFaqs.push({q:"", a:""}); drawHpFaqs(); const ins = document.querySelectorAll("#hpFaqList [data-hq]"); if(ins.length) ins[ins.length-1].focus(); });
   const hpSave = document.querySelector("#hpSave");
@@ -2063,6 +2097,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       showCollections: document.querySelector("#hpShowCollections").checked,
       showTrusted: document.querySelector("#hpShowTrusted").checked,
       showFaq: document.querySelector("#hpShowFaq").checked,
+      showReviews: document.querySelector("#hpShowReviews").checked,
+      reviews: hpRevs.map(r=>({name:r.name.trim(), role:r.role.trim(), text:r.text.trim(), link:r.link.trim()})).filter(r=>r.name && r.text),
       faqs: hpFaqs.map(f=>({q:f.q.trim(), a:f.a.trim()})).filter(f=>f.q && f.a)
     };
     const st = document.querySelector("#hpStatus");
