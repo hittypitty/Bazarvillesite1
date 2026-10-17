@@ -1148,3 +1148,10 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .pd-detail-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;padding:11px 0;font-size:14.5px;border-bottom:1px solid var(--line)}
 .pd-detail-row span:first-child{color:var(--muted)}
 .pd-detail-row span:last-child{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+
+/* nav WhatsApp button = same look as the floating chat bubble (green disc, white WhatsApp glyph, soft pulse ring) */
+.enqbtn{position:relative;background:#25d366;box-shadow:0 8px 22px rgba(37,211,102,.5)}
+.enqbtn svg{width:32px;height:32px;fill:#fff}
+.enqbtn:before{content:"";position:absolute;inset:0;border-radius:50%;background:rgba(37,211,102,.45);z-index:-1;animation:enqPulse 2.4s ease-out infinite}
+@keyframes enqPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.7);opacity:0}}
+@media(max-width:640px){.enqbtn svg{width:29px;height:29px}}
