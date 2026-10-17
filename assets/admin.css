@@ -332,7 +332,9 @@ body.role-super .ad-super-only{display:block}
 .ad-enq-empty{color:var(--muted);font-size:13.5px;padding:20px 0;text-align:center}
 
 @media(max-width:900px){
-  .ad-shell{grid-template-columns:1fr}
+  .ad-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr;align-content:start}
+  .ad-sidebar{align-items:center;scrollbar-width:none;position:sticky;top:0;z-index:50}
+  .ad-sidebar::-webkit-scrollbar{display:none}
   .ad-sidebar{position:static;height:auto;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:14px}
   .ad-nav{flex-direction:row}
   .ad-nav a{white-space:nowrap}
@@ -541,3 +543,16 @@ body.role-super .ad-super-only{display:block}
 .bz-s-chip{border:0;background:#111;color:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
 .bz-s-chip:hover{background:#333}
 .bz-s-act{border:1px solid #d0d3da;background:#f6f7f9;color:#444;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+
+/* ---------- mobile admin: modal header + colour chips + checkbox chips ---------- */
+@media(max-width:560px){
+  #productModalBackdrop .ad-modal-head{flex-wrap:wrap;row-gap:8px;align-items:center}
+  #productModalBackdrop .ad-modal-head h2{flex:1 1 60%;white-space:nowrap}
+  #productModalBackdrop .ad-modal-head-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;order:3}
+  #productModalBackdrop .ad-modal-status{flex:1 1 100%;min-width:0;width:auto}
+  #productModalBackdrop .ad-modal-head .ad-modal-close{order:2}
+  #pf_colorChips{flex-direction:column;align-items:stretch}
+  #pf_colorChips .ad-tag-chip{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;border-radius:14px;padding:8px 12px}
+  #pf_colorChips .ad-tag-chip .ad-color-name{flex:1 1 auto;min-width:0;width:auto}
+  .ad-chip-check input{flex:0 0 16px;width:16px;height:16px;padding:0}
+}
