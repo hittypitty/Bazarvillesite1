@@ -35,9 +35,8 @@ async function boot(){
   document.body.className = "paper-" + S.paper;
   const a = await BazDS.getCurrentAdmin().catch(()=>null);
   if(a && allowed(a)) return start(a);
-  if(!a){ location.replace("admin.html"); return; }   // not signed in → single login lives in Admin; session is shared
-  $("#loginScreen").hidden = false;
-  $("#liErr").textContent = "Is account ko POS/Inventory ka access nahi hai.";
+  $("#loginScreen").hidden = false;   // signed out → one-time sign-in on this device (stays signed in afterwards)
+  if(a && !allowed(a)) $("#liErr").textContent = "Is account ko POS/Inventory ka access nahi hai.";
 }
 $("#liBtn").addEventListener("click", async ()=>{
   const btn = $("#liBtn"); $("#liErr").textContent = "";
