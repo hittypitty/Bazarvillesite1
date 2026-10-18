@@ -1369,6 +1369,17 @@ function initQuotePage(){
 }
 
 /* ---------- product detail page ---------- */
+/* stock line for the product page: "In Stock · 12 pcs available" for the selected colour (when quantities are tracked in admin Inventory) */
+function pdStockHtml(p, colorHex){
+  const cs = p.colorStock || {}, k = (colorHex && cs[colorHex]!=null) ? colorHex : (cs._total!=null ? "_total" : null);
+  const vals = Object.values(cs).filter(x=>x!=null && !isNaN(x)).map(Number), tracked = vals.length > 0;
+  const n = k ? Number(cs[k]) : (tracked ? vals.reduce((a,b)=>a+b,0) : null);
+  if(n==null) return p.stock ? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>';
+  if(n<=0) return '<b style="color:#c0392b">Out of Stock</b>' + (colorHex && p.stock ? ' <span style="color:#6b7280">· this colour — try another</span>' : '');
+  if(n<=5) return `<b style="color:#b45309">Only ${n} pcs left</b>`;
+  return `<b style="color:#5b8a00">In Stock</b> <span style="color:#374151">· ${n} pcs available</span>`;
+}
+
 function initProductPage(){
   const el = document.querySelector("#pd-root");
   if(!el) return;
@@ -1402,7 +1413,7 @@ function initProductPage(){
       <div class="reveal-right">
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
-        <div class="pd-rating">${p.stock? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>'}</div>
+        <div class="pd-rating" id="pdStock">${pdStockHtml(p, p.colors[0])}</div>
         <div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
         <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>
@@ -1545,6 +1556,7 @@ function initProductPage(){
     // images), swap the gallery to show them; otherwise keep showing the main photos.
     const colorHex = p.colors[Number(s.dataset.c)];
     const cnEl = document.querySelector("#pdColorName"); if(cnEl) cnEl.textContent = colorName(p, colorHex);
+    const stEl = document.querySelector("#pdStock"); if(stEl) stEl.innerHTML = pdStockHtml(p, colorHex);
     const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
     renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
     recalc(); // selected colour is part of the WhatsApp enquiry message — keep it in sync
