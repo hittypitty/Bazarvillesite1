@@ -286,3 +286,11 @@ body.paper-a4 .px-receipt{max-width:640px;font-family:Inter,system-ui,sans-serif
 .px-line-btns .px-rm-del{background:#fee2e2;color:#b91c1c}
 .px-line-btns .px-rm-del:hover{background:#fecaca}
 .px-step button[data-dec]:disabled{opacity:.35}
+
+.px-vstock{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#e8f5c8;color:#2f5d00;font-size:11px;font-weight:700}
+.px-vstock.low{background:#fff1d6;color:#9a5b00}.px-vstock.zero{background:#fee2e2;color:#b91c1c}
+.px-vopt.active .px-vstock{background:rgba(255,255,255,.2);color:inherit}
+.px-vqty{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.px-avail{padding:6px 12px;border-radius:10px;background:#e8f5c8;color:#2f5d00;font-size:13px;font-weight:600}
+.px-avail b{font-size:16px}.px-avail.low{background:#fff1d6;color:#9a5b00}.px-avail.zero{background:#fee2e2;color:#b91c1c}
+.px-over{margin-top:8px;padding:8px 12px;border-radius:10px;background:#fff1d6;color:#9a5b00;font-size:12.5px;font-weight:600}

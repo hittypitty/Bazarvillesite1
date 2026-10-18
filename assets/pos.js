@@ -146,11 +146,11 @@ function openLineEdit(i){
 function renderVariant(){
   const {p} = vSel, colors = p.colors||[], sizes = p.sizes||[], prints = p.printOptions||[];
   let h = "";
-  if(colors.length>1) h += `<div class="px-vlabel">Colour</div><div class="px-vopts">${colors.map(c=>`<button class="px-vopt ${c===vSel.color?"active":""}" data-c="${esc(c)}"><i class="px-dot" style="background:${esc(c)}"></i>${esc(colorLabel(p,c)||"")}</button>`).join("")}</div>`;
+  if(colors.length>1) h += `<div class="px-vlabel">Colour</div><div class="px-vopts">${colors.map(c=>`<button class="px-vopt ${c===vSel.color?"active":""}" data-c="${esc(c)}"><i class="px-dot" style="background:${esc(c)}"></i>${esc(colorLabel(p,c)||"")}${(()=>{ const n = stockLeft(p,c); return n==null?"":` <small class="px-vstock ${n<=0?"zero":n<=5?"low":""}">${n<=0?"out":n}</small>`; })()}</button>`).join("")}</div>`;
   if(sizes.length>1) h += `<div class="px-vlabel">Size</div><div class="px-vopts">${sizes.map(s=>`<button class="px-vopt ${s===vSel.size?"active":""}" data-s="${esc(s)}">${esc(s)}</button>`).join("")}</div>`;
   if(prints.length>1) h += `<div class="px-vlabel">Printing</div><div class="px-vopts">${prints.map((s,i)=>`<button class="px-vopt ${i===vSel.pi?"active":""}" data-p="${i}">${esc(pName(s))}${pExtra(s)?` <small>+${money(pExtra(s))}</small>`:""}</button>`).join("")}</div>`;
   const left = stockLeft(p, vSel.color);
-  h += `<div class="px-vlabel">Quantity</div><div class="px-vqty"><div class="px-step"><button data-q="-1">−</button><input id="vQty" type="number" min="1" value="${vSel.qty}"><button data-q="1">+</button></div>${left!=null?`<small class="px-hint">${left} in stock</small>`:""}</div>`;
+  h += `<div class="px-vlabel">Quantity</div><div class="px-vqty"><div class="px-step"><button data-q="-1">−</button><input id="vQty" type="number" min="1" value="${vSel.qty}"><button data-q="1">+</button></div>${left!=null?`<span class="px-avail ${left<=0?"zero":left<=5?"low":""}">${left<=0?"Out of stock":"Available: <b>"+left+"</b>"}</span>`:""}</div>${left!=null&&vSel.qty>left&&left>0?`<div class="px-over">⚠ Stock me sirf ${left} hai — ${vSel.qty} bill ho rahe hain</div>`:""}`;
   const ex = prints[vSel.pi] ? pExtra(prints[vSel.pi]) : 0, unit = (tierPrice(p, vSel.qty)||0) + ex;
   h += `<div class="px-vtotal">${money(unit)} × ${vSel.qty} = <b>${money(unit*vSel.qty)}</b></div>`;
   $("#vBody").innerHTML = h;
