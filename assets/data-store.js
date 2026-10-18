@@ -600,12 +600,35 @@ const BazDS = (function(){
     if(fields.customerPhone !== undefined) row.customer_phone = fields.customerPhone;
     if(fields.paymentMethod) row.payment_method = fields.paymentMethod;
     if(fields.notes !== undefined) row.notes = fields.notes;
+    const rp = await rpcCall(sb, "pos_update_bill", { p_id: id, p_items: fields.items, p_subtotal: fields.subtotal, p_name: row.customer_name, p_phone: row.customer_phone ?? "", p_pay: row.payment_method ?? null, p_notes: row.notes ?? "" });
+    if(!rp.error){ if(rp.data === false) throw new Error("Bill update nahi hua (bill nahi mila)."); return true; }
+    if(!rpcMissing(rp.error)) throw rp.error;
     const { error } = await sb.from("orders").update(row).eq("id", id);
     if(error){ console.error("updatePosSale:", error.message); throw error; }
     return true;
   }
+  /* ---- POS open-counter helpers: use the narrow RPCs from supabase/pos_open_access.sql (work without a login);
+     fall back to the normal table calls (admin login) when those functions aren't installed. ---- */
+  const rpcCall = (sb, n, a) => (typeof sb.rpc === "function" ? sb.rpc(n, a) : Promise.resolve({ error: { message: "could not find the function" } }));
+  const rpcMissing = e => e && /could not find the function|PGRST202|does not exist|schema cache/i.test((e.message||"")+(e.code||""));
+  async function posGetBills(){
+    const sb = getClient(); if(!sb) return [];
+    const { data, error } = await rpcCall(sb, "pos_get_bills");
+    if(!error) return data || [];
+    if(!rpcMissing(error)) console.error("pos_get_bills:", error.message);
+    return getOrders();
+  }
+  async function posSetStock(p){
+    const sb = getClient(); if(!sb) return false;
+    const { error } = await rpcCall(sb, "pos_set_stock", { p_id: p.id, p_stock: p.colorStock || {} });
+    if(!error) return true;
+    if(!rpcMissing(error)) throw error;
+    const sv = await upsertProduct(p);
+    return !(sv && sv.__stripped && sv.__stripped.includes("color_stock") && sv.__stripped.includes("color_images"));
+  }
   async function getPosHolds(){
     const sb = getClient(); if(!sb) return [];
+    const rp = await rpcCall(sb, "pos_holds_list"); if(!rp.error) return rp.data || [];
     const { data, error } = await sb.from("pos_holds").select("*").order("created_at",{ascending:false});
     if(error){ console.error("getPosHolds:", error.message); return []; } // table may not exist yet (add_pos.sql not run) — fail quiet, POS still works without Hold
     return data;
@@ -613,12 +636,16 @@ const BazDS = (function(){
   async function holdPosSale(hold){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
     const row = { label: hold.label || "", items: hold.items, subtotal: hold.subtotal };
+    const rp = await rpcCall(sb, "pos_hold_add", { p_label: row.label, p_items: row.items, p_subtotal: row.subtotal });
+    if(!rp.error) return rp.data;
+    if(!rpcMissing(rp.error)) throw rp.error;
     const { data, error } = await sb.from("pos_holds").insert(row).select().single();
     if(error){ console.error("holdPosSale:", error.message); throw error; }
     return data;
   }
   async function deletePosHold(id){
     const sb = getClient(); if(!sb) return false;
+    const rp = await rpcCall(sb, "pos_hold_delete", { p_id: id }); if(!rp.error) return true;
     const { error } = await sb.from("pos_holds").delete().eq("id", id);
     if(error){ console.error("deletePosHold:", error.message); throw error; }
     return true;
@@ -665,7 +692,7 @@ const BazDS = (function(){
     signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus, updatePosSale,
-    createPosSale, getPosHolds, holdPosSale, deletePosHold,
+    createPosSale, posGetBills, posSetStock, getPosHolds, holdPosSale, deletePosHold,
     createQuote, getQuotes, getQuoteByRef, updateQuoteStatus
   };
 })();

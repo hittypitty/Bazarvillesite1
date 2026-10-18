@@ -34,9 +34,7 @@ function allowed(a){
 async function boot(){
   document.body.className = "paper-" + S.paper;
   const a = await BazDS.getCurrentAdmin().catch(()=>null);
-  if(a && allowed(a)) return start(a);
-  $("#loginScreen").hidden = false;   // signed out → one-time sign-in on this device (stays signed in afterwards)
-  if(a && !allowed(a)) $("#liErr").textContent = "Is account ko POS/Inventory ka access nahi hai.";
+  start(a || {email:"", role:"counter", fullName:"Counter"});   // no login screen — opens straight to billing
 }
 $("#liBtn").addEventListener("click", async ()=>{
   const btn = $("#liBtn"); $("#liErr").textContent = "";
@@ -313,7 +311,7 @@ function resetBill(){
   $("#note").hidden = true; $("#billPanel").classList.remove("open");
   renderCart(); newBillNo();
 }
-async function refreshOrders(){ try{ posOrders = (await BazDS.getOrders()).filter(isPos); }catch(e){ posOrders = []; } }
+async function refreshOrders(){ try{ posOrders = (await BazDS.posGetBills()).filter(isPos); }catch(e){ posOrders = []; } }
 
 /* ---------------- hold / recall ---------------- */
 async function refreshHolds(){
@@ -388,7 +386,7 @@ async function completeSale(){
     for(const [k,d] of Object.entries(delta)){ if(!d) continue; const [pid,color] = k.split("|"); const p = PRODUCTS.find(x=>String(x.id)===pid); if(deductStock(p, color, d)) touched.add(p); }
   } else for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty)) touched.add(p); }
   let warn = false;
-  for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(sv && sv.__stripped && sv.__stripped.includes("color_stock") && sv.__stripped.includes("color_images")) warn = true; }catch(e){ warn = true; console.error(e); } }
+  for(const p of touched){ try{ if(!(await BazDS.posSetStock(p))) warn = true; }catch(e){ warn = true; console.error(e); } }
   if(warn) toast("Sale ho gayi, par stock minus nahi hua — internet/Supabase check karo","err");
   busy(btn, false);
   await refreshOrders(); resetBill(); renderGrid();
