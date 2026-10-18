@@ -12,6 +12,18 @@ language sql security definer set search_path = public as $$
   select * from public.orders where source = 'pos' or ref like 'BZP-%' order by created_at desc limit 1000;
 $$;
 
+create or replace function public.pos_create_sale(p_ref text, p_name text, p_phone text, p_items jsonb, p_subtotal numeric, p_pay text, p_notes text)
+returns public.orders language plpgsql security definer set search_path = public as $$
+declare r public.orders;
+begin
+  insert into public.orders(ref, customer_id, customer_name, customer_phone, customer_email, shipping_address, items, subtotal,
+                            status, payment_method, payment_status, notes, source)
+  values (p_ref, null, coalesce(nullif(p_name,''), 'Walk-in counter sale'), coalesce(p_phone,''), '', '', p_items, p_subtotal,
+          'delivered', coalesce(p_pay,'cash'), 'paid', coalesce(p_notes,''), 'pos')
+  returning * into r;
+  return r;
+end $$;
+
 create or replace function public.pos_update_bill(p_id bigint, p_items jsonb, p_subtotal numeric, p_name text, p_phone text, p_pay text, p_notes text)
 returns boolean language plpgsql security definer set search_path = public as $$
 begin
@@ -46,6 +58,7 @@ begin
   return true;
 end $$;
 
+grant execute on function public.pos_create_sale(text,text,text,jsonb,numeric,text,text) to anon, authenticated;
 grant execute on function public.pos_get_bills() to anon, authenticated;
 grant execute on function public.pos_update_bill(bigint,jsonb,numeric,text,text,text,text) to anon, authenticated;
 grant execute on function public.pos_holds_list() to anon, authenticated;
@@ -54,6 +67,7 @@ grant execute on function public.pos_hold_delete(bigint) to anon, authenticated;
 grant execute on function public.pos_set_stock(bigint,jsonb) to anon, authenticated;
 
 -- ---- UNDO (run this to close the open counter again) ----
+-- revoke execute on function public.pos_create_sale(text,text,text,jsonb,numeric,text,text) from anon;
 -- revoke execute on function public.pos_get_bills() from anon;
 -- revoke execute on function public.pos_update_bill(bigint,jsonb,numeric,text,text,text,text) from anon;
 -- revoke execute on function public.pos_holds_list() from anon;

@@ -581,6 +581,10 @@ const BazDS = (function(){
       status: "delivered", payment_method: sale.paymentMethod || "cash", payment_status: "paid",
       notes: sale.notes || "", source: "pos"
     };
+    // open-counter path first (works without a login); falls back to a normal insert when the function isn't installed
+    const rp = await rpcCall(sb, "pos_create_sale", { p_ref: ref, p_name: row.customer_name, p_phone: row.customer_phone, p_items: row.items, p_subtotal: row.subtotal, p_pay: row.payment_method, p_notes: row.notes });
+    if(!rp.error && rp.data) return rp.data;
+    if(rp.error && !rpcMissing(rp.error)) { console.error("pos_create_sale:", rp.error.message); throw rp.error; }
     const runInsert = (r) => sb.from("orders").insert(r).select().single();
     let { data, error } = await runInsert(row);
     if(error && /source['"]?\s*column|column.*source/i.test(error.message)){
