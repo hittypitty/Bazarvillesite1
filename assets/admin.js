@@ -2473,10 +2473,39 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       else await BazDS.createStaffUser({email, password, fullName, role, permissions});
       closeUserModal();
       await renderTeamTable();
-      if(!editingUserId) alert(`User created. They can now sign in at this admin page with:\n\nEmail: ${email}\nPassword: ${password}\n\n(If your Supabase project requires email confirmation, they must click the confirmation email first.)`);
+      if(!editingUserId) showLoginCard({name: fullName, role, email, password});
     }catch(err){ showErr(err.message || "Could not save this user."); }
     finally{ busy(saveUserBtn, false); }
   });
+  /* Copy-ready login details for a newly created user — same layout the team shares on WhatsApp:
+       Name / Role
+       Username: email
+       Password: ******                                                                      */
+  function showLoginCard({name, role, email, password}){
+    const url = location.origin + location.pathname;
+    const text = `${name || (role==="super_admin" ? "Admin" : "Staff")}\nUsername: ${email}\nPassword: ${password}\nLogin: ${url}`;
+    const old = document.querySelector("#loginCardOverlay"); if(old) old.remove();
+    const ov = document.createElement("div"); ov.id = "loginCardOverlay";
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
+    ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 6px">✅ User ban gaya</h3>
+      <p class="ad-hint" style="margin:0 0 10px">Ye details copy karke bhej do. Supabase me email confirmation on hai to user ko pehle mail confirm karna hoga.</p>
+      <pre id="loginCardText" style="white-space:pre-wrap;background:#f4f6ef;border-radius:10px;padding:12px;font:inherit;font-size:14.5px;line-height:1.6;margin:0 0 12px;user-select:all"></pre>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="lcCopy" type="button">📋 Copy</button>
+        <a class="btn btn-outline btn-sm" id="lcWa" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <button class="btn btn-outline btn-sm" id="lcClose" type="button" style="margin-left:auto">Close</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector("#loginCardText").textContent = text;
+    ov.querySelector("#lcWa").href = "https://wa.me/?text=" + encodeURIComponent(text);
+    ov.querySelector("#lcCopy").addEventListener("click", async e=>{
+      try{ await navigator.clipboard.writeText(text); e.target.textContent = "✅ Copied"; }
+      catch(_){ const r = document.createRange(); r.selectNodeContents(ov.querySelector("#loginCardText")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); e.target.textContent = "Select ho gaya — Ctrl+C"; }
+    });
+    ov.querySelector("#lcClose").addEventListener("click", ()=>ov.remove());
+    ov.addEventListener("click", e=>{ if(e.target===ov) ov.remove(); });
+  }
   async function removeUser(u){
     if(!confirm(`Remove admin access for ${u.fullName||u.email}? They will no longer be able to open the admin panel.`)) return;
     try{ await BazDS.removeStaffProfile(u.id); await renderTeamTable(); }
