@@ -2598,6 +2598,25 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // Minimal CSV parser: handles quoted fields with embedded commas ("like, this").
   // Multi-value fields (professions/colors/sizes/images) are pipe-separated inside
   // their own cell — e.g. "Corporate|IT / Tech" — so a plain comma split won't work.
+  const normHeader = h => String(h||"").toLowerCase().trim().replace(/[\s\-]+/g,"_");
+  const HDR_ALIAS = {product_name:"name", title:"name", product:"name", cat:"category", profession:"professions", colours:"colors", colour:"colors", color:"colors",
+    size:"sizes", image:"images", image_urls:"images", photos:"images", qty:"stock_qty", quantity:"stock_qty", stock_quantity:"stock_qty", pieces:"stock_qty",
+    mrp:"price", rate:"price", moq_pcs:"moq", printing:"print_options", print:"print_options", description:"details", specs:"details", bulk:"bulk_threshold"};
+  const COLOR_NAMES = {black:"#1a1a1a", white:"#ffffff", red:"#dc2626", blue:"#2563eb", "royal blue":"#1d4ed8", "navy":"#1e3a8a", "navy blue":"#1e3a8a", "sky blue":"#38bdf8", green:"#16a34a", "mint green":"#86efac", "olive":"#6b7a2a", "bottle green":"#14532d",
+    yellow:"#facc15", orange:"#f97316", pink:"#ec4899", purple:"#8b5cf6", lavender:"#c4b5fd", maroon:"#7f1d1d", brown:"#7c4a21", beige:"#e8dcc2", "sand beige":"#d9c7a0", cream:"#f5efe0", grey:"#9ca3af", gray:"#9ca3af", "charcoal":"#374151", silver:"#c0c0c0", gold:"#d4af37", lime:"#c6f000", teal:"#0d9488", turquoise:"#2dd4bf", wine:"#722f37", khaki:"#b5a26a", "off white":"#f8f5ee", natural:"#d8c3a5"};
+  function parseColorToken(tok){
+    tok = String(tok||"").trim(); if(!tok) return null;
+    let hex = "", name = "";
+    const m = tok.match(/^(#[0-9a-fA-F]{3,8})\s*[:=]\s*(.+)$/);
+    if(m){ hex = m[1].toLowerCase(); name = m[2].trim(); }
+    else if(/^#[0-9a-fA-F]{3,8}$/.test(tok)) hex = tok.toLowerCase();
+    else { name = tok; hex = COLOR_NAMES[tok.toLowerCase()] || "#9ca3af"; }
+    return {hex, name};
+  }
+  function normaliseRow(r){
+    const o = {}; Object.keys(r).forEach(k=>{ const nk = HDR_ALIAS[normHeader(k)] || normHeader(k); const v = r[k]; o[nk] = (v==null ? "" : String(v)).trim(); });
+    return o;
+  }
   function parseCsv(text){
     const lines = text.replace(/\r\n/g,"\n").split("\n").filter(l=>l.trim().length);
     if(!lines.length) return [];
@@ -2617,7 +2636,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       out.push(cur);
       return out.map(s=>s.trim());
     }
-    const headers = parseLine(lines[0]).map(h=>h.toLowerCase().trim());
+    const headers = parseLine(lines[0]).map(normHeader);
     return lines.slice(1).map(line=>{
       const cells = parseLine(line);
       const row = {};
@@ -2626,8 +2645,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     });
   }
 
-  const BULK_CSV_TEMPLATE = `name,category,professions,purpose,occasion,brand,moq,bulk_threshold,price_tiers,colors,sizes,images,stock,status
-Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding,Cello,20,50,"20:399|50:349|100:299",#1a1a1a|#c6f000,S|M|L|XL,https://example.com/img1.jpg|https://example.com/img2.jpg,TRUE,published
+  const BULK_CSV_TEMPLATE = `name,category,professions,purposes,occasions,brand,moq,bulk_threshold,price,price_tiers,colors,sizes,print_options,details,stock_qty,images,stock,status
+Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding,Cello,20,50,,"20:399|50:349|100:299",Black|Lime|Royal Blue,S|M|L|XL,No Print|Custom Print::50,Fabric:Cotton|GSM:240,Black:40|Lime:15|Royal Blue:20,https://example.com/img1.jpg|https://example.com/img2.jpg,TRUE,published
+Simple Steel Bottle,Drinkware,Corporate,Client Gifting,,,10,50,299,Silver,Standard,,Capacity:750 ml,25,https://example.com/bottle.jpg,TRUE,published
 `;
 
   let bulkParsedRows = [];
@@ -2642,16 +2662,16 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
       // name). Updating an existing product via CSV never touches its photos,
       // so a missing/blank images column there is fine — see runBulkUpload().
       const isExisting = r.name && PRODUCTS.some(p=>p.name.toLowerCase()===r.name.toLowerCase());
-      if(!isExisting && !r.images) problems.push("missing images (required for new products only)");
-      if(!r.professions) problems.push("missing professions");
       return {i, problems};
     }).filter(r=>r.problems.length);
+    const noImg = rows.map((r,i)=>({r,i})).filter(({r})=>r.name && !r.images && !PRODUCTS.some(p=>p.name.toLowerCase()===r.name.toLowerCase()));
     const validCount = rows.length - errors.length;
     let html = `<p class="ad-hint"><b>${rows.length}</b> row(s) found — <b>${validCount}</b> look valid and ready to upload.</p>`;
     if(errors.length){
       html += `<p class="ad-hint" style="color:#c0392b">${errors.length} row(s) will be skipped: ` +
         errors.map(e=>`row ${e.i+2} (${e.problems.join(", ")})`).join("; ") + `</p>`;
     }
+    if(noImg.length) html += `<p class="ad-hint" style="color:#9a5b00">${noImg.length} naya product bina image ka hai (${noImg.slice(0,6).map(x=>x.r.name).join(", ")}${noImg.length>6?"…":""}) — ye <b>Draft</b> me save honge, photo baad me Edit se daalo.</p>`;
     el.innerHTML = html;
     runBtn.disabled = validCount === 0;
   }
@@ -2666,24 +2686,44 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
       // Images are required only when creating a brand-new product — an
       // existing product's photos are never touched by CSV (see below), so a
       // missing images column must not skip an otherwise-valid update row.
-      if(!r.name || !r.professions || (!existing && !r.images)) continue;
+      if(!r.name) continue;
       const tiers = (r.price_tiers||"").split("|").filter(Boolean).map(t=>{
         const [min,price] = t.split(":"); return {min:Number(min)||1, price:Number(price)||0};
       });
+      if(!tiers.length && Number(r.price)) tiers.push({min:Number(r.moq)||1, price:Number(r.price)});
+      const cols = (r.colors||"#1a1a1a").split("|").map(parseColorToken).filter(Boolean);
+      const colorNames = {}; cols.forEach(c=>{ if(c.name) colorNames[c.hex] = c.name; });
+      const colorHexes = cols.map(c=>c.hex);
+      const profs = (r.professions||"Corporate").split("|").map(s=>s.trim()).filter(Boolean);
+      const purposes = (r.purposes||r.purpose||"Employee Gifting").split("|").map(s=>s.trim()).filter(Boolean);
+      const occasions = (r.occasions||r.occasion||"").split("|").map(s=>s.trim()).filter(Boolean);
+      // stock_qty: a single number = total pieces, or "Red:10|Black:5" = per colour
+      let colorStock = existing ? (existing.colorStock||{}) : {};
+      if(r.stock_qty){
+        if(/^\d+$/.test(r.stock_qty.trim())){ colorStock = colorHexes.length===1 ? {[colorHexes[0]]:Number(r.stock_qty)} : {_total:Number(r.stock_qty)}; }
+        else {
+          const cs = {}; r.stock_qty.split("|").forEach(t=>{ const i = t.lastIndexOf(":"); if(i<0) return; const key = t.slice(0,i).trim(), n = Number(t.slice(i+1)); if(isNaN(n)) return;
+            const byName = cols.find(c=>c.name.toLowerCase()===key.toLowerCase() || c.hex===key.toLowerCase()); cs[byName?byName.hex:key] = n; });
+          if(Object.keys(cs).length) colorStock = cs;
+        }
+      }
+      const printOptions = (r.print_options||"").split("|").map(s=>s.trim()).filter(Boolean);
+      const details = (r.details||"").split("|").map(t=>{ const i = t.indexOf(":"); return i<0 ? null : {k:t.slice(0,i).trim(), v:t.slice(i+1).trim()}; }).filter(x=>x&&x.k&&x.v);
+      const imgList = (r.images||"").split("|").map(s=>s.trim()).filter(Boolean);
       const data = {
         id: existing ? existing.id : undefined,
         name: r.name,
         cat: r.category || "Uncategorised",
-        professions: r.professions.split("|").map(s=>s.trim()).filter(Boolean),
-        profession: r.professions.split("|")[0].trim(),
-        purpose: r.purpose || "Employee Gifting",
-        occasion: r.occasion || "",
+        professions: profs, profession: profs[0],
+        purposes, purpose: purposes[0], occasions, occasion: occasions[0] || "",
         brand: r.brand || null,
         moq: Number(r.moq) || 1,
         bulk: Number(r.bulk_threshold) || 1,
         stock: /^(true|yes|1)$/i.test(r.stock || "true"),
-        status: /^draft$/i.test(r.status || "published") ? "draft" : "published",
-        colors: (r.colors||"#1a1a1a").split("|").map(s=>s.trim()).filter(Boolean),
+        status: (/^draft$/i.test(r.status || "published") || (!existing && !imgList.length)) ? "draft" : "published",
+        colors: colorHexes, colorNames: existing ? {...(existing.colorNames||{}), ...colorNames} : colorNames,
+        printOptions: printOptions.length ? printOptions : (existing ? (existing.printOptions||[]) : []),
+        details: details.length ? details : (existing ? (existing.details||[]) : []),
         sizes: (r.sizes||"Standard").split("|").map(s=>s.trim()).filter(Boolean),
         tiers: tiers.length ? tiers : [{min:Number(r.moq)||1, price:0}],
         // IMPORTANT (client requirement): bulk CSV must never be able to wipe
@@ -2692,8 +2732,8 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
         // column says (stale/placeholder/blank values are common on re-upload
         // for something like a price change). Only a brand-new product (no
         // existing match by name) takes its images from the CSV.
-        img: existing ? existing.img : r.images.split("|").map(s=>s.trim()).filter(Boolean),
-        colorStock: existing ? (existing.colorStock||{}) : {},
+        img: existing ? existing.img : imgList,
+        colorStock,
         view360: existing ? (existing.view360||[]) : [],
         model3d: existing ? (existing.model3d||"") : ""
       };
@@ -2760,8 +2800,21 @@ Premium Cotton Polo Tee,T-Shirts,Corporate|IT / Tech,Employee Gifting,Onboarding
   if(bulkFileInput) bulkFileInput.addEventListener("change", (e)=>{
     const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
-    reader.onload = ()=>{ bulkParsedRows = parseCsv(reader.result); renderBulkResults(bulkParsedRows); };
-    reader.readAsText(file);
+    if(/\.(xlsx|xls)$/i.test(file.name)){
+      if(typeof XLSX === "undefined"){ alert("Excel reader load nahi hua — internet check karo ya CSV use karo."); return; }
+      reader.onload = ()=>{
+        try{
+          const wb = XLSX.read(reader.result, {type:"array"});
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""});
+          bulkParsedRows = rows.map(normaliseRow).filter(r=>Object.values(r).some(v=>v!==""));
+        }catch(err){ alert("Excel file padh nahi paya: " + err.message); bulkParsedRows = []; }
+        renderBulkResults(bulkParsedRows);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = ()=>{ bulkParsedRows = parseCsv(reader.result).map(normaliseRow); renderBulkResults(bulkParsedRows); };
+      reader.readAsText(file);
+    }
   });
   const runBulkBtn = document.querySelector("#runBulkBtn");
   if(runBulkBtn) runBulkBtn.addEventListener("click", ()=>runBulkUpload(bulkParsedRows));

@@ -357,11 +357,12 @@
 <!-- ===================== BULK UPLOAD MODAL ===================== -->
 <div class="ad-modal-backdrop" id="bulkModalBackdrop">
   <div class="ad-modal ad-modal-lg">
-    <div class="ad-modal-head"><h2>Bulk Upload Products (CSV)</h2><span class="ad-modal-close" id="closeBulkModal">✕</span></div>
+    <div class="ad-modal-head"><h2>Bulk Upload Products (Excel / CSV)</h2><span class="ad-modal-close" id="closeBulkModal">✕</span></div>
     <div class="ad-modal-body">
       <p class="ad-hint">Upload a CSV to add or update many products at once. Rows with an existing product name are updated in place; new names create new products. <a href="#" id="bulkTemplateLink">Download a starter template</a> to see the exact column format.</p>
+      <p class="ad-hint"><b>Excel (.xlsx) ya CSV</b> dono chalte hain. Ek se zyada values ek cell me <code>|</code> se alag karo. Colours naam se likh sakte ho (<code>Black|Royal Blue</code>) ya <code>#hex:Naam</code>. <code>price</code> me ek hi rate likho, ya <code>price_tiers</code> me <code>20:399|50:349</code>. <code>stock_qty</code> me total (<code>40</code>) ya colour-wise (<code>Black:10|Red:5</code>). <code>print_options</code>: <code>No Print|Custom Print::50</code> (:: ke baad extra ₹). <code>details</code>: <code>Fabric:Cotton|GSM:240</code>. Bina image ka naya product <b>Draft</b> me save hota hai.</p>
       <p class="ad-hint">Note: the <code>images</code> column is only used when creating a brand-new product; updating an existing product (matched by name) never changes its photos via CSV — edit photos from that product's own Edit screen.</p>
-      <input type="file" id="bulkFileInput" accept=".csv">
+      <input type="file" id="bulkFileInput" accept=".csv,.xlsx,.xls">
       <div id="bulkResults" style="margin-top:16px"></div>
     </div>
     <div class="ad-modal-foot">
@@ -525,6 +526,7 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/data-store.js"></script>
 <script src="assets/script.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="assets/admin.js"></script>
 <script src="assets/words-en.js"></script>
 <script src="assets/typing-assist.js"></script>
