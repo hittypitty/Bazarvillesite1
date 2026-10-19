@@ -17,7 +17,7 @@
     <p>Sign in to manage products, collections and site settings.</p>
     <div class="ad-field">
       <label>Email</label>
-      <input id="loginEmail" type="email" placeholder="you@example.com">
+      <input id="loginEmail" type="text" placeholder="Username ya email" autocomplete="username" autocapitalize="none">
     </div>
     <div class="ad-field">
       <label>Password</label>
@@ -467,7 +467,7 @@
     <div class="ad-modal-head"><h2 id="userModalTitle">Add User</h2><span class="ad-modal-close" id="closeUserModal">✕</span></div>
     <div class="ad-modal-body">
       <div class="ad-field"><label>Full name</label><input id="uf_name" placeholder="e.g. Rahul Sharma"></div>
-      <div class="ad-field"><label>Email (login)</label><input id="uf_email" type="email" placeholder="name@example.com" autocomplete="off"></div>
+      <div class="ad-field"><label>Username (login)</label><input id="uf_email" type="text" placeholder="e.g. rahul  (email bhi chalega)" autocomplete="off" autocapitalize="none" data-no-assist="1"></div>
       <div class="ad-field" id="uf_passwordField"><label>Password</label><input id="uf_password" type="text" placeholder="At least 6 characters" autocomplete="new-password"></div>
       <label class="ad-user-super" id="uf_superRow"><input type="checkbox" id="uf_super"> <span><b>👑 Super Admin</b> — full access to everything, including Site Settings and Users &amp; Roles</span></label>
       <div id="uf_permsWrap">

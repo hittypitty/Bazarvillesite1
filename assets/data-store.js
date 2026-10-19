@@ -385,8 +385,14 @@ const BazDS = (function(){
   }
 
   /* ---------- auth ---------- */
+  /* Username login: Supabase signs in by email, so a plain username (no "@") is mapped to a hidden address
+     name@staff.bazarville.com. Typing a real email still works exactly as before. */
+  const USER_DOMAIN = "staff.bazarville.com";
+  const toLoginEmail = u => { u = String(u||"").trim(); return u.includes("@") ? u : (u.toLowerCase() + "@" + USER_DOMAIN); };
+  const toUsername = e => { e = String(e||""); return e.toLowerCase().endsWith("@"+USER_DOMAIN) ? e.slice(0, -(USER_DOMAIN.length+1)) : e; };
   async function signIn(email, password){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    email = toLoginEmail(email);
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if(error) throw error;
     return data.user;
@@ -693,7 +699,7 @@ const BazDS = (function(){
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings, updateTrustedBrands, updateHomepage,
     logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage, uploadFile,
-    signIn, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
+    signIn, toLoginEmail, toUsername, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus, updatePosSale,
     createPosSale, posGetBills, posSetStock, getPosHolds, holdPosSale, deletePosHold,

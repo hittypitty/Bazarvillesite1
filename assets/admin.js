@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const isSuper = admin.role === "super_admin";
     currentAdmin = admin;
     document.body.classList.toggle("role-super", isSuper);
-    document.querySelector("#roleBadge").textContent = isSuper ? `👑 ${admin.email}` : `🗂️ ${admin.fullName||admin.email}`;
+    document.querySelector("#roleBadge").textContent = isSuper ? `👑 ${BazDS.toUsername(admin.email)}` : `🗂️ ${admin.fullName||BazDS.toUsername(admin.email)}`;
     // Per-user section ticks (Users & Roles). permissions === null means the
     // database hasn't run add_user_permissions.sql yet — behave as before
     // (every non-super user keeps the old Catalog Manager access).
@@ -2392,7 +2392,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function teamRowHtml(u){
     const isMe = currentAdmin && u.email===currentAdmin.email;
     return `<tr data-id="${u.id}">
-      <td><b>${u.fullName||"—"}</b>${isMe?` <span class="ad-badge in">You</span>`:""}<br><span class="ad-hint" style="margin:0">${u.email||""}</span></td>
+      <td><b>${u.fullName||"—"}</b>${isMe?` <span class="ad-badge in">You</span>`:""}<br><span class="ad-hint" style="margin:0">${BazDS.toUsername(u.email||"")}</span></td>
       <td>${u.role==="super_admin"?"👑 Super Admin":"🗂️ Team member"}</td>
       <td><div class="ad-perm-chips">${permSummary(u)}</div></td>
       <td><div class="ad-row-actions">
@@ -2430,7 +2430,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     document.querySelector("#userModalTitle").textContent = u ? "Edit User" : "Add User";
     document.querySelector("#saveUserBtn").textContent = u ? "Save Changes" : "Create User";
     document.querySelector("#uf_name").value = u ? u.fullName : "";
-    const emailEl = document.querySelector("#uf_email"); emailEl.value = u ? (u.email||"") : ""; emailEl.disabled = !!u;
+    const emailEl = document.querySelector("#uf_email"); emailEl.value = u ? BazDS.toUsername(u.email||"") : ""; emailEl.disabled = !!u;
     document.querySelector("#uf_password").value = "";
     document.querySelector("#uf_passwordField").style.display = u ? "none" : "block";
     const isMe = !!(u && currentAdmin && u.email===currentAdmin.email);
@@ -2457,12 +2457,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const showErr = (m)=>{ errEl.textContent = m; errEl.style.display = "block"; };
     errEl.style.display = "none";
     const fullName = document.querySelector("#uf_name").value.trim();
-    const email = document.querySelector("#uf_email").value.trim();
+    const rawLogin = document.querySelector("#uf_email").value.trim();
+    const email = rawLogin.includes("@") ? rawLogin : rawLogin.toLowerCase();
     const password = document.querySelector("#uf_password").value;
     const isSuper = document.querySelector("#uf_super").checked;
     const permissions = [...document.querySelectorAll("#uf_perms input:checked")].map(i=>i.value);
     if(!editingUserId){
-      if(!email || !/^\S+@\S+\.\S+$/.test(email)) return showErr("Enter a valid email address.");
+      if(rawLogin.includes("@") ? !/^\S+@\S+\.\S+$/.test(rawLogin) : !/^[a-z0-9._-]{3,30}$/.test(email)) return showErr("Username 3-30 characters ka ho (a-z, 0-9, . _ -), ya poora email likho.");
       if(password.length < 6) return showErr("Password must be at least 6 characters.");
     }
     if(!isSuper && !permissions.length && !confirm("No sections are ticked — this user won't be able to open anything. Continue?")) return;
@@ -2470,10 +2471,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     try{
       const role = isSuper ? "super_admin" : "catalog_manager";
       if(editingUserId) await BazDS.updateStaffProfile(editingUserId, {role, permissions, fullName});
-      else await BazDS.createStaffUser({email, password, fullName, role, permissions});
+      else await BazDS.createStaffUser({email: BazDS.toLoginEmail(email), password, fullName, role, permissions});
       closeUserModal();
       await renderTeamTable();
-      if(!editingUserId) showLoginCard({name: fullName, role, email, password});
+      if(!editingUserId) showLoginCard({name: fullName, role, email: BazDS.toUsername(BazDS.toLoginEmail(email)), password});
     }catch(err){ showErr(err.message || "Could not save this user."); }
     finally{ busy(saveUserBtn, false); }
   });
@@ -2489,7 +2490,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px";
     ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.3)">
       <h3 style="margin:0 0 6px">✅ User ban gaya</h3>
-      <p class="ad-hint" style="margin:0 0 10px">Ye details copy karke bhej do. Supabase me email confirmation on hai to user ko pehle mail confirm karna hoga.</p>
+      <p class="ad-hint" style="margin:0 0 10px">Ye details copy karke bhej do. Username se seedha login hoga. (Supabase me 'Confirm email' OFF hona chahiye, warna login nahi chalega.)</p>
       <pre id="loginCardText" style="white-space:pre-wrap;background:#f4f6ef;border-radius:10px;padding:12px;font:inherit;font-size:14.5px;line-height:1.6;margin:0 0 12px;user-select:all"></pre>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" id="lcCopy" type="button">📋 Copy</button>
