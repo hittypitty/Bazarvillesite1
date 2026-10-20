@@ -74,12 +74,24 @@ function stockTotal(p){
   const v = Object.values(p.colorStock||{}).filter(x=>x!=null && !isNaN(x)).map(Number);
   return v.length ? v.reduce((a,b)=>a+b,0) : null;
 }
-function stockKey(p, color){ const cs = p.colorStock||{}; return (color && cs[color]!=null) ? color : (cs._total!=null ? "_total" : null); }
-function stockLeft(p, color){ const k = stockKey(p, color); return k ? Number(p.colorStock[k]) : null; }
+/* colorStock keys: "<colour>" (colour-wise), "<colour>|<size>" (size-wise), "_total" (single number) */
+function hasSizeKeys(cs, color){ return !!color && Object.keys(cs).some(k=>k.startsWith(color+"|")); }
+function stockKey(p, color, size){
+  const cs = p.colorStock||{};
+  if(color && size && cs[color+"|"+size]!=null) return color+"|"+size;
+  if(hasSizeKeys(cs, color)) return null;                       // this colour is tracked size-wise, this size isn't set
+  return (color && cs[color]!=null) ? color : (cs._total!=null ? "_total" : null);
+}
+function stockLeft(p, color, size){ const k = stockKey(p, color, size); return k ? Number(p.colorStock[k]) : null; }
+function colourLeft(p, color){
+  const cs = p.colorStock||{}; let n = null;
+  for(const [k,v] of Object.entries(cs)){ if((k===color || k.startsWith(color+"|")) && v!=null && !isNaN(v)){ n = (n||0) + Number(v); } }
+  return n!=null ? n : (cs._total!=null ? Number(cs._total) : null);
+}
 function isOut(p){ const t = stockTotal(p); return p.stock === false || (t!=null && t<=0); }
-function deductStock(p, color, qty){
+function deductStock(p, color, qty, size){
   if(!p || !qty) return false;
-  const cs = p.colorStock || {}, key = stockKey(p, color); if(!key) return false;
+  const cs = p.colorStock || {}, key = stockKey(p, color, size); if(!key) return false;
   const before = stockTotal(p);
   p.colorStock = {...cs, [key]: Math.max(0, Number(cs[key]) - qty)};
   const after = stockTotal(p);
@@ -129,7 +141,7 @@ $("#grid").addEventListener("click", e => { const b = e.target.closest(".px-prod
 /* ---------------- variant picker ---------------- */
 function openProduct(p){
   const colors = p.colors||[], sizes = p.sizes||[], prints = p.printOptions||[];
-  if(colors.length<=1 && sizes.length<=1 && prints.length<=1){
+  if(colors.length<=1 && sizes.length<=1){
     addLine(p, {color:colors[0]||"", size:sizes[0]||"", print:prints[0]?pName(prints[0]):"", extra:prints[0]?pExtra(prints[0]):0, qty:1}); return;
   }
   vSel = {p, color:colors[0]||"", size:sizes[0]||"", pi:0, qty:1};
@@ -146,10 +158,9 @@ function openLineEdit(i){
 function renderVariant(){
   const {p} = vSel, colors = p.colors||[], sizes = p.sizes||[], prints = p.printOptions||[];
   let h = "";
-  if(colors.length>1) h += `<div class="px-vlabel">Colour</div><div class="px-vopts">${colors.map(c=>`<button class="px-vopt ${c===vSel.color?"active":""}" data-c="${esc(c)}"><i class="px-dot" style="background:${esc(c)}"></i>${esc(colorLabel(p,c)||"")}${(()=>{ const n = stockLeft(p,c); return n==null?"":` <small class="px-vstock ${n<=0?"zero":n<=5?"low":""}">${n<=0?"out":n}</small>`; })()}</button>`).join("")}</div>`;
-  if(sizes.length>1) h += `<div class="px-vlabel">Size</div><div class="px-vopts">${sizes.map(s=>`<button class="px-vopt ${s===vSel.size?"active":""}" data-s="${esc(s)}">${esc(s)}</button>`).join("")}</div>`;
-  if(prints.length>1) h += `<div class="px-vlabel">Printing</div><div class="px-vopts">${prints.map((s,i)=>`<button class="px-vopt ${i===vSel.pi?"active":""}" data-p="${i}">${esc(pName(s))}${pExtra(s)?` <small>+${money(pExtra(s))}</small>`:""}</button>`).join("")}</div>`;
-  const left = stockLeft(p, vSel.color);
+  if(colors.length>1) h += `<div class="px-vlabel">Colour</div><div class="px-vopts">${colors.map(c=>`<button class="px-vopt ${c===vSel.color?"active":""}" data-c="${esc(c)}"><i class="px-dot" style="background:${esc(c)}"></i>${esc(colorLabel(p,c)||"")}${(()=>{ const n = colourLeft(p,c); return n==null?"":` <small class="px-vstock ${n<=0?"zero":n<=5?"low":""}">${n<=0?"out":n}</small>`; })()}</button>`).join("")}</div>`;
+  if(sizes.length>1) h += `<div class="px-vlabel">Size</div><div class="px-vopts">${sizes.map(s=>`<button class="px-vopt ${s===vSel.size?"active":""}" data-s="${esc(s)}">${esc(s)}${(()=>{ const n = stockLeft(p, vSel.color, s); return n==null?"":` <small class="px-vstock ${n<=0?"zero":n<=5?"low":""}">${n<=0?"out":n}</small>`; })()}</button>`).join("")}</div>`;
+  const left = stockLeft(p, vSel.color, vSel.size);
   h += `<div class="px-vlabel">Quantity</div><div class="px-vqty"><div class="px-step"><button data-q="-1">−</button><input id="vQty" type="number" min="1" value="${vSel.qty}"><button data-q="1">+</button></div>${left!=null?`<span class="px-avail ${left<=0?"zero":left<=5?"low":""}">${left<=0?"Out of stock":"Available: <b>"+left+"</b>"}</span>`:""}</div>${left!=null&&vSel.qty>left&&left>0?`<div class="px-over">⚠ Stock me sirf ${left} hai — ${vSel.qty} bill ho rahe hain</div>`:""}`;
   const ex = prints[vSel.pi] ? pExtra(prints[vSel.pi]) : 0, unit = (tierPrice(p, vSel.qty)||0) + ex;
   h += `<div class="px-vtotal">${money(unit)} × ${vSel.qty} = <b>${money(unit*vSel.qty)}</b></div>`;
@@ -189,7 +200,7 @@ $("#vAdd").addEventListener("click", () => {
 function lineRate(l){ const p = PRODUCTS.find(x=>x.id===l.productId); return l.manual ? l.price : ((p?tierPrice(p,l.qty):l.base)||0) + (l.extra||0); }
 function addLine(p, o){
   const key = [p.id,o.color,o.size,o.print].join("|");
-  const left = stockLeft(p, o.color);
+  const left = stockLeft(p, o.color, o.size);
   let l = cart.find(x=>x.key===key);
   const newQty = (l?l.qty:0) + o.qty;
   if(isOut(p)) toast(`${p.name} stock me nahi dikh raha — phir bhi bill me add kiya`, "err");
@@ -340,6 +351,21 @@ function openHolds(){
 }
 $("#btnHolds").addEventListener("click", openHolds);
 $("#lBody").addEventListener("click", async e => {
+  const db = e.target.closest("[data-delbill]");
+  if(db){
+    const o = posOrders.find(x=>String(x.id)===db.dataset.delbill); if(!o) return;
+    const bn = (/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1] || o.ref;
+    if(!confirm(`${bn} (${money(o.subtotal||0)}) delete karna hai?\nBill ke items ka stock wapas add ho jayega.`)) return;
+    try{
+      await BazDS.deletePosSale(o.id);
+      const touched = new Set();
+      for(const it of (Array.isArray(o.items)?o.items:[])){ const p = PRODUCTS.find(x=>String(x.id)===String(it.productId)); if(deductStock(p, it.color, -(it.qty||0), it.size)) touched.add(p); }
+      for(const p of touched){ try{ await BazDS.posSetStock(p); }catch(err){ console.error(err); } }
+      await refreshOrders(); renderGrid(); toast("🗑 "+bn+" delete ho gaya","ok");
+      $("#btnRecent").click();
+    }catch(err){ toast("Delete nahi hua: "+(err.message||""),"err"); }
+    return;
+  }
   const rc = e.target.closest("[data-recall]"), dl = e.target.closest("[data-del]"), rp = e.target.closest("[data-reprint]"), ed = e.target.closest("[data-edit]");
   if(rc){
     const h = holds.find(x=>String(x.id)===rc.dataset.recall); if(!h) return;
@@ -381,10 +407,10 @@ async function completeSale(){
   const touched = new Set();
   if(old){ // only the difference vs the old bill moves stock
     const delta = {};
-    const add = (it, sgn) => { const k = it.productId+"|"+(it.color||""); delta[k] = (delta[k]||0) + sgn*it.qty; };
+    const add = (it, sgn) => { const k = it.productId+"|"+(it.color||"")+"|"+(it.size||""); delta[k] = (delta[k]||0) + sgn*it.qty; };
     (Array.isArray(old.items)?old.items:[]).forEach(i=>add(i,-1)); rec.items.forEach(i=>add(i,1));
-    for(const [k,d] of Object.entries(delta)){ if(!d) continue; const [pid,color] = k.split("|"); const p = PRODUCTS.find(x=>String(x.id)===pid); if(deductStock(p, color, d)) touched.add(p); }
-  } else for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty)) touched.add(p); }
+    for(const [k,d] of Object.entries(delta)){ if(!d) continue; const [pid,color,size] = k.split("|"); const p = PRODUCTS.find(x=>String(x.id)===pid); if(deductStock(p, color, d, size)) touched.add(p); }
+  } else for(const l of cart){ const p = PRODUCTS.find(x=>x.id===l.productId); if(deductStock(p, l.color, l.qty, l.size)) touched.add(p); }
   let warn = false;
   for(const p of touched){ try{ if(!(await BazDS.posSetStock(p))) warn = true; }catch(e){ warn = true; console.error(e); } }
   if(warn) toast("Sale ho gayi, par stock minus nahi hua — internet/Supabase check karo","err");
@@ -446,7 +472,7 @@ $("#btnRecent").addEventListener("click", async () => {
   await refreshOrders();
   $("#lTitle").textContent = "🧾 Recent bills";
   const billRows = list => list.length ? list.map(o=>`<div class="px-li"><div><b>${esc((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1]||o.ref)}</b> · ${money(o.subtotal)}<small>${esc(o.customer_name||"")} · ${esc(o.payment_method||"cash")} · ${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>
-    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button></div></div>`).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
+    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button><button class="px-btn px-btn-outline px-del-bill" data-delbill="${o.id}" title="Bill delete karo">🗑</button></div></div>`).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
   $("#lBody").innerHTML = '<input id="billSearch" placeholder="Bill no. ya customer search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
   const draw = () => { const q = $("#billSearch").value.trim().toLowerCase(); $("#billRows").innerHTML = billRows(posOrders.filter(o => !q || ((o.notes||"")+" "+(o.customer_name||"")+" "+(o.ref||"")).toLowerCase().includes(q)).slice(0,60)); };
   $("#billSearch").addEventListener("input", draw); draw();

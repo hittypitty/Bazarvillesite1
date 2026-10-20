@@ -290,10 +290,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   }
   /* Remove qty (negative qty = put back). Returns true if a tracked number was changed. Flips the
      in/out flag automatically when the tracked total hits 0 (and back when stock returns). */
-  function deductStock(p, color, qty){
+  /* keys: "<colour>" | "<colour>|<size>" (size-wise) | "_total" */
+  function stockKeyFor(cs, color, size){
+    if(color && size && cs[color+"|"+size]!=null) return color+"|"+size;
+    if(color && Object.keys(cs).some(k=>k.startsWith(color+"|"))) return null;
+    return (color && cs[color]!=null) ? color : (cs._total!=null ? "_total" : null);
+  }
+  function deductStock(p, color, qty, size){
     if(!p || !qty) return false;
     const cs = p.colorStock || {};
-    const key = (color && cs[color]!=null) ? color : (cs._total!=null ? "_total" : null);
+    const key = stockKeyFor(cs, color, size);
     if(!key) return false;
     const before = stockTotal(p);
     p.colorStock = {...cs, [key]: Math.max(0, Number(cs[key]) - qty)};
@@ -310,6 +316,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
     const cs = {...(p.colorStock||{})};
     if(value==="") delete cs[key]; else cs[key] = Math.max(0, Math.round(Number(value)||0));
+    if(key.includes("|") && value!=="") delete cs[key.split("|")[0]];   // size-wise numbers replace the colour-wise one (no double counting)
     p.colorStock = cs;
     const t = stockTotal(p);
     if(t!=null) p.stock = t>0;
@@ -375,6 +382,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   function invQtyCellHtml(p){
     const cs = p.colorStock||{};
     const colors = (p.colors||[]);
+    const sizes = (p.sizes||[]).filter(Boolean);
+    if(colors.length && sizes.length>1){
+      const total = stockTotal(p);
+      return `<div class="inv-qty-colors inv-qty-sizewise">` + colors.map(c=>{
+        const colSum = Object.entries(cs).filter(([k,v])=>(k===c||k.startsWith(c+"|"))&&v!=null).reduce((a,[,v])=>a+Number(v),0);
+        return `<div class="inv-sz-colour"><div class="inv-sz-head"><i class="pos-cart-dot" style="background:${c}"></i><small>${(p.colorNames&&p.colorNames[c])||""}</small><b>${Object.keys(cs).some(k=>k===c||k.startsWith(c+"|"))?colSum+" pcs":""}</b></div>
+          <div class="inv-sz-grid">${sizes.map(sz=>`<label class="inv-sz-cell"><span>${sz}</span><input type="number" min="0" class="inv-qty-input" data-id="${p.id}" data-key="${c}|${sz}" value="${cs[c+"|"+sz]!=null?cs[c+"|"+sz]:((cs[c]!=null&&!Object.keys(cs).some(k=>k.startsWith(c+"|")))?"":"")}" placeholder="—"></label>`).join("")}</div>
+          ${(cs[c]!=null&&!Object.keys(cs).some(k=>k.startsWith(c+"|")))?`<div class="inv-sz-note">Abhi colour-wise ${cs[c]} pcs hai — size-wise bharoge to ye replace ho jayega</div>`:""}</div>`;
+      }).join("") + `</div>${total!=null?`<div class="inv-qty-total">${total} left</div>`:`<div class="inv-qty-total muted">Not tracked</div>`}`;
+    }
     if(colors.length){
       const total = stockTotal(p);
       return `<div class="inv-qty-colors">` + colors.map(c=>`
@@ -733,7 +750,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const soldTouched = new Set();
       for(const item of posCart){
         const p = PRODUCTS.find(x=>x.id===item.productId);
-        if(deductStock(p, item.color, item.qty)) soldTouched.add(p);
+        if(deductStock(p, item.color, item.qty, item.size)) soldTouched.add(p);
       }
       let stockWarn = false;
       for(const p of soldTouched){
@@ -995,12 +1012,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       // stock: the original colour gets the old qty back, the (possibly new) colour is charged the new qty.
       // Only colours that have tracked stock are touched.
       const touched = new Set();
-      const bump = (p, color, delta)=>{ if(deductStock(p, color, -delta)) touched.add(p); };
+      const bump = (p, color, delta, size)=>{ if(deductStock(p, color, -delta, size)) touched.add(p); };
       b.rows.forEach(r=>{
         const it = b.orig[r.i], p = findBillProduct(it);
         const newQty = (r.removed || !(Number(r.qty)>0)) ? 0 : Math.round(Number(r.qty));
-        bump(p, it.color, +(it.qty||1));
-        bump(p, r.color, -newQty);
+        bump(p, it.color, +(it.qty||1), it.size);
+        bump(p, r.color, -newQty, r.size!=null ? r.size : it.size);
       });
       for(const p of touched){ try{ const sv = await BazDS.upsertProduct(p); if(stockWasStripped(sv)) posToast(STOCK_SQL_MSG,"error"); }catch(e){ console.error("Stock adjust failed for", p.name, e); } }
       closeBillEdit();

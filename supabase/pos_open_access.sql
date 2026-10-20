@@ -35,6 +35,13 @@ begin
   return found;
 end $$;
 
+create or replace function public.pos_delete_bill(p_id bigint) returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.orders where id = p_id and (source = 'pos' or ref like 'BZP-%');
+  return found;
+end $$;
+
 create or replace function public.pos_holds_list() returns setof public.pos_holds
 language sql security definer set search_path = public as $$
   select * from public.pos_holds order by created_at desc limit 200;
@@ -60,6 +67,7 @@ end $$;
 
 grant execute on function public.pos_create_sale(text,text,text,jsonb,numeric,text,text) to anon, authenticated;
 grant execute on function public.pos_get_bills() to anon, authenticated;
+grant execute on function public.pos_delete_bill(bigint) to anon, authenticated;
 grant execute on function public.pos_update_bill(bigint,jsonb,numeric,text,text,text,text) to anon, authenticated;
 grant execute on function public.pos_holds_list() to anon, authenticated;
 grant execute on function public.pos_hold_add(text,jsonb,numeric) to anon, authenticated;
@@ -69,6 +77,7 @@ grant execute on function public.pos_set_stock(bigint,jsonb) to anon, authentica
 -- ---- UNDO (run this to close the open counter again) ----
 -- revoke execute on function public.pos_create_sale(text,text,text,jsonb,numeric,text,text) from anon;
 -- revoke execute on function public.pos_get_bills() from anon;
+-- revoke execute on function public.pos_delete_bill(bigint) from anon;
 -- revoke execute on function public.pos_update_bill(bigint,jsonb,numeric,text,text,text,text) from anon;
 -- revoke execute on function public.pos_holds_list() from anon;
 -- revoke execute on function public.pos_hold_add(text,jsonb,numeric) from anon;

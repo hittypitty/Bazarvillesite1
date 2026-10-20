@@ -591,7 +591,9 @@ const BazDS = (function(){
     const rp = await rpcCall(sb, "pos_create_sale", { p_ref: ref, p_name: row.customer_name, p_phone: row.customer_phone, p_items: row.items, p_subtotal: row.subtotal, p_pay: row.payment_method, p_notes: row.notes });
     if(!rp.error && rp.data) return rp.data;
     if(rp.error && !rpcMissing(rp.error)) { console.error("pos_create_sale:", rp.error.message); throw rp.error; }
-    const runInsert = (r) => sb.from("orders").insert(r).select().single();
+    // Plain insert WITHOUT ".select()": reading the row back needs a SELECT permission that a signed-out counter
+    // device doesn't have (that was the "row-level security" error). We already know everything we inserted.
+    const runInsert = async (r) => { const { error } = await sb.from("orders").insert(r); return { data: error ? null : { ...r, id: null, created_at: new Date().toISOString() }, error }; };
     let { data, error } = await runInsert(row);
     if(error && /source['"]?\s*column|column.*source/i.test(error.message)){
       // add_pos.sql hasn't been run yet — orders.source doesn't exist. Save
@@ -635,6 +637,16 @@ const BazDS = (function(){
     if(!rpcMissing(error)) throw error;
     const sv = await upsertProduct(p);
     return !(sv && sv.__stripped && sv.__stripped.includes("color_stock") && sv.__stripped.includes("color_images"));
+  }
+  /** Delete a POS bill (open-counter RPC first, plain table delete as fallback). */
+  async function deletePosSale(id){
+    const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
+    const rp = await rpcCall(sb, "pos_delete_bill", { p_id: id });
+    if(!rp.error){ if(rp.data === false) throw new Error("Bill nahi mila / delete nahi hua."); return true; }
+    if(!rpcMissing(rp.error)) throw rp.error;
+    const { error } = await sb.from("orders").delete().eq("id", id);
+    if(error) throw error;
+    return true;
   }
   async function getPosHolds(){
     const sb = getClient(); if(!sb) return [];
@@ -702,7 +714,7 @@ const BazDS = (function(){
     signIn, toLoginEmail, toUsername, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus, updatePosSale,
-    createPosSale, posGetBills, posSetStock, getPosHolds, holdPosSale, deletePosHold,
+    createPosSale, deletePosSale, posGetBills, posSetStock, getPosHolds, holdPosSale, deletePosHold,
     createQuote, getQuotes, getQuoteByRef, updateQuoteStatus
   };
 })();

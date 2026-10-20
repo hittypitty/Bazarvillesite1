@@ -1371,9 +1371,15 @@ function initQuotePage(){
 /* ---------- product detail page ---------- */
 /* stock line for the product page: "In Stock · 12 pcs available" for the selected colour (when quantities are tracked in admin Inventory) */
 function pdStockHtml(p, colorHex){
-  const cs = p.colorStock || {}, k = (colorHex && cs[colorHex]!=null) ? colorHex : (cs._total!=null ? "_total" : null);
+  const cs = p.colorStock || {};
   const vals = Object.values(cs).filter(x=>x!=null && !isNaN(x)).map(Number), tracked = vals.length > 0;
-  const n = k ? Number(cs[k]) : (tracked ? vals.reduce((a,b)=>a+b,0) : null);
+  let n = null;
+  if(colorHex){
+    const mine = Object.entries(cs).filter(([k,v])=>(k===colorHex||k.startsWith(colorHex+"|")) && v!=null && !isNaN(v));
+    if(mine.length) n = mine.reduce((a,[,v])=>a+Number(v),0);
+    else if(cs._total!=null) n = Number(cs._total);
+  }
+  if(n==null && tracked) n = vals.reduce((a,b)=>a+b,0);
   if(n==null) return p.stock ? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>';
   if(n<=0) return '<b style="color:#c0392b">Out of Stock</b>' + (colorHex && p.stock ? ' <span style="color:#6b7280">· this colour — try another</span>' : '');
   if(n<=5) return `<b style="color:#b45309">Only ${n} pcs left</b>`;
