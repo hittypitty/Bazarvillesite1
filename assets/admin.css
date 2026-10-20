@@ -576,3 +576,12 @@ body.role-super .ad-super-only{display:block}
 .inv-sz-cell{display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:700;color:var(--muted)}
 .inv-sz-cell .inv-qty-input{width:62px}
 .inv-sz-note{margin-top:6px;font-size:11px;color:#9a5b00}
+
+/* Sidebar stays put while the page scrolls: style.css puts overflow-x:hidden on html/body, which turns body into a
+   scroll container and silently breaks position:sticky. "clip" hides sideways overflow WITHOUT doing that. */
+html,body{overflow-x:clip}
+.ad-shell{align-items:start}
+@media(min-width:901px){
+  .ad-sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;align-self:start;scrollbar-width:thin}
+  .ad-main{min-height:100vh}
+}
