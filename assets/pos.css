@@ -294,3 +294,16 @@ body.paper-a4 .px-receipt{max-width:640px;font-family:Inter,system-ui,sans-serif
 .px-avail{padding:6px 12px;border-radius:10px;background:#e8f5c8;color:#2f5d00;font-size:13px;font-weight:600}
 .px-avail b{font-size:16px}.px-avail.low{background:#fff1d6;color:#9a5b00}.px-avail.zero{background:#fee2e2;color:#b91c1c}
 .px-over{margin-top:8px;padding:8px 12px;border-radius:10px;background:#fff1d6;color:#9a5b00;font-size:12.5px;font-weight:600}
+
+.px-bill-card{flex-direction:column;align-items:stretch;gap:8px}
+.px-bl-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.px-bl-total{font-size:17px}
+.px-bl-cust{font-size:13px;font-weight:600;color:var(--ink)}
+.px-bl-items{background:#fafbf6;border:1px solid var(--line);border-radius:10px;padding:4px 10px}
+.px-bl-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.px-bl-item:last-child{border-bottom:0}
+.px-bl-n small{display:block;color:var(--mut);font-size:11.5px;margin-top:1px}
+.px-bl-q{color:var(--mut);font-size:12px;white-space:nowrap}
+.px-bl-foot{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--mut)}
+.px-bl-ex{color:#9a5b00;font-weight:600}
+.px-bill-card .px-li-actions{justify-content:flex-end;flex-wrap:wrap}

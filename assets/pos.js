@@ -471,10 +471,27 @@ $("#rWa").addEventListener("click", () => {
 $("#btnRecent").addEventListener("click", async () => {
   await refreshOrders();
   $("#lTitle").textContent = "🧾 Recent bills";
-  const billRows = list => list.length ? list.map(o=>`<div class="px-li"><div><b>${esc((/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1]||o.ref)}</b> · ${money(o.subtotal)}<small>${esc(o.customer_name||"")} · ${esc(o.payment_method||"cash")} · ${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</small></div>
-    <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button><button class="px-btn px-btn-outline px-del-bill" data-delbill="${o.id}" title="Bill delete karo">🗑</button></div></div>`).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
-  $("#lBody").innerHTML = '<input id="billSearch" placeholder="Bill no. ya customer search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
-  const draw = () => { const q = $("#billSearch").value.trim().toLowerCase(); $("#billRows").innerHTML = billRows(posOrders.filter(o => !q || ((o.notes||"")+" "+(o.customer_name||"")+" "+(o.ref||"")).toLowerCase().includes(q)).slice(0,60)); };
+  const billRows = list => list.length ? list.map(o=>{
+    const bn = (/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1] || o.ref;
+    const items = Array.isArray(o.items) ? o.items : [];
+    const pcs = items.reduce((a,i)=>a+(+i.qty||0),0);
+    const extras = String(o.notes||"").split(" | ").map(x=>x.trim()).filter(x=>x && !/^Bill No:/.test(x) && !/^Round:/.test(x));
+    const walk = !o.customer_name || o.customer_name==="Walk-in counter sale";
+    const lines = items.map(i=>{
+      const p = PRODUCTS.find(x=>String(x.id)===String(i.productId));
+      const col = i.color ? `<i class="px-dot" style="background:${esc(i.color)}"></i>${esc((p&&colorLabel(p,i.color))||"")} ` : "";
+      const v = [i.size && i.size!=="Standard" ? esc(i.size) : "", i.print ? esc(i.print) : ""].filter(Boolean).join(" · ");
+      return `<div class="px-bl-item"><span class="px-bl-n">${esc(i.name)}<small>${col}${v}</small></span><span class="px-bl-q">${i.qty} × ${money(i.price)}</span><b>${money((i.qty||0)*(i.price||0))}</b></div>`;
+    }).join("");
+    return `<div class="px-li px-bill-card">
+      <div class="px-bl-head"><div><b>${esc(bn)}</b><small>${new Date(o.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})} · ${esc((o.payment_method||"cash").toUpperCase())}</small></div><b class="px-bl-total">${money(o.subtotal)}</b></div>
+      <div class="px-bl-cust">👤 ${walk?"Walk-in customer":esc(o.customer_name)}${o.customer_phone?` · 📞 ${esc(o.customer_phone)}`:""}</div>
+      <div class="px-bl-items">${lines || '<small>Items ka record nahi hai</small>'}</div>
+      <div class="px-bl-foot"><span>${items.length} item${items.length===1?"":"s"} · ${pcs} pcs</span>${extras.length?`<span class="px-bl-ex">${extras.map(esc).join(" · ")}</span>`:""}</div>
+      <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button><button class="px-btn px-btn-outline px-del-bill" data-delbill="${o.id}" title="Bill delete karo">🗑 Delete</button></div></div>`;
+  }).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
+  $("#lBody").innerHTML = '<input id="billSearch" placeholder="Bill no., customer, phone ya product search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
+  const draw = () => { const q = $("#billSearch").value.trim().toLowerCase(); $("#billRows").innerHTML = billRows(posOrders.filter(o => !q || ((o.notes||"")+" "+(o.customer_name||"")+" "+(o.customer_phone||"")+" "+(o.ref||"")+" "+(Array.isArray(o.items)?o.items.map(i=>i.name).join(" "):"")).toLowerCase().includes(q)).slice(0,60)); };
   $("#billSearch").addEventListener("input", draw); draw();
   show("mList");
 });
