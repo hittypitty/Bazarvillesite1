@@ -352,17 +352,21 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(filter==="in") list = list.filter(p=>p.stock);
     if(filter==="out") list = list.filter(p=>!p.stock);
 
-    table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>MOQ</th><th>Available qty</th><th>Stock</th></tr>` +
-      (list.length ? list.map(p=>`
+    table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>Colours / Sizes</th><th>Total stock</th><th>Status</th><th></th></tr>` +
+      (list.length ? list.map(p=>{
+        const t = stockTotal(p);
+        return `
         <tr>
           <td><input type="checkbox" class="inv-check" data-id="${p.id}" ${invChecked.has(p.id)?"checked":""}></td>
           <td><img src="${(p.img&&p.img[0])||''}" alt=""></td>
-          <td><b>${p.name}</b></td>
+          <td><b>${p.name}</b><br><small class="ad-hint" style="margin:0">MOQ ${p.moq} pcs</small></td>
           <td>${p.cat}</td>
-          <td>${p.moq} pcs</td>
-          <td class="inv-qty-cell">${invQtyCellHtml(p)}</td>
+          <td class="inv-variants">${(p.colors||[]).map(c=>`<i class="pos-cart-dot" style="background:${c}" title="${(p.colorNames&&p.colorNames[c])||c}"></i>`).join("")}<div class="inv-sizes">${(p.sizes||[]).join(" · ")}</div></td>
+          <td>${t==null?`<span class="inv-total muted">Not tracked</span>`:`<span class="inv-total ${t<=0?"zero":t<=5?"low":""}">${t} pcs</span>`}</td>
           <td><button type="button" class="ad-stock-toggle ${p.stock?'in':'out'}" data-id="${p.id}">${p.stock?'In stock':'Out of stock'}</button></td>
-        </tr>`).join("") : `<tr><td colspan="7"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
+          <td><button type="button" class="btn btn-primary btn-sm inv-update-btn" data-id="${p.id}">✏️ Update stock</button></td>
+        </tr>`;}).join("") : `<tr><td colspan="8"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
+    table.querySelectorAll(".inv-update-btn").forEach(btn=>btn.addEventListener("click", ()=>openStockModal(Number(btn.dataset.id))));
 
     table.querySelectorAll(".inv-check").forEach(cb=>{
       cb.addEventListener("change", ()=>{
@@ -378,6 +382,87 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       btn.addEventListener("click", ()=> AdminUI.toggleStock(Number(btn.dataset.id)));
     });
     updateInvBulkButtons();
+  }
+  /* ---------- Update-stock window: every colour × size of one product; type +10 / -5 and press Enter ---------- */
+  let stockModalId = null;
+  function stockCell(p, color, size){
+    const cs = p.colorStock||{};
+    if(color && size && cs[color+"|"+size]!=null) return {key: color+"|"+size, qty: Number(cs[color+"|"+size])};
+    if(color && size) return {key: color+"|"+size, qty: Object.keys(cs).some(k=>k.startsWith(color+"|")) ? null : (cs[color]!=null ? Number(cs[color]) : (cs._total!=null ? null : null)), legacy: cs[color]!=null && !Object.keys(cs).some(k=>k.startsWith(color+"|"))};
+    if(color) return {key: color, qty: cs[color]!=null ? Number(cs[color]) : null};
+    return {key: "_total", qty: cs._total!=null ? Number(cs._total) : null};
+  }
+  function openStockModal(id){
+    stockModalId = id; drawStockModal();
+  }
+  function drawStockModal(){
+    const p = PRODUCTS.find(x=>x.id===stockModalId); if(!p) return;
+    let ov = document.querySelector("#stockModalOverlay");
+    if(!ov){
+      ov = document.createElement("div"); ov.id = "stockModalOverlay"; ov.className = "stk-overlay";
+      ov.addEventListener("click", e=>{ if(e.target===ov || e.target.closest("[data-stk-close]")){ ov.remove(); stockModalId = null; } });
+      ov.addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.classList.contains("stk-in")){ e.preventDefault(); applyStockDelta(e.target, 1); } });
+      ov.addEventListener("click", e=>{
+        const b = e.target.closest("[data-stk-sign]"); if(!b) return;
+        const inp = b.parentElement.querySelector(".stk-in"); applyStockDelta(inp, Number(b.dataset.stkSign));
+      });
+      document.body.appendChild(ov);
+    }
+    const sizes = (p.sizes||[]).filter(Boolean), colors = (p.colors||[]);
+    const sizeWise = sizes.length>1;
+    const total = stockTotal(p);
+    const row = (label, cell, color, size)=>`
+      <div class="stk-row">
+        <div class="stk-label">${label}</div>
+        <div class="stk-cur ${cell.qty==null?"muted":cell.qty<=0?"zero":cell.qty<=5?"low":""}">${cell.qty==null?"—":cell.qty}</div>
+        <div class="stk-edit" data-key="${cell.key}">
+          <button type="button" class="stk-btn minus" data-stk-sign="-1" title="Minus">−</button>
+          <input class="stk-in" type="number" min="1" inputmode="numeric" placeholder="qty" data-id="${p.id}" data-key="${cell.key}" ${cell.legacy?'data-legacy="1"':""}>
+          <button type="button" class="stk-btn plus" data-stk-sign="1" title="Plus">+</button>
+        </div>
+      </div>`;
+    let body = "";
+    if(colors.length){
+      body = colors.map(c=>{
+        const nm = (p.colorNames&&p.colorNames[c]) || "";
+        const head = `<span class="stk-dot" style="background:${c}"></span><b>${nm||c}</b>`;
+        if(sizeWise){
+          const sum = Object.entries(p.colorStock||{}).filter(([k,v])=>(k===c||k.startsWith(c+"|"))&&v!=null).reduce((a,[,v])=>a+Number(v),0);
+          const tracked = Object.keys(p.colorStock||{}).some(k=>k===c||k.startsWith(c+"|"));
+          const legacy = (p.colorStock||{})[c]!=null && !Object.keys(p.colorStock||{}).some(k=>k.startsWith(c+"|"));
+          return `<section class="stk-colour"><div class="stk-chead">${head}<span class="stk-csum">${tracked?sum+" pcs":"Not tracked"}</span></div>
+            ${legacy?`<p class="stk-note">Abhi is colour ka stock size-wise nahi hai (${(p.colorStock||{})[c]} pcs). Size me qty daaloge to ye size-wise ban jayega.</p>`:""}
+            ${sizes.map(sz=>row(sz, stockCell(p,c,sz), c, sz)).join("")}</section>`;
+        }
+        return `<section class="stk-colour"><div class="stk-chead">${head}</div>${row("Stock", stockCell(p,c,""), c, "")}</section>`;
+      }).join("");
+    } else {
+      body = `<section class="stk-colour">${row("Total stock", stockCell(p,"",""), "", "")}</section>`;
+    }
+    ov.innerHTML = `<div class="stk-modal" role="dialog">
+      <div class="stk-head"><img src="${(p.img&&p.img[0])||''}" alt=""><div><h3>${p.name}</h3><small>${p.cat||""} · ${colors.length} colour${colors.length===1?"":"s"}${sizes.length?` · ${sizes.length} size${sizes.length===1?"":"s"}`:""}</small></div><button type="button" class="stk-x" data-stk-close>✕</button></div>
+      <div class="stk-total"><span>Total stock</span><b>${total==null?"Not tracked":total+" pcs"}</b></div>
+      <p class="stk-help">Number likho aur <b>Enter</b> dabao (ya + / − dabao). <b>+</b> se stock badhta hai, <b>−</b> se kam hota hai. Jaise Black me 10 aaye: <b>10</b> likho → Enter.</p>
+      <div class="stk-body">${body}</div>
+      <div class="stk-foot"><span class="stk-status" id="stkStatus"></span><button type="button" class="btn btn-outline btn-sm" data-stk-close>Done</button></div></div>`;
+    const first = ov.querySelector(".stk-in"); if(first && !ov.dataset.focused){ ov.dataset.focused = "1"; }
+  }
+  async function applyStockDelta(inp, sign){
+    if(!inp) return;
+    const p = PRODUCTS.find(x=>x.id===Number(inp.dataset.id)); if(!p) return;
+    const typed = Math.round(Number(inp.value));
+    if(!typed){ inp.focus(); return; }
+    const delta = sign===-1 ? -Math.abs(typed) : typed;                 // "−" button = minus; Enter/"+" = as typed (−5 also works)
+    const key = inp.dataset.key, cs = {...(p.colorStock||{})};
+    const cur = cs[key]!=null ? Number(cs[key]) : 0;
+    const next = Math.max(0, cur + delta);
+    const st = document.querySelector("#stkStatus"); if(st) st.textContent = "Saving…";
+    const focusKey = key;
+    // size-wise entry replaces a colour-wise number for that colour
+    await saveStockQty(p.id, key, String(next));
+    if(st) st.textContent = "";
+    drawStockModal();
+    const again = document.querySelector(`#stockModalOverlay .stk-in[data-key="${CSS.escape(focusKey)}"]`); if(again) again.focus();
   }
   function invQtyCellHtml(p){
     const cs = p.colorStock||{};
@@ -871,7 +956,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const from = document.querySelector("#historyFrom")?.value || "";
     const to = document.querySelector("#historyTo")?.value || "";
     return historyCache.filter(o=>{
-      if(q && !((o.ref||"").toLowerCase().includes(q) || (o.customer_name||"").toLowerCase().includes(q))) return false;
+      if(q && !(((o.ref||"")+" "+(o.notes||"")+" "+(o.customer_name||"")+" "+(o.customer_phone||"")+" "+(Array.isArray(o.items)?o.items.map(i=>i.name).join(" "):"")).toLowerCase().includes(q))) return false;
       const d = o.created_at ? o.created_at.slice(0,10) : "";
       if(from && d < from) return false;
       if(to && d > to) return false;
@@ -892,11 +977,19 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-stat"><b>${money(todayRevenue)}</b><span>Revenue today</span></div>`;
   }
   function historyRowHtml(o){
-    const itemCount = (o.items||[]).reduce((n,it)=>n+(it.qty||1),0);
+    const items = Array.isArray(o.items) ? o.items : [];
+    const itemCount = items.reduce((n,it)=>n+(it.qty||1),0);
+    const bn = (/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1];
+    const walk = !o.customer_name || o.customer_name==="Walk-in counter sale";
+    const colName = it=>{ if(!it.color) return ""; const p = PRODUCTS.find(x=>String(x.id)===String(it.productId)); return (p&&p.colorNames&&p.colorNames[it.color]) || ""; };
+    const lines = items.map(it=>{
+      const v = [colName(it), it.size && it.size!=="Standard" ? it.size : ""].filter(Boolean).join(" · ");
+      return `<div class="hist-item"><span>${it.name}${v?` <small>(${v})</small>`:""}</span><b>× ${it.qty||1}</b><span class="hist-amt">${money((it.qty||1)*(it.price||0))}</span></div>`;
+    }).join("");
     return `<tr data-id="${o.id}">
-      <td><b>${o.ref}</b></td>
-      <td>${o.customer_name||"Walk-in Customer"}</td>
-      <td>${itemCount} pcs</td>
+      <td><b>${bn||o.ref}</b>${bn?`<br><small class="ad-hint" style="margin:0">${o.ref}</small>`:""}</td>
+      <td>${walk?"Walk-in customer":o.customer_name}${o.customer_phone?`<br><small class="ad-hint" style="margin:0">📞 ${o.customer_phone}</small>`:""}<br><small class="ad-hint" style="margin:0">${(o.payment_method||"cash").toUpperCase()}</small></td>
+      <td class="hist-items">${lines || `${itemCount} pcs`}<div class="hist-pcs">${itemCount} pcs</div></td>
       <td>${money(o.subtotal||0)}</td>
       <td>${new Date(o.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}, ${new Date(o.created_at).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true})}</td>
       <td class="ad-row-actions"><button class="ad-icon-btn" title="View bill" onclick="AdminUI.openOrder(${o.id})">👁️</button><button class="ad-icon-btn" title="Edit bill" onclick="AdminUI.editBill(${o.id})">✏️</button></td>
