@@ -954,8 +954,8 @@ function openQuickView(id){
         <h2>${p.name}</h2>
         <div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
         <table class="tier-table">${safeTiers(p).map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
-        <div class="opt-title">Colour</div>
-        <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
+${p.colors.length?`        <div class="opt-title">Colour</div>
+        <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>`:""}
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
         <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
@@ -1420,11 +1420,11 @@ function initProductPage(){
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating" id="pdStock">${pdStockHtml(p, p.colors[0])}</div>
-        <div class="opt-title">Colour</div>
+        ${p.colors.length?`<div class="opt-title">Colour</div>
         <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
-        <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>
-        <div class="opt-title">Size</div>
-        <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>
+        <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>`:""}
+        ${p.sizes.length?`<div class="opt-title">Size</div>
+        <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>`:""}
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
         <div class="sizerow" id="printOptRow">${p.printOptions.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-p="${i}" data-name="${printName(s).replace(/"/g,'&quot;')}" data-extra="${printExtra(s)}">${printName(s)}</span>`).join("")}</div>`:""}
         <!-- Just the quantity-tier table now, no separate standalone price

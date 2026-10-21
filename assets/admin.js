@@ -1876,20 +1876,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(!name){ alert("Product name is required."); return; }
     if(!productImages.length){ alert("Add at least one product image."); return; }
     const professions = [...document.querySelectorAll("#pf_professions input:checked")].map(i=>i.value);
-    if(!professions.length){ alert("Select at least one profession."); return; }
     const purposes = [...document.querySelectorAll("#pf_purposes input:checked")].map(i=>i.value);
-    if(!purposes.length){ alert("Select at least one purpose."); return; }
     const occasions = [...document.querySelectorAll("#pf_occasions input:checked")].map(i=>i.value);
-    if(!workingColors.length){ alert("Add at least one colour."); return; }
-    if(!workingSizes.length){ alert("Add at least one size."); return; }
     const data = {
       id: editingProductId || undefined,
       name,
       cat: document.querySelector("#pf_cat").value.trim() || "Uncategorised",
       professions,
-      profession: professions[0],
+      profession: professions[0] || "",
       purposes,
-      purpose: purposes[0],
+      purpose: purposes[0] || "",
       occasions,
       occasion: occasions[0] || "",
       brand: document.querySelector("#pf_brand").value.trim() || null,
