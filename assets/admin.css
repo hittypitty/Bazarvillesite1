@@ -642,3 +642,11 @@ html,body{overflow-x:clip}
 .pf-card-side .ad-field>label{display:none}
 .ad-modal-lg .ad-modal-status{min-width:230px}
 .ad-modal-lg .ad-modal-head-right{gap:10px}
+.pf-acc{padding:0}
+.pf-acc>summary{list-style:none;cursor:pointer;margin:0;padding:16px 18px;user-select:none}
+.pf-acc>summary::-webkit-details-marker{display:none}
+.pf-acc>summary>div{flex:1}
+.pf-acc .pf-chev{font-size:16px;color:var(--muted);transition:transform .2s}
+.pf-acc[open] .pf-chev{transform:rotate(180deg)}
+.pf-acc[open]>summary{border-bottom:1px solid var(--line);margin-bottom:14px}
+.pf-acc .pf-acc-body{padding:0 18px 4px}

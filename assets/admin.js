@@ -1206,9 +1206,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
         </div>
       </section>
-      <section class="pf-card ">
-        <div class="pf-card-head"><span class="pf-num">2</span><div><h3>Variants</h3><p>Colours and sizes of this product</p></div></div>
-        <div class="ad-form-grid">
+      <details class="pf-card pf-acc ">
+        <summary class="pf-card-head"><span class="pf-num">2</span><div><h3>Variants</h3><p>Colours and sizes of this product</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>Colours</label>
         <div class="ad-tag-group" id="pf_colorChips"></div>
@@ -1231,10 +1231,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
         </div>
-      </section>
-      <section class="pf-card ">
-        <div class="pf-card-head"><span class="pf-num">3</span><div><h3>Pricing &amp; Order</h3><p>MOQ, bulk threshold, stock and quantity-tier prices</p></div></div>
-        <div class="ad-form-grid">
+      </details>
+      <details class="pf-card pf-acc ">
+        <summary class="pf-card-head"><span class="pf-num">3</span><div><h3>Pricing &amp; Order</h3><p>MOQ, bulk threshold, stock and quantity-tier prices</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field"><label>MOQ (pcs)</label><input id="pf_moq" type="number" value="${p?p.moq:10}"></div>
       <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
       <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
@@ -1244,10 +1244,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <button class="btn btn-outline btn-sm" id="pf_addTier" type="button">+ Add price tier</button>
       </div>
         </div>
-      </section>
-      <section class="pf-card ">
-        <div class="pf-card-head"><span class="pf-num">4</span><div><h3>Who is it for?</h3><p>Profession, purpose and occasion tags (optional)</p></div></div>
-        <div class="ad-form-grid">
+      </details>
+      <details class="pf-card pf-acc ">
+        <summary class="pf-card-head"><span class="pf-num">4</span><div><h3>Who is it for?</h3><p>Profession, purpose and occasion tags (optional)</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>Profession (select all that apply)</label>
         <div class="ad-chip-group" id="pf_professions">${professionCheckboxesHtml(p?p.professions:[])}</div>
@@ -1273,10 +1273,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
         </div>
-      </section>
-      <section class="pf-card ">
-        <div class="pf-card-head"><span class="pf-num">5</span><div><h3>Product Details</h3><p>Printing options and the details table (optional)</p></div></div>
-        <div class="ad-form-grid">
+      </details>
+      <details class="pf-card pf-acc ">
+        <summary class="pf-card-head"><span class="pf-num">5</span><div><h3>Product Details</h3><p>Printing options and the details table (optional)</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>Printing options <span class="ad-hint" style="display:inline">(optional — shown on the product page, e.g. No Print / Custom Print. Type an extra ₹ per piece next to an option and the price on the product page goes up automatically when the customer picks it)</span></label>
         <div class="ad-tag-group" id="pf_printOptChips"></div>
@@ -1291,20 +1291,20 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <button class="btn btn-outline btn-sm" type="button" id="pf_addDetailBtn" style="margin-top:8px">+ Add detail row</button>
       </div>
         </div>
-      </section>
-      <section class="pf-card ">
-        <div class="pf-card-head"><span class="pf-num">6</span><div><h3>SEO</h3><p>Shown in Google search results and the browser tab (optional)</p></div></div>
-        <div class="ad-form-grid">
+      </details>
+      <details class="pf-card pf-acc ">
+        <summary class="pf-card-head"><span class="pf-num">6</span><div><h3>SEO</h3><p>Shown in Google search results and the browser tab (optional)</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full"><label>Meta title</label><input id="pf_metaTitle" value="${p&&p.metaTitle?p.metaTitle.replace(/"/g,'&quot;'):''}" placeholder="Defaults to the product name if left blank" maxlength="70"></div>
       <div class="ad-field full"><label>Meta description</label><input id="pf_metaDesc" value="${p&&p.metaDescription?p.metaDescription.replace(/"/g,'&quot;'):''}" placeholder="1-2 line summary shown under the title in Google" maxlength="160"></div>
       <div class="ad-field full"><label>URL slug</label><input id="pf_slug" value="${p&&p.slug?p.slug:''}" placeholder="e.g. steel-water-bottle-750ml (auto-generated from the name if left blank)"></div>
         </div>
-      </section>
+      </details>
       </div>
       <div class="pf-side">
-      <section class="pf-card pf-card-side">
-        <div class="pf-card-head"><span class="pf-num">📷</span><div><h3>Product Images</h3><p>Main gallery — first image is the cover</p></div></div>
-        <div class="ad-form-grid">
+      <details class="pf-card pf-acc pf-card-side" open>
+        <summary class="pf-card-head"><span class="pf-num">📷</span><div><h3>Product Images</h3><p>Main gallery — first image is the cover</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>Product images</label>
         <div class="ad-img-grid" id="pf_imgGrid"></div>
@@ -1317,10 +1317,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
         </div>
-      </section>
-      <section class="pf-card pf-card-side">
-        <div class="pf-card-head"><span class="pf-num">🔄</span><div><h3>360° / 3D View</h3><p>Optional — rotate and zoom on the product page</p></div></div>
-        <div class="ad-form-grid">
+      </details>
+      <details class="pf-card pf-acc pf-card-side">
+        <summary class="pf-card-head"><span class="pf-num">🔄</span><div><h3>360° / 3D View</h3><p>Optional — rotate and zoom on the product page</p></div><span class="pf-chev">▾</span></summary>
+        <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>360° / 3D view <span class="ad-hint" style="display:inline;margin-left:6px">(optional — shoppers can rotate, view from every angle and zoom)</span></label>
         <div class="ad-view360">
@@ -1349,7 +1349,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
         </div>
-      </section>
+      </details>
       </div>
     </div>`;
   }
