@@ -1196,10 +1196,58 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   function productFormHtml(p){
     return `
-    <div class="ad-form-grid">
+    <div class="pf-layout">
+      <div class="pf-main">
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">1</span><div><h3>Basic Information</h3><p>Name, category and brand</p></div></div>
+        <div class="ad-form-grid">
       <div class="ad-field full"><label>Product name</label><input id="pf_name" value="${p?p.name.replace(/"/g,'&quot;'):''}"></div>
       <div class="ad-field"><label>Category</label><input id="pf_cat" value="${p?p.cat:''}" placeholder="e.g. T-Shirts"></div>
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
+        </div>
+      </section>
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">2</span><div><h3>Variants</h3><p>Colours and sizes of this product</p></div></div>
+        <div class="ad-form-grid">
+      <div class="ad-field full">
+        <label>Colours</label>
+        <div class="ad-tag-group" id="pf_colorChips"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <input type="color" id="pf_colorPicker" value="#1a1a1a" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer">
+          <input type="text" id="pf_colorName" maxlength="30" placeholder="Colour name (e.g. Black) — shown on the site" style="flex:1;min-width:140px;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addColorBtn">+ Add colour</button>
+        </div>
+      </div>
+      <div class="ad-field full">
+        <label>Colour-specific images <span class="ad-hint" style="display:inline">(optional — when a customer clicks this colour on the product page, the photo gallery switches to these. A colour with none here just keeps showing the main product images above.)</span></label>
+        <div id="pf_colorImageGroups"></div>
+      </div>
+      <div class="ad-field full">
+        <label>Sizes</label>
+        <div class="ad-tag-group" id="pf_sizeChips"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input type="text" id="pf_sizeInput" placeholder="e.g. XL" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addSizeBtn">+ Add size</button>
+        </div>
+      </div>
+        </div>
+      </section>
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">3</span><div><h3>Pricing &amp; Order</h3><p>MOQ, bulk threshold, stock and quantity-tier prices</p></div></div>
+        <div class="ad-form-grid">
+      <div class="ad-field"><label>MOQ (pcs)</label><input id="pf_moq" type="number" value="${p?p.moq:10}"></div>
+      <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
+      <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
+      <div class="ad-field full">
+        <label>Quantity-tier pricing</label>
+        <div id="pf_tiers"></div>
+        <button class="btn btn-outline btn-sm" id="pf_addTier" type="button">+ Add price tier</button>
+      </div>
+        </div>
+      </section>
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">4</span><div><h3>Who is it for?</h3><p>Profession, purpose and occasion tags (optional)</p></div></div>
+        <div class="ad-form-grid">
       <div class="ad-field full">
         <label>Profession (select all that apply)</label>
         <div class="ad-chip-group" id="pf_professions">${professionCheckboxesHtml(p?p.professions:[])}</div>
@@ -1224,29 +1272,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <button class="btn btn-outline btn-sm" type="button" id="pf_addOccasionBtn">+ Add new</button>
         </div>
       </div>
-      <div class="ad-field"><label>MOQ (pcs)</label><input id="pf_moq" type="number" value="${p?p.moq:10}"></div>
-      <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
-      <div class="ad-field full">
-        <label>Colours</label>
-        <div class="ad-tag-group" id="pf_colorChips"></div>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-          <input type="color" id="pf_colorPicker" value="#1a1a1a" style="width:44px;height:38px;padding:2px;border:1.5px solid var(--line);border-radius:8px;cursor:pointer">
-          <input type="text" id="pf_colorName" maxlength="30" placeholder="Colour name (e.g. Black) — shown on the site" style="flex:1;min-width:140px;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
-          <button class="btn btn-outline btn-sm" type="button" id="pf_addColorBtn">+ Add colour</button>
         </div>
-      </div>
-      <div class="ad-field full">
-        <label>Colour-specific images <span class="ad-hint" style="display:inline">(optional — when a customer clicks this colour on the product page, the photo gallery switches to these. A colour with none here just keeps showing the main product images above.)</span></label>
-        <div id="pf_colorImageGroups"></div>
-      </div>
-      <div class="ad-field full">
-        <label>Sizes</label>
-        <div class="ad-tag-group" id="pf_sizeChips"></div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <input type="text" id="pf_sizeInput" placeholder="e.g. XL" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
-          <button class="btn btn-outline btn-sm" type="button" id="pf_addSizeBtn">+ Add size</button>
-        </div>
-      </div>
+      </section>
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">5</span><div><h3>Product Details</h3><p>Printing options and the details table (optional)</p></div></div>
+        <div class="ad-form-grid">
       <div class="ad-field full">
         <label>Printing options <span class="ad-hint" style="display:inline">(optional — shown on the product page, e.g. No Print / Custom Print. Type an extra ₹ per piece next to an option and the price on the product page goes up automatically when the customer picks it)</span></label>
         <div class="ad-tag-group" id="pf_printOptChips"></div>
@@ -1260,16 +1290,37 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div id="pf_detailRows" class="ad-detail-rows"></div>
         <button class="btn btn-outline btn-sm" type="button" id="pf_addDetailBtn" style="margin-top:8px">+ Add detail row</button>
       </div>
-      <div class="ad-field full"><h4 style="margin:6px 0 -4px">SEO (optional — shown in Google search results and the browser tab)</h4></div>
+        </div>
+      </section>
+      <section class="pf-card ">
+        <div class="pf-card-head"><span class="pf-num">6</span><div><h3>SEO</h3><p>Shown in Google search results and the browser tab (optional)</p></div></div>
+        <div class="ad-form-grid">
       <div class="ad-field full"><label>Meta title</label><input id="pf_metaTitle" value="${p&&p.metaTitle?p.metaTitle.replace(/"/g,'&quot;'):''}" placeholder="Defaults to the product name if left blank" maxlength="70"></div>
       <div class="ad-field full"><label>Meta description</label><input id="pf_metaDesc" value="${p&&p.metaDescription?p.metaDescription.replace(/"/g,'&quot;'):''}" placeholder="1-2 line summary shown under the title in Google" maxlength="160"></div>
       <div class="ad-field full"><label>URL slug</label><input id="pf_slug" value="${p&&p.slug?p.slug:''}" placeholder="e.g. steel-water-bottle-750ml (auto-generated from the name if left blank)"></div>
-      <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
-      <div class="ad-field full">
-        <label>Quantity-tier pricing</label>
-        <div id="pf_tiers"></div>
-        <button class="btn btn-outline btn-sm" id="pf_addTier" type="button">+ Add price tier</button>
+        </div>
+      </section>
       </div>
+      <div class="pf-side">
+      <section class="pf-card pf-card-side">
+        <div class="pf-card-head"><span class="pf-num">📷</span><div><h3>Product Images</h3><p>Main gallery — first image is the cover</p></div></div>
+        <div class="ad-form-grid">
+      <div class="ad-field full">
+        <label>Product images</label>
+        <div class="ad-img-grid" id="pf_imgGrid"></div>
+        <input type="file" id="pf_imgInput" accept="image/*" multiple style="display:none">
+        <p class="ad-hint" id="pf_uploadStatus" style="margin-top:8px"></p>
+        <p class="ad-link-toggle" id="pf_imgLinkToggle" style="margin-top:10px;font-size:12.5px;color:var(--muted);cursor:pointer;text-decoration:underline">Paste a link instead (not recommended — links can stop working later; uploading here is permanent)</p>
+        <div id="pf_imgLinkRow" style="display:none;gap:8px;margin-top:10px">
+          <input type="url" id="pf_imgUrlInput" placeholder="Paste a direct image link (e.g. Dropbox link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
+          <button class="btn btn-outline btn-sm" type="button" id="pf_addImgUrlBtn">Add link</button>
+        </div>
+      </div>
+        </div>
+      </section>
+      <section class="pf-card pf-card-side">
+        <div class="pf-card-head"><span class="pf-num">🔄</span><div><h3>360° / 3D View</h3><p>Optional — rotate and zoom on the product page</p></div></div>
+        <div class="ad-form-grid">
       <div class="ad-field full">
         <label>360° / 3D view <span class="ad-hint" style="display:inline;margin-left:6px">(optional — shoppers can rotate, view from every angle and zoom)</span></label>
         <div class="ad-view360">
@@ -1297,16 +1348,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           </div>
         </div>
       </div>
-      <div class="ad-field full">
-        <label>Product images</label>
-        <div class="ad-img-grid" id="pf_imgGrid"></div>
-        <input type="file" id="pf_imgInput" accept="image/*" multiple style="display:none">
-        <p class="ad-hint" id="pf_uploadStatus" style="margin-top:8px"></p>
-        <p class="ad-link-toggle" id="pf_imgLinkToggle" style="margin-top:10px;font-size:12.5px;color:var(--muted);cursor:pointer;text-decoration:underline">Paste a link instead (not recommended — links can stop working later; uploading here is permanent)</p>
-        <div id="pf_imgLinkRow" style="display:none;gap:8px;margin-top:10px">
-          <input type="url" id="pf_imgUrlInput" placeholder="Paste a direct image link (e.g. Dropbox link ending ?dl=1)" style="flex:1;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit">
-          <button class="btn btn-outline btn-sm" type="button" id="pf_addImgUrlBtn">Add link</button>
         </div>
+      </section>
       </div>
     </div>`;
   }
