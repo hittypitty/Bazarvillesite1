@@ -1,4 +1,20 @@
 /* ===================== BAZARVILLE ADMIN PANEL (Supabase-backed) ===================== */
+/* Show/hide password: every password box (login, add-user…) gets an eye button. */
+(function(){
+  function addEyes(root){
+    (root||document).querySelectorAll('input[type=password]:not([data-eye])').forEach(inp=>{
+      inp.dataset.eye="1";
+      const w=document.createElement('div'); w.className='pw-wrap';
+      inp.parentNode.insertBefore(w,inp); w.appendChild(inp);
+      const b=document.createElement('button'); b.type='button'; b.className='pw-eye'; b.setAttribute('aria-label','Show password'); b.textContent='👁';
+      b.addEventListener('click',()=>{ const show=inp.type==='password'; inp.type=show?'text':'password'; b.textContent=show?'🙈':'👁'; b.setAttribute('aria-label',show?'Hide password':'Show password'); });
+      w.appendChild(b);
+    });
+  }
+  const start=()=>{ addEyes(); new MutationObserver(()=>addEyes()).observe(document.body,{childList:true,subtree:true}); };
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded',start);
+})();
+
 document.addEventListener("DOMContentLoaded", async ()=>{
 
   // NOTE: these two preset lists are declared right here at the very top,

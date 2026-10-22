@@ -650,3 +650,7 @@ html,body{overflow-x:clip}
 .pf-acc[open] .pf-chev{transform:rotate(180deg)}
 .pf-acc[open]>summary{border-bottom:1px solid var(--line);margin-bottom:14px}
 .pf-acc .pf-acc-body{padding:0 18px 4px}
+.pw-wrap{position:relative;display:block;width:100%}
+.pw-wrap input{padding-right:46px!important}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:18px;padding:6px 8px;line-height:1;opacity:.7}
+.pw-eye:hover{opacity:1}
