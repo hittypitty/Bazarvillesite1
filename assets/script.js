@@ -266,6 +266,7 @@ function ref(){ return "BZV-" + Math.random().toString(36).slice(2,6).toUpperCas
    site visitor to miss. This swaps a failed image for a neutral inline-SVG
    "photo unavailable" placeholder so the gap is immediately visible instead
    of silently invisible — read-only, it never touches any stored data. */
+const T = (u,w,q)=> (window.BazDS && BazDS.thumb) ? BazDS.thumb(u,w,q) : u;
 const IMG_FALLBACK_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
     <rect width="400" height="400" fill="#f1f1ee"/>
@@ -279,6 +280,13 @@ const IMG_FALLBACK_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
 );
 function imgFallback(el){
   if(!el || el.src === IMG_FALLBACK_SVG) return;
+  // CDN thumbnail failed? retry once with the original full-size URL first.
+  try{
+    const u = new URL(el.src);
+    if(u.hostname === "images.weserv.nl" && !el.dataset.triedOrig){
+      el.dataset.triedOrig = "1"; el.src = u.searchParams.get("url"); return;
+    }
+  }catch(e){}
   el.src = IMG_FALLBACK_SVG;
   el.classList.add("img-fallback");
   el.alt = "Photo unavailable";
@@ -374,7 +382,7 @@ function productCard(p){
       <button type="button" class="wish-btn ${wished?'active':''}" data-wish-id="${p.id}" title="${wished?'Remove from wishlist':'Add to wishlist'}" aria-label="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
       <button type="button" class="qv-btn" data-qv-id="${p.id}" title="Quick View" aria-label="Quick View">👁</button>
     </div>
-    <a href="product.html?id=${p.id}"><div class="pimg"><img src="${p.img[0]}" alt="${p.name}" loading="lazy" onerror="imgFallback(this)"></div></a>
+    <a href="product.html?id=${p.id}"><div class="pimg"><img src="${T(p.img[0],480)}" alt="${p.name}" loading="lazy" decoding="async" width="480" height="480" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
       <h3><a href="product.html?id=${p.id}" title="${String(p.name).replace(/"/g,'&quot;')}">${p.name}</a></h3>
@@ -430,7 +438,7 @@ function renderCollections(target, list=COLLECTIONS){
     const hp = (typeof SETTINGS !== "undefined" && SETTINGS && SETTINGS.homepage) || {};
     if(sec) sec.style.display = (!list || !list.length || hp.showCollections === false) ? "none" : "";
   }
-  el.innerHTML = list.map(c=>`<a class="coll" href="collection.html?name=${encodeURIComponent(c.name)}"><img src="${c.img}" alt="${c.name}" loading="lazy"><div class="ov"><b>${c.name}</b><span>${c.tag}</span></div></a>`).join("");
+  el.innerHTML = list.map(c=>`<a class="coll" href="collection.html?name=${encodeURIComponent(c.name)}"><img src="${T(c.img,640)}" alt="${c.name}" loading="lazy" decoding="async"><div class="ov"><b>${c.name}</b><span>${c.tag}</span></div></a>`).join("");
 }
 
 // Prev/next arrow buttons for the "Trending Products" slider (#collGrid is a
@@ -946,8 +954,8 @@ function openQuickView(id){
   body.innerHTML = `
     <div class="qv-grid">
       <div class="qv-gallery">
-        <div class="qv-gallery-main"><img id="qvMainImg" src="${p.img[0]}" alt="${p.name}" onerror="imgFallback(this)"></div>
-        <div class="qv-thumbs">${p.img.map((src,i)=>`<img src="${src}" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
+        <div class="qv-gallery-main"><img id="qvMainImg" src="${T(p.img[0],800)}" alt="${p.name}" onerror="imgFallback(this)"></div>
+        <div class="qv-thumbs">${p.img.map((src,i)=>`<img src="${T(src,160)}" loading="lazy" class="${i===0?'active':''}" data-src="${src}" onerror="imgFallback(this)">`).join("")}</div>
       </div>
       <div class="qv-info">
         <span class="pd-cat">${p.profession}</span>
@@ -967,7 +975,7 @@ ${p.colors.length?`        <div class="opt-title">Colour</div>
     </div>`;
   body.querySelectorAll(".qv-thumbs img").forEach(th=>th.addEventListener("click",()=>{
     body.querySelectorAll(".qv-thumbs img").forEach(x=>x.classList.remove("active"));
-    th.classList.add("active"); body.querySelector("#qvMainImg").src = th.dataset.src;
+    th.classList.add("active"); body.querySelector("#qvMainImg").src = T(th.dataset.src,800);
   }));
   // Keep the WhatsApp enquiry link's message in sync with whichever colour/size
   // is currently picked, so it reaches Vikas's team with the right details.
@@ -1088,7 +1096,7 @@ function initComparePage(){
     return;
   }
   const rows = [
-    {label:"", render:p=>`<img src="${p.img[0]}" alt="${p.name}" style="width:90px;height:90px;object-fit:contain;border-radius:10px;background:var(--soft)" onerror="imgFallback(this)">`},
+    {label:"", render:p=>`<img src="${T(p.img[0],200)}" alt="${p.name}" style="width:90px;height:90px;object-fit:contain;border-radius:10px;background:var(--soft)" onerror="imgFallback(this)">`},
     {label:"Product", render:p=>`<a href="product.html?id=${p.id}"><b>${p.name}</b></a>`},
     {label:"Price", render:p=>money(tierFor(p,p.moq).price)+" / pc"},
     {label:"MOQ", render:p=>p.moq+" pcs"},
@@ -1147,7 +1155,7 @@ function initCartPage(){
     el.innerHTML = `
       <div class="cart-rows">${cart.map((c,i)=>`
         <div class="cart-row">
-          <img src="${c.img}" alt="${c.name}">
+          <img src="${T(c.img,200)}" alt="${c.name}">
           <div class="cart-row-info">
             <b>${c.name}</b>
             <span class="cart-row-meta">${[c.color,c.size,c.printOption].filter(Boolean).join(" • ")}</span>
@@ -1491,7 +1499,7 @@ function initProductPage(){
     grid.innerHTML = galleryImages.map((src,i)=>{
       const spanFull = (galleryImages.length % 2 === 1) && (i === galleryImages.length - 1);
       return `<div class="pd-gallery-cell${spanFull?' span2':''}" data-i="${i}">
-        <img src="${src}" alt="${p.name}" loading="${i<2?'eager':'lazy'}" onerror="imgFallback(this)">
+        <img src="${T(src,1000)}" alt="${p.name}" loading="${i<2?'eager':'lazy'}" decoding="async" onerror="imgFallback(this)">
       </div>`;
     }).join("");
     // Mobile only (see .pd-gallery-grid's max-width:640px rule in style.css):

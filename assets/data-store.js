@@ -332,8 +332,8 @@ const BazDS = (function(){
      loss on a product-card/gallery size image. Falls back to the original file
      untouched if anything goes wrong (corrupt image, browser without canvas
      support, etc.) so an upload never hard-fails because of this step. */
-  const MAX_DIMENSION = 1600;
-  const JPEG_QUALITY = 0.82;
+  const MAX_DIMENSION = 1200;
+  const JPEG_QUALITY = 0.8;
   function optimizeImage(file){
     return new Promise(resolve=>{
       if(!file.type || !file.type.startsWith("image/") || file.type === "image/svg+xml"){
@@ -365,11 +365,27 @@ const BazDS = (function(){
     });
   }
 
+  /* ---------- fast image delivery ----------
+     Product photos are stored at up to 1200px, but a phone only shows them
+     ~180px wide in a card. thumb(url, w) routes http(s) photos through the
+     free images.weserv.nl CDN, which resizes + converts to WebP and caches
+     worldwide — typically 10-20x smaller than the original. Anything that is
+     not a plain remote photo (data:, blob:, relative asset, svg, placeholder)
+     is returned untouched. imgFallback() in script.js falls back to the
+     original URL if the CDN ever fails, so nothing breaks. */
+  function thumb(url, w, q){
+    try{
+      if(!url || typeof url !== "string" || !/^https?:\/\//i.test(url)) return url;
+      if(/images\.weserv\.nl|picsum\.photos|\.svg(\?|$)/i.test(url)) return url;
+      return "https://images.weserv.nl/?url=" + encodeURIComponent(url) + "&w=" + (w||480) + "&q=" + (q||70) + "&output=webp&we";
+    }catch(e){ return url; }
+  }
+
   async function uploadImage(file, folder){
     const sb = getClient(); if(!sb) throw new Error("Supabase not configured");
     const optimized = await optimizeImage(file);
     const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}-${optimized.name.replace(/[^a-zA-Z0-9.\-_]/g,"")}`;
-    const { error } = await sb.storage.from(BUCKET).upload(path, optimized, { cacheControl:"3600", upsert:false });
+    const { error } = await sb.storage.from(BUCKET).upload(path, optimized, { cacheControl:"31536000", upsert:false });
     if(error){ console.error("uploadImage:", error.message); throw error; }
     const { data } = sb.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
@@ -710,7 +726,7 @@ const BazDS = (function(){
     getProducts, upsertProduct, deleteProduct,
     getCollections, upsertCollection, deleteCollection,
     getSettings, updateSettings, updateTrustedBrands, updateHomepage,
-    logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage, uploadFile,
+    logEnquiry, submitGeneralEnquiry, getEnquiries, updateEnquiry, addManualLead, uploadImage, uploadFile, thumb,
     signIn, toLoginEmail, toUsername, signOut, getCurrentAdmin, getTeam, createStaffUser, updateStaffProfile, removeStaffProfile,
     customerSignUp, customerSignIn, customerSignOut, getCurrentCustomer, updateCustomer,
     createOrder, getOrders, updateOrderStatus, updatePosSale,

@@ -125,7 +125,7 @@ function renderGrid(){
     const t = stockTotal(p), out = isOut(p), low = !out && t!=null && t<=5;
     const price = tierPrice(p, 1) || tierPrice(p, p.moq||1);
     return `<button class="px-prod ${out?"out":""}" data-id="${p.id}">
-      <div class="px-prod-img" style="background-image:url('${esc(imgOf(p))}')">${out?'<span class="px-prod-badge out">Out of stock</span>':low?`<span class="px-prod-badge low">${t} left</span>`:""}</div>
+      <div class="px-prod-img" style="background-image:url('${esc(BazDS.thumb?BazDS.thumb(imgOf(p),360):imgOf(p))}')">${out?'<span class="px-prod-badge out">Out of stock</span>':low?`<span class="px-prod-badge low">${t} left</span>`:""}</div>
       <div class="px-prod-info"><div class="px-prod-name">${esc(p.name)}</div>
       <div class="px-prod-meta">${esc(p.cat||"")}${t!=null&&!out&&!low?` · ${t} in stock`:""}</div>
       <div class="px-prod-price">${price?money(price):"Set price"}</div></div><span class="px-prod-add" aria-hidden="true">+</span></button>`;
@@ -216,7 +216,7 @@ function renderCart(){
     const p = PRODUCTS.find(x=>x.id===l.productId);
     const v = [l.color?`<i class="px-dot" style="background:${esc(l.color)}"></i>${esc((p&&colorLabel(p,l.color))||"")}`:"", l.size&&l.size!=="Standard"?esc(l.size):"", l.print?esc(l.print):""].filter(Boolean).join(" · ");
     return `<div class="px-line">
-      ${l.img?`<img src="${esc(l.img)}" alt="">`:'<div class="ph"></div>'}
+      ${l.img?`<img src="${esc(BazDS.thumb?BazDS.thumb(l.img,160):l.img)}" alt="" loading="lazy" decoding="async">`:'<div class="ph"></div>'}
       <div><div class="px-line-name">${esc(l.name)}</div>${v?`<div class="px-line-var">${v}</div>`:""}
         <div class="px-line-rate">${money(l.price)} /pc</div></div>
       <div class="px-line-right"><b>${money(l.qty*l.price)}</b>
