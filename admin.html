@@ -109,7 +109,12 @@
           <button class="btn btn-outline btn-sm" id="invMarkInBtn" disabled>✅ Mark In Stock</button>
           <button class="btn btn-outline btn-sm" id="invMarkOutBtn" disabled>🚫 Mark Out of Stock</button>
         </div>
-        <div class="ad-table-wrap">
+        <div class="ad-inv-viewtoggle">
+          <button type="button" class="ad-inv-vbtn active" data-invview="grid">▦ Cards</button>
+          <button type="button" class="ad-inv-vbtn" data-invview="list">☰ List</button>
+        </div>
+        <div class="pos-product-grid inv-grid" id="inventoryGrid"></div>
+        <div class="ad-table-wrap" id="inventoryTableWrap" style="display:none">
           <table class="ad-table" id="inventoryTable"></table>
         </div>
       </div>

@@ -348,8 +348,40 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // already use — toggle one product in place, or check several and apply
   // a bulk update, without opening each product's full edit screen.
   let invChecked = new Set();
+  let invView = "grid";   // "grid" (cards, like POS) | "list" (table)
+  const productStartPrice = p=> (p.tiers && p.tiers[0] && p.tiers[0].price) || 0;
+  function allProductImages(p){
+    const out = [...(p.img||[])];
+    Object.values(p.colorImages||{}).forEach(arr=>(arr||[]).forEach(u=>{ if(u && !out.includes(u)) out.push(u); }));
+    return out.filter(Boolean);
+  }
+  function openImageViewer(id, startIdx){
+    const p = PRODUCTS.find(x=>x.id===id); if(!p) return;
+    const imgs = allProductImages(p); if(!imgs.length) return posToast("Is product ki koi image nahi hai","error");
+    let idx = startIdx||0;
+    let ov = document.querySelector("#imgViewerOverlay"); if(ov) ov.remove();
+    ov = document.createElement("div"); ov.id = "imgViewerOverlay"; ov.className = "iv-overlay";
+    const draw = ()=>{
+      ov.innerHTML = `<div class="iv-box" role="dialog">
+        <div class="iv-head"><b>${p.name}</b><span>${idx+1} / ${imgs.length}</span><button type="button" class="stk-x" data-iv-close>✕</button></div>
+        <div class="iv-main"><img src="${imgs[idx]}" alt=""></div>
+        <div class="iv-thumbs">${imgs.map((u,i)=>`<img src="${u}" class="${i===idx?"on":""}" data-iv-i="${i}" alt="">`).join("")}</div>
+      </div>`;
+    };
+    draw();
+    ov.addEventListener("click", e=>{
+      if(e.target===ov || e.target.closest("[data-iv-close]")){ ov.remove(); return; }
+      const t = e.target.closest("[data-iv-i]"); if(t){ idx = Number(t.dataset.ivI); draw(); }
+    });
+    document.body.appendChild(ov);
+  }
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ const o = document.querySelector("#imgViewerOverlay"); if(o) o.remove(); } });
   function renderInventoryView(){
     const table = document.querySelector("#inventoryTable"); if(!table) return;
+    const grid = document.querySelector("#inventoryGrid"), tableWrap = document.querySelector("#inventoryTableWrap");
+    if(grid) grid.style.display = invView==="grid" ? "" : "none";
+    if(tableWrap) tableWrap.style.display = invView==="list" ? "" : "none";
+    document.querySelectorAll(".ad-inv-vbtn").forEach(b=>b.classList.toggle("active", b.dataset.invview===invView));
     const statsEl = document.querySelector("#invStats");
     const searchEl = document.querySelector("#invSearch");
     const filterEl = document.querySelector("#invFilter");
@@ -368,13 +400,31 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(filter==="in") list = list.filter(p=>p.stock);
     if(filter==="out") list = list.filter(p=>!p.stock);
 
+    if(grid) grid.innerHTML = list.length ? list.map(p=>{
+      const t = stockTotal(p);
+      const stockTxt = p.stock ? "In Stock" : "Out of Stock";
+      const nImgs = allProductImages(p).length;
+      return `
+      <div class="pos-product-card inv-card" data-id="${p.id}">
+        <label class="inv-card-check" title="Select"><input type="checkbox" class="inv-check" data-id="${p.id}" ${invChecked.has(p.id)?"checked":""}></label>
+        <div class="pos-product-img inv-card-img" data-view-img="${p.id}" title="Saari images dekho"><img src="${(p.img&&p.img[0])||''}" alt="" loading="lazy">${nImgs>1?`<span class="inv-img-count">🖼 ${nImgs}</span>`:""}</div>
+        <div class="pos-product-body">
+          <b class="pos-product-name">${p.name}</b>
+          <div class="inv-card-cat">${p.cat||""}</div>
+          <div class="pos-product-price">${money(productStartPrice(p))}</div>
+          <div class="pos-product-stock ${p.stock?'in':'out'}"><i></i>${stockTxt}${t==null?"":" · "+t+" left"}</div>
+          <div class="inv-card-dots">${(p.colors||[]).slice(0,8).map(c=>`<i class="pos-cart-dot" style="background:${c}" title="${(p.colorNames&&p.colorNames[c])||c}"></i>`).join("")}</div>
+          <button type="button" class="btn btn-primary btn-sm pos-product-addbtn inv-update-btn" data-id="${p.id}">✏️ Update stock</button>
+          <button type="button" class="ad-stock-toggle ${p.stock?'in':'out'} inv-card-toggle" data-id="${p.id}">${p.stock?'Mark out of stock':'Mark in stock'}</button>
+        </div>
+      </div>`;}).join("") : `<p class="ad-hint" style="grid-column:1/-1">No products match this search/filter.</p>`;
     table.innerHTML = `<tr><th></th><th></th><th>Product</th><th>Category</th><th>Colours / Sizes</th><th>Total stock</th><th>Status</th><th></th></tr>` +
       (list.length ? list.map(p=>{
         const t = stockTotal(p);
         return `
         <tr>
           <td><input type="checkbox" class="inv-check" data-id="${p.id}" ${invChecked.has(p.id)?"checked":""}></td>
-          <td><img src="${(p.img&&p.img[0])||''}" alt=""></td>
+          <td><img src="${(p.img&&p.img[0])||''}" alt="" class="inv-thumb-click" data-view-img="${p.id}" title="Saari images dekho"></td>
           <td><b>${p.name}</b><br><small class="ad-hint" style="margin:0">MOQ ${p.moq} pcs</small></td>
           <td>${p.cat}</td>
           <td class="inv-variants">${(p.colors||[]).map(c=>`<i class="pos-cart-dot" style="background:${c}" title="${(p.colorNames&&p.colorNames[c])||c}"></i>`).join("")}<div class="inv-sizes">${(p.sizes||[]).join(" · ")}</div></td>
@@ -382,21 +432,23 @@ document.addEventListener("DOMContentLoaded", async ()=>{
           <td><button type="button" class="ad-stock-toggle ${p.stock?'in':'out'}" data-id="${p.id}">${p.stock?'In stock':'Out of stock'}</button></td>
           <td><button type="button" class="btn btn-primary btn-sm inv-update-btn" data-id="${p.id}">✏️ Update stock</button></td>
         </tr>`;}).join("") : `<tr><td colspan="8"><p class="ad-hint" style="margin:14px 0">No products match this search/filter.</p></td></tr>`);
-    table.querySelectorAll(".inv-update-btn").forEach(btn=>btn.addEventListener("click", ()=>openStockModal(Number(btn.dataset.id))));
+    const scope = [table, grid].filter(Boolean);
+    scope.forEach(root=>root.querySelectorAll(".inv-update-btn").forEach(btn=>btn.addEventListener("click", ()=>openStockModal(Number(btn.dataset.id)))));
+    scope.forEach(root=>root.querySelectorAll("[data-view-img]").forEach(el=>el.addEventListener("click", ()=>openImageViewer(Number(el.dataset.viewImg)))));
 
-    table.querySelectorAll(".inv-check").forEach(cb=>{
+    scope.forEach(root=>root.querySelectorAll(".inv-check").forEach(cb=>{
       cb.addEventListener("change", ()=>{
         const id = Number(cb.dataset.id);
         if(cb.checked) invChecked.add(id); else invChecked.delete(id);
         updateInvBulkButtons();
       });
-    });
+    }));
     table.querySelectorAll(".inv-qty-input").forEach(inp=>{
       inp.addEventListener("change", ()=> saveStockQty(Number(inp.dataset.id), inp.dataset.key, inp.value.trim()));
     });
-    table.querySelectorAll(".ad-stock-toggle").forEach(btn=>{
+    scope.forEach(root=>root.querySelectorAll(".ad-stock-toggle").forEach(btn=>{
       btn.addEventListener("click", ()=> AdminUI.toggleStock(Number(btn.dataset.id)));
-    });
+    }));
     updateInvBulkButtons();
   }
   /* ---------- Update-stock window: every colour × size of one product; type +10 / -5 and press Enter ---------- */
@@ -542,6 +594,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if(invSearchEl) invSearchEl.addEventListener("input", renderInventoryView);
   const invFilterEl = document.querySelector("#invFilter");
   if(invFilterEl) invFilterEl.addEventListener("change", renderInventoryView);
+  document.querySelectorAll(".ad-inv-vbtn").forEach(b=>b.addEventListener("click", ()=>{ invView = b.dataset.invview; renderInventoryView(); }));
   const invMarkInBtn = document.querySelector("#invMarkInBtn");
   if(invMarkInBtn) invMarkInBtn.addEventListener("click", ()=>bulkSetStock(true));
   const invMarkOutBtn = document.querySelector("#invMarkOutBtn");
@@ -1255,6 +1308,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       <div class="ad-field"><label>Bulk enquiry threshold (pcs)</label><input id="pf_bulk" type="number" value="${p?p.bulk:25}"></div>
       <div class="ad-field ad-checkbox-row" style="align-self:end"><input type="checkbox" id="pf_stock" ${!p||p.stock?'checked':''}> <label>In stock</label></div>
       <div class="ad-field full">
+        <label>Stock quantity <span class="ad-hint" style="display:inline">(kitna stock hai — khaali chhodo to quantity track nahi hogi, sirf In stock / Out of stock rahega)</span></label>
+        <div id="pf_stockQty" class="pf-stock-qty"></div>
+      </div>
+      <div class="ad-field full">
         <label>Quantity-tier pricing</label>
         <div id="pf_tiers"></div>
         <button class="btn btn-outline btn-sm" id="pf_addTier" type="button">+ Add price tier</button>
@@ -1410,12 +1467,41 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   let workingSizes = [];
   let workingPrintOpts = [];
   let workingDetails = []; // [{k:"Flavour", v:"Apricot"}] — the product page's "Additional Details" table
+  let workingStock = {}; // product form: stock quantities, same keys as product.colorStock ("_total" | "<colour>" | "<colour>|<size>")
+  function stockFormKeys(){
+    const colors = workingColors.slice(), sizes = workingSizes.filter(Boolean);
+    const sizeWise = sizes.length>1;
+    if(!colors.length) return [{key:"_total", label:"Total stock"}];
+    const nm = c=>workingColorNames[c]||c;
+    if(sizeWise) return colors.flatMap(c=>sizes.map(sz=>({key:c+"|"+sz, label:nm(c)+" · "+sz, color:c})));
+    return colors.map(c=>({key:c, label:nm(c), color:c}));
+  }
+  function renderStockQtyFields(){
+    const el = document.querySelector("#pf_stockQty"); if(!el) return;
+    const keys = stockFormKeys();
+    el.innerHTML = `<div class="pf-stock-grid">` + keys.map(k=>`
+      <label class="pf-stock-row">${k.color?`<i class="pos-cart-dot" style="background:${k.color}"></i>`:""}<span>${k.label}</span>
+        <input type="number" min="0" inputmode="numeric" placeholder="pcs" data-stock-key="${k.key.replace(/"/g,"&quot;")}" value="${workingStock[k.key]!=null?workingStock[k.key]:""}"></label>`).join("") + `</div>`;
+    el.querySelectorAll("input[data-stock-key]").forEach(inp=>inp.addEventListener("input", ()=>{
+      const key = inp.dataset.stockKey, v = inp.value.trim();
+      if(v==="") delete workingStock[key]; else workingStock[key] = Math.max(0, Math.round(Number(v)||0));
+      // size-wise numbers replace an older colour-wise number (no double counting)
+      if(key.includes("|") && v!=="") delete workingStock[key.split("|")[0]];
+    }));
+  }
+  function collectStockFromForm(){
+    const valid = new Set([...stockFormKeys().map(k=>k.key), ...workingColors]);
+    const out = {};
+    Object.entries(workingStock).forEach(([k,v])=>{ if(valid.has(k) && v!=null && !isNaN(v)) out[k] = Number(v); });
+    return out;
+  }
   let workingColorImages = {}; // {"#1a1a1a": ["url1","url2"]} — optional per-colour gallery override
   function renderColorChips(){
     const el = document.querySelector("#pf_colorChips"); if(!el) return;
     el.innerHTML = workingColors.map((c,i)=>`
       <span class="ad-tag-chip" style="background:${c}"><i></i>${c}<input class="ad-color-name" type="text" maxlength="30" placeholder="Colour name" value="${(workingColorNames[c]||"").replace(/"/g,"&quot;")}" onchange="AdminUI.setColorName(${i},this.value)"><b onclick="AdminUI.removeColor(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No colours added yet</span>`;
     renderColorImageGroups();
+    renderStockQtyFields();
     // The main Product images grid's per-photo colour-tag dropdown lists the
     // current colours too, so it needs refreshing whenever the colour list
     // changes (a newly-added colour wouldn't otherwise appear as an option).
@@ -1488,6 +1574,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const el = document.querySelector("#pf_sizeChips"); if(!el) return;
     el.innerHTML = workingSizes.map((s,i)=>`
       <span class="ad-tag-chip ad-tag-chip-plain">${s}<b onclick="AdminUI.removeSize(${i})">✕</b></span>`).join("") || `<span class="ad-hint" style="margin:0">No sizes added yet</span>`;
+    renderStockQtyFields();
   }
   // A printing option may carry an extra per-piece price, stored inside the same string as "Name::250" (no DB change needed).
   const poName = s=>String(s).split("::")[0];
@@ -1669,6 +1756,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     workingColorNames = p && p.colorNames ? {...p.colorNames} : {};
     workingColorImages = p && p.colorImages ? JSON.parse(JSON.stringify(p.colorImages)) : {};
     workingSizes = p ? p.sizes.slice() : ["Standard"];
+    workingStock = p ? {...(p.colorStock||{})} : {};
     workingPrintOpts = p && p.printOptions ? p.printOptions.slice() : [];
     workingDetails = p && Array.isArray(p.details) ? p.details.map(x=>({k:x.k,v:x.v})) : [];
     document.querySelector("#productModalTitle").textContent = p ? "Edit Product" : "Add Product";
@@ -1907,7 +1995,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       brand: document.querySelector("#pf_brand").value.trim() || null,
       moq: Number(document.querySelector("#pf_moq").value)||1,
       bulk: Number(document.querySelector("#pf_bulk").value)||1,
-      stock: document.querySelector("#pf_stock").checked,
+      stock: (()=>{ const t = Object.values(collectStockFromForm()); return t.length ? t.reduce((a,b)=>a+b,0)>0 : document.querySelector("#pf_stock").checked; })(),
       status: document.querySelector("#pf_status").value,
       trending: workingTrending,
       colors: workingColors.slice(),
@@ -1943,8 +2031,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         return valid.length ? valid : [{min:1, price:0}];
       })(),
       img: productImages,
-      // Not editable in this form — carry them over, otherwise every product edit would wipe the stock quantities.
-      colorStock: ((editingProductId && PRODUCTS.find(x=>x.id===editingProductId)) || {}).colorStock || {},
+      // Stock quantities are edited in the "Stock quantity" block of the Pricing & Order section above.
+      colorStock: collectStockFromForm(),
       view360: view360Frames.slice(),
       model3d: model3dUrl || "",
       metaTitle: document.querySelector("#pf_metaTitle").value.trim(),
