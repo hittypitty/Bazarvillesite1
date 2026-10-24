@@ -387,6 +387,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const filterEl = document.querySelector("#invFilter");
     const q = (searchEl && searchEl.value || "").trim().toLowerCase();
     const filter = (filterEl && filterEl.value) || "all";
+    const catEl = document.querySelector("#invCat");
+    if(catEl){
+      const cats = [...new Set(PRODUCTS.map(p=>p.cat).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+      const keep = catEl.value || "";
+      catEl.innerHTML = `<option value="">All categories</option>` + cats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===keep?'selected':''}>${c} (${PRODUCTS.filter(p=>p.cat===c).length})</option>`).join("");
+    }
+    const catFilter = catEl ? catEl.value : "";
 
     const inCount = PRODUCTS.filter(p=>p.stock).length;
     const outCount = PRODUCTS.length - inCount;
@@ -397,6 +404,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
     let list = PRODUCTS.slice();
     if(q) list = list.filter(p=>(p.name||"").toLowerCase().includes(q) || (p.cat||"").toLowerCase().includes(q));
+    if(catFilter) list = list.filter(p=>p.cat===catFilter);
     if(filter==="in") list = list.filter(p=>p.stock);
     if(filter==="out") list = list.filter(p=>!p.stock);
 
@@ -594,6 +602,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if(invSearchEl) invSearchEl.addEventListener("input", renderInventoryView);
   const invFilterEl = document.querySelector("#invFilter");
   if(invFilterEl) invFilterEl.addEventListener("change", renderInventoryView);
+  const invCatEl = document.querySelector("#invCat");
+  if(invCatEl) invCatEl.addEventListener("change", renderInventoryView);
   document.querySelectorAll(".ad-inv-vbtn").forEach(b=>b.addEventListener("click", ()=>{ invView = b.dataset.invview; renderInventoryView(); }));
   const invMarkInBtn = document.querySelector("#invMarkInBtn");
   if(invMarkInBtn) invMarkInBtn.addEventListener("click", ()=>bulkSetStock(true));
@@ -1263,6 +1273,130 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   // when it's already sitting in the main gallery.
   let productImageColors = [];
 
+
+  /* ---------- Category presets + auto-tagging ---------- */
+  const CATEGORY_PRESETS = [
+    "Corporate Gifts & Hampers","Bottles & Drinkware","Diaries & Stationery","Pens & Writing Instruments",
+    "Apparel & Clothing","Bags & Travel Accessories","Electronics & Gadgets","Keychains & Accessories",
+    "Awards & Trophies","ID Cards, Lanyards & Badges","Wristbands & Event Merchandise",
+    "Printing & Marketing Materials","Stickers & Labels","Packaging & Boxes","Signage & Display Products",
+    "Office & Desk Accessories","Home & Lifestyle Gifts","Promotional Merchandise"
+  ];
+  function allCategoryNames(extra){
+    const list = CATEGORY_PRESETS.slice();
+    PRODUCTS.map(p=>p.cat).concat(extra||[]).forEach(c=>{ if(c && c!=="Uncategorised" && !list.some(x=>x.toLowerCase()===String(c).toLowerCase())) list.push(c); });
+    return list;
+  }
+  // Suggestions: category -> [professions, purposes, occasions]. Only values
+  // that actually exist as checkboxes get ticked, so renamed/removed tags are ignored.
+  const TAG_MAP = {
+    "Corporate Gifts & Hampers":[["Corporate","Finance","IT / Tech","Hospitality"],["Client Gifts","Employee / Staff Gifts","Festive Gifting","Welcome / Gift Kits","Team / Group Gifting"],["Diwali","New Year","Company Anniversary","Corporate Events","Employee Recognition & Awards"]],
+    "Bottles & Drinkware":[["Corporate","IT / Tech","Education","Healthcare","Manufacturing"],["Employee / Staff Gifts","Office & Workplace","Travel / Utility Gifting","Marketing & Promotion"],["New Year","Corporate Events","Employee Joining / Onboarding"]],
+    "Diaries & Stationery":[["Corporate","Education","Finance","IT / Tech"],["Client Gifts","Office & Workplace","Onboarding / Joining Kits","Conferences / Seminars / Workshops"],["New Year","Diwali","Employee Joining / Onboarding","Conferences & Exhibitions"]],
+    "Pens & Writing Instruments":[["Corporate","Education","Finance","Retail"],["Client Gifts","Office & Workplace","Marketing & Promotion","Conferences / Seminars / Workshops"],["Conferences & Exhibitions","Client / Dealer Meets","New Year"]],
+    "Apparel & Clothing":[["Corporate","Hospitality","Manufacturing","Retail","Education","Healthcare"],["Branding & Corporate Identity","Team / Group Gifting","Employee / Staff Gifts","Onboarding / Joining Kits"],["Annual Day","Team Outings & Celebrations","Employee Joining / Onboarding","Corporate Events"]],
+    "Bags & Travel Accessories":[["Corporate","IT / Tech","Education","Hospitality"],["Travel / Utility Gifting","Conferences / Seminars / Workshops","Onboarding / Joining Kits","Client Gifts"],["Conferences & Exhibitions","Employee Joining / Onboarding","Diwali","New Year"]],
+    "Electronics & Gadgets":[["IT / Tech","Corporate","Finance","Retail"],["Client Gifts","Awards & Recognition","Employee Appreciation","Festive Gifting"],["Diwali","New Year","Employee Recognition & Awards","Product Launch"]],
+    "Keychains & Accessories":[["Corporate","Retail","Hospitality","Education"],["Marketing & Promotion","Branding & Corporate Identity","Dealer / Distributor Gifts","Team / Group Gifting"],["Corporate Events","Conferences & Exhibitions","Independence Day","Team Outings & Celebrations"]],
+    "Awards & Trophies":[["Corporate","Education","Healthcare","Manufacturing","Finance","Hospitality"],["Awards & Recognition","Employee Appreciation","Corporate Events"],["Annual Day","Employee Recognition & Awards","Company Anniversary","Employee Farewell","Republic Day","Independence Day"]],
+    "ID Cards, Lanyards & Badges":[["Corporate","Education","Healthcare","IT / Tech","Manufacturing","Hospitality"],["Office & Workplace","Onboarding / Joining Kits","Conferences / Seminars / Workshops","Branding & Corporate Identity"],["Employee Joining / Onboarding","Conferences & Exhibitions","Corporate Events"]],
+    "Wristbands & Event Merchandise":[["Hospitality","Education","Corporate","Retail"],["Corporate Events","Marketing & Promotion","Conferences / Seminars / Workshops","Team / Group Gifting"],["Corporate Events","Conferences & Exhibitions","Annual Day","Team Outings & Celebrations","Product Launch"]],
+    "Printing & Marketing Materials":[["Retail","Corporate","Finance","Hospitality","Education"],["Marketing & Promotion","Branding & Corporate Identity","Dealer / Distributor Gifts"],["Product Launch","Conferences & Exhibitions","Client / Dealer Meets"]],
+    "Stickers & Labels":[["Retail","Manufacturing","Corporate"],["Marketing & Promotion","Branding & Corporate Identity"],["Product Launch","Corporate Events"]],
+    "Packaging & Boxes":[["Retail","Manufacturing","Hospitality","Corporate"],["Branding & Corporate Identity","Marketing & Promotion","Festive Gifting","Welcome / Gift Kits"],["Diwali","Product Launch","New Year"]],
+    "Signage & Display Products":[["Retail","Hospitality","Corporate","Healthcare","Education"],["Branding & Corporate Identity","Marketing & Promotion","Office & Workplace"],["Product Launch","Conferences & Exhibitions","Company Anniversary"]],
+    "Office & Desk Accessories":[["Corporate","IT / Tech","Finance","Education"],["Office & Workplace","Employee / Staff Gifts","Onboarding / Joining Kits","Client Gifts"],["Employee Joining / Onboarding","New Year","Diwali"]],
+    "Home & Lifestyle Gifts":[["Corporate","Hospitality","Retail"],["Festive Gifting","Client Gifts","Employee Appreciation","Welcome / Gift Kits"],["Diwali","New Year","Holi","Raksha Bandhan","Christmas","Eid","Employee Farewell"]],
+    "Promotional Merchandise":[["Retail","Corporate","Education","Hospitality"],["Marketing & Promotion","Branding & Corporate Identity","Conferences / Seminars / Workshops","Dealer / Distributor Gifts"],["Corporate Events","Conferences & Exhibitions","Product Launch","Independence Day","Republic Day"]]
+  };
+  // Words in the product name that add to / sharpen the suggestion.
+  const NAME_TAGS = [
+    [/diwali|deepavali/i,[null,null,["Diwali"]]], [/christmas|xmas/i,[null,null,["Christmas"]]], [/\beid\b/i,[null,null,["Eid"]]],
+    [/\bholi\b/i,[null,null,["Holi"]]], [/rakhi|raksha/i,[null,null,["Raksha Bandhan"]]], [/new year/i,[null,null,["New Year"]]],
+    [/independence/i,[null,null,["Independence Day"]]], [/republic/i,[null,null,["Republic Day"]]],
+    [/doctor|medical|hospital|clinic|stethoscope|nurse|pharma/i,[["Healthcare"],null,null]],
+    [/school|student|teacher|college|university|campus/i,[["Education"],null,null]],
+    [/laptop|usb|pen ?drive|power ?bank|wireless|bluetooth|tech|smart/i,[["IT / Tech"],null,null]],
+    [/hotel|restaurant|cafe|chef|apron/i,[["Hospitality"],null,null]],
+    [/award|trophy|medal|plaque|memento|shield/i,[null,["Awards & Recognition"],["Employee Recognition & Awards"]]],
+    [/welcome|joining|onboard/i,[null,["Onboarding / Joining Kits","Welcome / Gift Kits"],["Employee Joining / Onboarding"]]],
+    [/hamper|gift ?set|combo|kit/i,[null,["Festive Gifting","Client Gifts"],null]]
+  ];
+  // Product-name words that pick a category when none is chosen yet.
+  const NAME_CATEGORY = [
+    [/pen ?drive|power ?bank|speaker|earbud|earphone|headphone|charger|usb|bluetooth|smart ?watch|gadget|cable/i,"Electronics & Gadgets"],
+    [/\bpens?\b|ball ?point|roller ?ball|fountain|highlighter|marker/i,"Pens & Writing Instruments"],
+    [/diary|notebook|planner|journal|notepad|stationery/i,"Diaries & Stationery"],
+    [/bottle|tumbler|sipper|flask|\bmug|cup\b|drinkware|glass/i,"Bottles & Drinkware"],
+    [/t-?shirt|polo|hoodie|jacket|\bcap\b|apparel|uniform|apron|sweatshirt|shirt/i,"Apparel & Clothing"],
+    [/backpack|\bbag\b|tote|wallet|luggage|trolley|pouch|laptop sleeve/i,"Bags & Travel Accessories"],
+    [/key ?chain|key ?ring/i,"Keychains & Accessories"],
+    [/trophy|award|medal|plaque|memento|shield/i,"Awards & Trophies"],
+    [/lanyard|badge|id ?card/i,"ID Cards, Lanyards & Badges"],
+    [/wristband|wrist band/i,"Wristbands & Event Merchandise"],
+    [/brochure|flyer|visiting card|poster|banner|catalog|leaflet/i,"Printing & Marketing Materials"],
+    [/sticker|label/i,"Stickers & Labels"],
+    [/\bbox\b|packaging|carton|packing/i,"Packaging & Boxes"],
+    [/standee|signage|display|flag|hoarding/i,"Signage & Display Products"],
+    [/desk|organi[sz]er|mouse ?pad|calendar|paper ?weight|stand\b/i,"Office & Desk Accessories"],
+    [/lamp|plant|candle|cushion|decor|home|photo ?frame/i,"Home & Lifestyle Gifts"],
+    [/hamper|gift ?set|combo|gift/i,"Corporate Gifts & Hampers"]
+  ];
+  function suggestCategory(name){
+    for(const [re,cat] of NAME_CATEGORY) if(re.test(name||"")) return cat;
+    return "";
+  }
+  function suggestTags(cat, name){
+    const out = {prof:new Set(), purp:new Set(), occ:new Set()};
+    const base = TAG_MAP[cat];
+    if(base){ base[0].forEach(v=>out.prof.add(v)); base[1].forEach(v=>out.purp.add(v)); base[2].forEach(v=>out.occ.add(v)); }
+    NAME_TAGS.forEach(([re,[a,b,c]])=>{ if(re.test(name||"")){ (a||[]).forEach(v=>out.prof.add(v)); (b||[]).forEach(v=>out.purp.add(v)); (c||[]).forEach(v=>out.occ.add(v)); } });
+    return out;
+  }
+  function catSelectHtml(current){
+    const cur = current && current!=="Uncategorised" ? current : "";
+    const list = allCategoryNames(cur?[cur]:[]);
+    return `<select id="pf_cat"><option value="">— Select category —</option>${list.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===cur?'selected':''}>${c}</option>`).join("")}<option value="__new">➕ Other (type a new category)…</option></select>
+      <input id="pf_catNew" placeholder="New category name" style="display:none;margin-top:8px">`;
+  }
+  function currentCategory(){
+    const sel = document.querySelector("#pf_cat"); if(!sel) return "";
+    if(sel.value==="__new") return (document.querySelector("#pf_catNew").value||"").trim();
+    return sel.value;
+  }
+  let autoTagOn = true, catTouched = false;
+  function applyAutoTags(){
+    if(!autoTagOn) return;
+    const name = (document.querySelector("#pf_name")||{}).value || "";
+    if(!catTouched){
+      const guess = suggestCategory(name);
+      const sel = document.querySelector("#pf_cat");
+      if(guess && sel && sel.value!==guess){ sel.value = guess; }
+    }
+    const cat = currentCategory();
+    const s = suggestTags(cat, name);
+    if(!s.prof.size && !s.purp.size && !s.occ.size) return;
+    let n = 0;
+    [["#pf_professions",s.prof],["#pf_purposes",s.purp],["#pf_occasions",s.occ]].forEach(([sel,set])=>{
+      document.querySelectorAll(sel+" input").forEach(i=>{ const on=set.has(i.value); if(i.checked!==on) i.checked=on; if(on) n++; });
+    });
+    const sub = document.querySelector("#pf_tagsSub");
+    if(sub) sub.textContent = `✨ ${n} tags auto-selected from category & name — tick/untick anything you like`;
+  }
+  function initAutoTags(p){
+    autoTagOn = !(p && ((p.professions||[]).length || (p.purposes||[]).length || (p.occasions||[]).length));
+    catTouched = !!(p && p.cat && p.cat!=="Uncategorised");
+    const sel = document.querySelector("#pf_cat"), nw = document.querySelector("#pf_catNew"), nm = document.querySelector("#pf_name");
+    sel.addEventListener("change", ()=>{ catTouched = true; nw.style.display = sel.value==="__new" ? "" : "none"; if(sel.value==="__new") nw.focus(); applyAutoTags(); });
+    nw.addEventListener("input", ()=>{ clearTimeout(nw._t); nw._t=setTimeout(applyAutoTags,300); });
+    let t; nm.addEventListener("input", ()=>{ clearTimeout(t); t=setTimeout(applyAutoTags,350); });
+    // The moment the admin ticks/unticks a tag by hand, stop overwriting their choice.
+    ["#pf_professions","#pf_purposes","#pf_occasions"].forEach(id=>{
+      document.querySelector(id).addEventListener("click", e=>{ if(e.target.closest("input") && e.isTrusted){ autoTagOn = false; const sub=document.querySelector("#pf_tagsSub"); if(sub) sub.textContent="Profession, purpose and occasion tags (optional)"; } });
+    });
+    applyAutoTags();
+  }
+
   function productFormHtml(p){
     return `
     <div class="pf-layout">
@@ -1271,7 +1405,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         <div class="pf-card-head"><span class="pf-num">1</span><div><h3>Basic Information</h3><p>Name, category and brand</p></div></div>
         <div class="ad-form-grid">
       <div class="ad-field full"><label>Product name</label><input id="pf_name" value="${p?p.name.replace(/"/g,'&quot;'):''}"></div>
-      <div class="ad-field"><label>Category</label><input id="pf_cat" value="${p?p.cat:''}" placeholder="e.g. T-Shirts"></div>
+      <div class="ad-field"><label>Category</label>${catSelectHtml(p?p.cat:'')}</div>
       <div class="ad-field"><label>Brand (internal, optional)</label><input id="pf_brand" value="${p&&p.brand?p.brand:''}"></div>
         </div>
       </section>
@@ -1319,7 +1453,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </details>
       <details class="pf-card pf-acc ">
-        <summary class="pf-card-head"><span class="pf-num">4</span><div><h3>Who is it for?</h3><p>Profession, purpose and occasion tags (optional)</p></div><span class="pf-chev">▾</span></summary>
+        <summary class="pf-card-head"><span class="pf-num">4</span><div><h3>Who is it for?</h3><p id="pf_tagsSub">Profession, purpose and occasion tags (optional)</p></div><span class="pf-chev">▾</span></summary>
         <div class="ad-form-grid pf-acc-body">
       <div class="ad-field full">
         <label>Profession (select all that apply)</label>
@@ -1773,6 +1907,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     trendingBtn.classList.toggle("active", workingTrending);
     trendingBtn.onclick = ()=>{ workingTrending = !workingTrending; trendingBtn.classList.toggle("active", workingTrending); };
     document.querySelector("#productForm").innerHTML = productFormHtml(p);
+    initAutoTags(p);
     renderTierRows(workingTiers);
     renderImgGrid();
     renderColorChips();
@@ -1985,7 +2120,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const data = {
       id: editingProductId || undefined,
       name,
-      cat: document.querySelector("#pf_cat").value.trim() || "Uncategorised",
+      cat: currentCategory() || "Uncategorised",
       professions,
       profession: professions[0] || "",
       purposes,
