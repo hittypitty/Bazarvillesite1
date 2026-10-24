@@ -683,3 +683,24 @@ html,body{overflow-x:clip}
 .pf-stock-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-stock-row input{width:84px;border:1.5px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
 @media(max-width:600px){.inv-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- Mobile admin: sidebar becomes a slide-in drawer (same menu as desktop) ---------- */
+.ad-mtop,.ad-backdrop{display:none}
+@media(max-width:900px){
+  .ad-shell{display:block}
+  .ad-mtop{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:60;background:var(--ink);color:#fff;padding:10px 14px}
+  .ad-mtop img{width:30px;height:30px;border-radius:50%}
+  .ad-mtop b{font-family:"Playfair Display",Georgia,serif;font-size:17px}
+  .ad-menu-btn{border:0;background:#262626;color:#fff;width:42px;height:42px;border-radius:12px;font-size:22px;line-height:1;cursor:pointer}
+  .ad-sidebar{position:fixed;top:0;left:0;bottom:0;height:100vh;height:100dvh;width:280px;max-width:84vw;z-index:100;
+    flex-direction:column;align-items:stretch;overflow-x:hidden;overflow-y:auto;padding:22px 16px;
+    transform:translateX(-105%);transition:transform .28s cubic-bezier(.16,1,.3,1);box-shadow:none}
+  .ad-sidebar.open{transform:none;box-shadow:12px 0 40px rgba(0,0,0,.35)}
+  .ad-nav{flex-direction:column}
+  .ad-nav a{white-space:normal;padding:13px 12px;font-size:15px}
+  .ad-brand{padding:0 4px 16px;margin-bottom:10px;border-bottom:1px solid #2a2a2a}
+  .ad-roleinfo{display:block}
+  .ad-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90;opacity:0;pointer-events:none;transition:opacity .25s;display:block}
+  .ad-backdrop.open{opacity:1;pointer-events:auto}
+  body.ad-noscroll{overflow:hidden}
+}

@@ -1,4 +1,18 @@
 /* ===================== BAZARVILLE ADMIN PANEL (Supabase-backed) ===================== */
+/* Mobile: the left menu is a slide-in drawer (same sidebar as desktop). */
+(function(){
+  document.addEventListener("DOMContentLoaded",()=>{
+    const side=document.querySelector(".ad-sidebar"), bd=document.querySelector("#adBackdrop"), btn=document.querySelector("#adMenuBtn");
+    if(!side||!btn) return;
+    const set=o=>{ side.classList.toggle("open",o); bd.classList.toggle("open",o); document.body.classList.toggle("ad-noscroll",o); };
+    btn.addEventListener("click",()=>set(!side.classList.contains("open")));
+    bd.addEventListener("click",()=>set(false));
+    side.addEventListener("click",e=>{ if(e.target.closest(".ad-nav a")) set(false); });
+    window.addEventListener("hashchange",()=>set(false));
+    window.addEventListener("resize",()=>{ if(innerWidth>900) set(false); });
+  });
+})();
+
 /* Show/hide password: every password box (login, add-user…) gets an eye button. */
 (function(){
   function addEyes(root){
