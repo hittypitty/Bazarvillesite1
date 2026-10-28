@@ -1424,7 +1424,7 @@ function initProductPage(){
         <div class="pd-gallery-grid" id="pdGalleryGrid"></div>
         <div class="pd-gallery-dots" id="pdGalleryDots"></div>
       </div>
-      <div class="reveal-right">
+      <div class="reveal-right"><div class="pd-info-scroll">
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating" id="pdStock">${pdStockHtml(p, p.colors[0])}</div>
@@ -1471,7 +1471,7 @@ function initProductPage(){
           <div class="pd-spec"><span>Bulk enquiry from</span><span>${p.bulk} pcs</span></div>
           <div class="pd-spec"><span>GST</span><span>Exclusive</span></div>
         </div>
-      </div>
+      </div></div>
     </div>
     <div class="pd-related" id="relatedSection" style="display:none">
       <div class="pd-related-head"><h2>You may also like</h2><p>Matched by profession, purpose or occasion.</p></div>
