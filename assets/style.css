@@ -1191,3 +1191,17 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .fgroup select{font-weight:600}
 .range-row,.range-row span{font-size:12px;font-weight:500}
 .filters .fgroup h4,.resultbar .count,.resultbar select{font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+
+/* Vikas (Oct 28): no blank space under the product photos.
+   - Photos flow in two masonry columns, each shown at its own ratio, so a short photo never leaves an empty strip under it.
+   - The details panel on the right is its own scroll area (stays in view while the photos scroll past), so the left
+     side never has to stretch or leave a gap to match the right side's height. (desktop only) */
+@media(min-width:1001px){
+  .pd-layout{align-items:start}
+  .pd-layout .reveal-left{position:static;max-height:none;overflow:visible;align-self:start;display:block}
+  .pd-layout .reveal-left .pd-gallery-grid{display:block;column-count:2;column-gap:10px}
+  .pd-layout .reveal-left .pd-gallery-cell,.pd-layout .reveal-left .pd-gallery-cell.span2{display:block;break-inside:avoid;margin:0 0 10px;min-height:0;aspect-ratio:auto!important;background:transparent}
+  .pd-layout .reveal-left .pd-gallery-cell.span2{column-span:all}
+  .pd-layout .reveal-left .pd-gallery-cell img{width:100%;height:auto;object-fit:contain;display:block}
+  .pd-layout .reveal-right{position:sticky;top:100px;align-self:start;max-height:calc(100vh - 120px);overflow-y:auto;padding-right:6px;scrollbar-width:thin}
+}
