@@ -1507,9 +1507,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         </div>
       </div>
       <div class="ad-field full">
-        <label>Additional details <span class="ad-hint" style="display:inline">(optional — a "label : value" table shown on the product page, e.g. Material : Cotton, Capacity : 100 ml, Country of Origin : India)</span></label>
-        <div id="pf_detailRows" class="ad-detail-rows"></div>
-        <button class="btn btn-outline btn-sm" type="button" id="pf_addDetailBtn" style="margin-top:8px">+ Add detail row</button>
+        <label>Description <span class="ad-hint" style="display:inline">(optional — normal paragraph text shown on the product page. Press Enter for a new line.)</span></label>
+        <textarea id="pf_desc" rows="7" maxlength="3000" placeholder="Write about the product here — material, size, usage, anything customers should know…" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 13px;font:inherit;line-height:1.5;resize:vertical"></textarea>
       </div>
         </div>
       </details>
@@ -1927,8 +1926,12 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     renderColorChips();
     renderSizeChips();
     renderPrintOptChips();
-    renderDetailRows();
-    document.querySelector("#pf_addDetailBtn").addEventListener("click", ()=>{ workingDetails.push({k:"",v:""}); renderDetailRows(); const ins = document.querySelectorAll("#pf_detailRows input"); if(ins.length>1) ins[ins.length-2].focus(); });
+    // Description: old "label : value" rows (if any) become plain text lines so nothing is lost.
+    (function(){
+      const old = (p && Array.isArray(p.details)) ? p.details.filter(x=>x.k&&x.v).map(x=>x.k+": "+x.v).join("\n") : "";
+      const cur = (p && p.desc) ? p.desc : "";
+      document.querySelector("#pf_desc").value = [cur, old].filter(Boolean).join(cur&&old?"\n\n":"");
+    })();
     initView360Controls();
     document.querySelector("#pf_addPrintOptBtn").addEventListener("click", ()=>{
       const input = document.querySelector("#pf_printOptInput");
@@ -2170,7 +2173,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       })(),
       sizes: workingSizes.slice(),
       printOptions: workingPrintOpts.slice(),
-      details: workingDetails.map(x=>({k:String(x.k||'').trim(),v:String(x.v||'').trim()})).filter(x=>x.k&&x.v),
+      details: [], // replaced by the free-text description below
+      desc: (document.querySelector("#pf_desc").value||"").trim(),
       // Never save a product with zero valid tiers — every price display,
       // sort-by-price and the budget filter on the public site reads
       // tiers[0], and an empty array used to crash those features for

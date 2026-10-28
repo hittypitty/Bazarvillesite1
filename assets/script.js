@@ -1452,9 +1452,9 @@ function initProductPage(){
           <button type="button" class="wish-btn pd-wish ${isWishlisted(p.id)?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${isWishlisted(p.id)?'❤️':'🤍'}</span><span class="wish-label">${isWishlisted(p.id)?'Wishlisted':'Add to Wishlist'}</span></button>
           <a id="waBtn" class="btn btn-wa" target="_blank" href="#">🟢 Send WhatsApp Enquiry</a>
         </div>
-        ${(p.details&&p.details.length)?`<div class="pd-details open" id="pdDetails">
-          <button type="button" class="pd-details-head" id="pdDetailsToggle" aria-expanded="true"><span>Additional Details</span><span class="pd-details-car">⌃</span></button>
-          <div class="pd-details-body">${p.details.map(r=>`<div class="pd-detail-row"><span>${String(r.k).replace(/</g,"&lt;")}</span><span>${String(r.v).replace(/</g,"&lt;")}</span></div>`).join("")}</div>
+        ${((p.details&&p.details.length)||p.desc)?`<div class="pd-details open" id="pdDetails">
+          <button type="button" class="pd-details-head" id="pdDetailsToggle" aria-expanded="true"><span>${p.desc?"Description":"Additional Details"}</span><span class="pd-details-car">⌃</span></button>
+          <div class="pd-details-body">${p.desc?`<p class="pd-desc">${String(p.desc).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>")}</p>`:""}${(p.details||[]).map(r=>`<div class="pd-detail-row"><span>${String(r.k).replace(/</g,"&lt;")}</span><span>${String(r.v).replace(/</g,"&lt;")}</span></div>`).join("")}</div>
         </div>`:""}
         <div class="pd-specs pd-specs-suit">
           <div class="pd-spec pd-spec-tags">

@@ -1179,3 +1179,4 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .logochip-img .lc-name{font-size:11.5px;max-width:120px}
 .logostrip{gap:14px}
 @media(max-width:700px){.trusted{padding:18px 0}.logochip-img img{height:30px;max-width:96px}.logochip-img .lc-name{font-size:10.5px;max-width:96px}}
+.pd-desc{margin:0;font-size:14.5px;line-height:1.65;color:var(--ink-soft,#444);white-space:normal;word-break:break-word}
