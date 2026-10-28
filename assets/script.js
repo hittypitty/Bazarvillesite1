@@ -376,7 +376,7 @@ function productCard(p){
   const rawTiers = Array.isArray(p.tiers) ? p.tiers : [];
   const hasPricing = rawTiers.length>0 && rawTiers.some(x=>x && x.price>0);
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
-    <span class="badge-stock ${p.stock?'in':'out'}">${p.stock?'In Stock':'Out of Stock'}</span>
+    ${p.stock?'':'<span class="badge-stock out">Out of Stock</span>'}
     ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
     <div class="pcard-actions">
       <button type="button" class="wish-btn ${wished?'active':''}" data-wish-id="${p.id}" title="${wished?'Remove from wishlist':'Add to wishlist'}" aria-label="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
