@@ -1428,9 +1428,8 @@ function initProductPage(){
         <span class="pd-cat">${p.profession}</span>
         <h1 class="pd-title">${p.name}</h1>
         <div class="pd-rating" id="pdStock">${pdStockHtml(p, p.colors[0])}</div>
-        ${p.colors.length?`<div class="opt-title">Colour</div>
-        <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>
-        <div class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])}</div>`:""}
+        ${p.colors.length?`<div class="opt-title">Colour<span class="pd-colorname" id="pdColorName">${colorName(p,p.colors[0])?" - "+colorName(p,p.colors[0]):""}</span></div>
+        <div class="swatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>`:""}
         ${p.sizes.length?`<div class="opt-title">Size</div>
         <div class="sizerow">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>`:""}
         ${(p.printOptions&&p.printOptions.length)?`<div class="opt-title">Printing Option</div>
@@ -1569,7 +1568,7 @@ function initProductPage(){
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
     // images), swap the gallery to show them; otherwise keep showing the main photos.
     const colorHex = p.colors[Number(s.dataset.c)];
-    const cnEl = document.querySelector("#pdColorName"); if(cnEl) cnEl.textContent = colorName(p, colorHex);
+    const cnEl = document.querySelector("#pdColorName"); if(cnEl) { const n = colorName(p, colorHex); cnEl.textContent = n ? " - " + n : ""; }
     const stEl = document.querySelector("#pdStock"); if(stEl) stEl.innerHTML = pdStockHtml(p, colorHex);
     const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
     renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
