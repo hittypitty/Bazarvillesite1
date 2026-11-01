@@ -1240,3 +1240,15 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .pimg img{padding:0!important;object-fit:contain!important}
 .pprice-note-wa{display:flex;align-items:center;gap:6px}
 .wa-dot{width:18px;height:18px;border-radius:50%;background:var(--wa,#25d366);display:inline-flex;align-items:center;justify-content:center;flex:none}
+
+/* Cards: no big green button — a bigger "Ask us on WhatsApp" line with a round icon sits at the bottom; photo frame taller */
+.pcard-wa{display:none!important}
+.pimg{aspect-ratio:3/4!important}
+.pcard-ask{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--ink,#1a1a1a);font-weight:700;font-size:14px;line-height:1.2;text-decoration:none;font-family:"Plus Jakarta Sans",system-ui,sans-serif}
+.pcard-ask .wa-circle{width:30px;height:30px;border-radius:50%;background:var(--wa,#25d366);display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 4px 10px -4px rgba(37,211,102,.7);transition:transform .2s}
+.pcard-ask:hover .wa-circle{transform:scale(1.1)}
+@media(max-width:640px){
+  .pcard-ask{font-size:12.5px;gap:8px}
+  .pcard-ask .wa-circle{width:28px;height:28px}
+  .grid4{gap:10px}
+}
