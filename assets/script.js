@@ -377,11 +377,6 @@ function productCard(p){
   const hasPricing = rawTiers.length>0 && rawTiers.some(x=>x && x.price>0);
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
     ${p.stock?'':'<span class="badge-stock out">Out of Stock</span>'}
-    ${badge? `<span class="badge-signal">${badge.emoji} ${badge.label}</span>` : ""}
-    <div class="pcard-actions">
-      <button type="button" class="wish-btn ${wished?'active':''}" data-wish-id="${p.id}" title="${wished?'Remove from wishlist':'Add to wishlist'}" aria-label="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
-      <button type="button" class="qv-btn" data-qv-id="${p.id}" title="Quick View" aria-label="Quick View">👁</button>
-    </div>
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${T(p.img[0],480)}" alt="${p.name}" loading="lazy" decoding="async" width="480" height="480" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
@@ -689,6 +684,17 @@ function initNavSearch(){
     }else{
       location.href = "products.html?q=" + encodeURIComponent(q);
     }
+  }
+
+  // Mobile: a proper full-width search bar under the header (the header icon alone was too small to notice).
+  const hdr = document.querySelector("header.nav");
+  if(hdr && !document.querySelector(".m-search")){
+    const m = document.createElement("form");
+    m.className = "m-search"; m.setAttribute("role","search");
+    m.innerHTML = '<input type="search" class="m-search-input" placeholder="Search products…" aria-label="Search products" enterkeyhint="search"><button type="submit" aria-label="Search">Search</button>';
+    hdr.insertAdjacentElement("afterend", m);
+    const mi = m.querySelector("input"); if(qParam) mi.value = qParam;
+    m.addEventListener("submit", e=>{ e.preventDefault(); input.value = mi.value; runSearch(); });
   }
 
   btn.addEventListener("click", ()=>{
