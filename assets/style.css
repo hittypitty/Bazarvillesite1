@@ -1252,3 +1252,13 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
   .pcard-ask .wa-circle{width:28px;height:28px}
   .grid4{gap:10px}
 }
+
+/* Cards (final): photo fills the frame width (4:5); MOQ on the left, round WhatsApp icon on the right of the same row */
+.pimg{aspect-ratio:4/5!important}
+.pimg img{padding:0!important;object-fit:contain!important}
+.pcard .pfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.pcard-ask{display:inline-flex!important;align-items:center;justify-content:center;width:38px;height:38px;margin:0!important;padding:0!important;border:0!important;border-radius:50%;background:var(--wa,#25d366);flex:none;box-shadow:0 6px 14px -6px rgba(37,211,102,.75);transition:transform .2s}
+.pcard-ask:hover{transform:scale(1.1)}
+.pcard-ask span{display:none}
+.pcard-oos{color:#c0392b}
+@media(max-width:640px){.pcard-ask{width:36px;height:36px}}
