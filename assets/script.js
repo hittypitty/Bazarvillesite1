@@ -357,6 +357,8 @@ function computeCardBadge(p){
 // first tier and its best (highest-quantity) tier — "how much cheaper it
 // gets if you order more" — labelled clearly as a bulk saving, not a
 // discount off the price shown.
+// A product with no real price (all tiers missing or ₹0) never shows a price anywhere — enquiry via WhatsApp only.
+function hasPrice(p){ const t = Array.isArray(p && p.tiers) ? p.tiers : []; return t.some(x=>x && Number(x.price)>0); }
 function productCard(p){
   const t = tierFor(p, p.moq);
   const wished = isWishlisted(p.id);
@@ -386,8 +388,7 @@ function productCard(p){
         ${offPct>0? `<span class="poff">(Save up to ${offPct}%)</span>` : ""}
       </div>
       <div class="pprice-note">starting price</div>` : `
-      <div class="pprice-row"><span class="pprice pprice-tbd">Price on request</span></div>
-      `}
+`}
       <div class="pfoot">
         <span class="moqtag">MOQ ${p.moq} pcs</span>${p.stock?'':'<span class="pcard-oos">Out of stock</span>'}
       </div>
@@ -401,7 +402,7 @@ function waLink(p, qty, printOpt, color, size, extra){
   const colorLine = color ? `%0AColour: ${colorName(p,color)||color}` : "";
   const sizeLine = size ? `%0ASize: ${size}` : "";
   const printLine = printOpt ? `%0APrinting option: ${printOpt}` : "";
-  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}%0AApplicable price: ${money(unit)}/pc%0APlease share more details.`;
+  const msg = `Hi Bazarville! I'm interested in *${p.name}* (Ref: ${ref()}).%0AQuantity: ${qty} pcs${colorLine}${sizeLine}${printLine}${hasPrice(p)?`%0AApplicable price: ${money(unit)}/pc`:""}%0APlease share more details.`;
   return `https://wa.me/${SETTINGS.whatsappNumber||"919827869031"}?text=${msg}`;
 }
 
@@ -966,8 +967,8 @@ function openQuickView(id){
       <div class="qv-info">
         <span class="pd-cat">${p.profession}</span>
         <h2>${p.name}</h2>
-        <div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
-        <table class="tier-table">${safeTiers(p).map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>
+        ${hasPrice(p)?`<div class="pd-price" style="margin:8px 0">${money(t.price)} <span>/ piece</span></div>
+        <table class="tier-table">${safeTiers(p).map(tr=>`<tr><td>${tr.min}+ pcs</td><td>${money(tr.price)}</td></tr>`).join("")}</table>`:""}
 ${p.colors.length?`        <div class="opt-title">Colour</div>
         <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>`:""}
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
@@ -1443,7 +1444,7 @@ function initProductPage(){
              tag above it — Vikas's feedback was that having both up top felt
              redundant; the tier table (with the active row highlighted) is
              the real price. -->
-        <div class="pd-price-box">
+        <div class="pd-price-box"${hasPrice(p)?"":" hidden"}>
           <table class="tier-table" id="tierTable"><tr><th>Quantity</th><th>Price / pc</th></tr>
           ${safeTiers(p).map(t=>`<tr data-min="${t.min}" data-base="${t.price}"><td>${t.min}+ pcs</td><td class="tier-price">${money(t.price)}</td></tr>`).join("")}
           </table>
@@ -1597,7 +1598,7 @@ function initProductPage(){
     const extra = pEl ? Number(pEl.dataset.extra)||0 : 0;
     const unit = t.price + extra;
     document.querySelectorAll("#tierTable tr[data-base]").forEach(r=>{ r.querySelector(".tier-price").textContent = money(Number(r.dataset.base)+extra); });
-    document.querySelector("#liveCalc").innerHTML = `${qty} pcs × ${money(unit)} = <b>${money(qty*unit)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
+    document.querySelector("#liveCalc").innerHTML = !hasPrice(p) ? "" : `${qty} pcs × ${money(unit)} = <b>${money(qty*unit)}</b> <span style="color:var(--muted)">(estimated, excl. GST)</span>`;
     document.querySelectorAll("#tierTable tr[data-min]").forEach(row=>{
       row.classList.toggle("active-tier", Number(row.dataset.min)===t.min);
     });
