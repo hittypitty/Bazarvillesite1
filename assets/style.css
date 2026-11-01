@@ -1262,3 +1262,7 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .pcard-ask span{display:none}
 .pcard-oos{color:#c0392b}
 @media(max-width:640px){.pcard-ask{width:36px;height:36px}}
+
+/* Cards in a row are equal height and the WhatsApp icon row always sits at the very bottom, so icons line up across cards */
+.pcard .pfoot{margin-top:auto!important;padding-top:12px}
+.pcard .pimg{flex:none}
