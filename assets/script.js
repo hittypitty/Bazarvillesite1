@@ -974,8 +974,7 @@ ${p.colors.length?`        <div class="opt-title">Colour</div>
         <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
           <a class="btn btn-wa btn-sm" id="qvWaBtn" target="_blank" href="${waLink(p, p.moq)}">🟢 WhatsApp Enquiry</a>
-          <button type="button" class="wish-btn qv-wish ${wished?'active':''}" data-wish-id="${p.id}" title="Toggle wishlist"><span class="wish-icon">${wished?'❤️':'🤍'}</span></button>
-          <a class="btn btn-outline btn-sm" href="product.html?id=${p.id}">View full details →</a>
+          <a class="btn btn-primary btn-sm" href="product.html?id=${p.id}">View full details →</a>
         </div>
       </div>
     </div>`;
@@ -2214,6 +2213,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(wishBtn){ e.preventDefault(); toggleWishlist(Number(wishBtn.dataset.wishId)); return; }
     const qvBtn = e.target.closest(".qv-btn");
     if(qvBtn){ e.preventDefault(); openQuickView(Number(qvBtn.dataset.qvId)); return; }
+    // Tap a product card (photo or name) -> quick view opens first; its "View full details" button then opens the full product page.
+    const cardLink = e.target.closest(".pcard-wrap a[href^='product.html']");
+    if(cardLink && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)){
+      const wrap = cardLink.closest(".pcard-wrap");
+      const pid = wrap && Number(wrap.dataset.pid);
+      if(pid){ e.preventDefault(); openQuickView(pid); return; }
+    }
   });
   // Compare checkbox delegation — revert the checkbox if the COMPARE_MAX cap blocked it.
   document.addEventListener("change", (e)=>{
