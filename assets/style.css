@@ -1234,3 +1234,9 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .pcard-wa{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;padding:11px 10px;border-radius:12px;background:var(--wa,#25d366);color:#fff;font-weight:700;font-size:13.5px;line-height:1;text-decoration:none;font-family:"Plus Jakarta Sans",system-ui,sans-serif;transition:transform .2s,box-shadow .2s}
 .pcard-wa:hover{transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(37,211,102,.7)}
 @media(max-width:640px){.pcard-wa{font-size:12.5px;padding:10px 6px;gap:5px}}
+
+/* Card photo bigger: portrait frame, photo fills the width (still shown in full, nothing cropped) */
+.pimg{aspect-ratio:4/5!important}
+.pimg img{padding:0!important;object-fit:contain!important}
+.pprice-note-wa{display:flex;align-items:center;gap:6px}
+.wa-dot{width:18px;height:18px;border-radius:50%;background:var(--wa,#25d366);display:inline-flex;align-items:center;justify-content:center;flex:none}
