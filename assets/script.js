@@ -376,7 +376,6 @@ function productCard(p){
   const rawTiers = Array.isArray(p.tiers) ? p.tiers : [];
   const hasPricing = rawTiers.length>0 && rawTiers.some(x=>x && x.price>0);
   return `<div class="pcard-wrap" data-pid="${p.id}"><div class="pcard tilt">
-    ${p.stock?'':'<span class="badge-stock out">Out of Stock</span>'}
     <a href="product.html?id=${p.id}"><div class="pimg"><img src="${T(p.img[0],480)}" alt="${p.name}" loading="lazy" decoding="async" width="480" height="480" onerror="imgFallback(this)"></div></a>
     <div class="pbody">
       ${p.profession? `<span class="pcat">${p.profession}</span>` : ""}
@@ -390,8 +389,9 @@ function productCard(p){
       <div class="pprice-row"><span class="pprice pprice-tbd">Price on request</span></div>
       <div class="pprice-note">ask us on WhatsApp</div>`}
       <div class="pfoot">
-        <span class="moqtag">MOQ ${p.moq} pcs</span>
+        <span class="moqtag">MOQ ${p.moq} pcs</span>${p.stock?'':'<span class="pcard-oos">Out of stock</span>'}
       </div>
+      <a class="pcard-wa" href="${waLink(p, p.moq)}" target="_blank" rel="noopener" aria-label="WhatsApp enquiry for ${String(p.name).replace(/"/g,'&quot;')}"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.4-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1.1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.8-.1 1.4z"/></svg> WhatsApp Enquiry</a>
     </div>
   </div></div>`;
 }
@@ -2194,7 +2194,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
 
   // fire-and-forget enquiry logging — never blocks the WhatsApp redirect itself
   document.addEventListener("click", (e)=>{
-    const link = e.target.closest(".wa-mini, #waBtn");
+    const link = e.target.closest(".wa-mini, #waBtn, .pcard-wa");
     if(!link || !link.href) return;
     try{
       const url = new URL(link.href);

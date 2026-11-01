@@ -1225,3 +1225,12 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
   .m-search-input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:16px;padding:12px 12px;color:var(--ink,#1a1a1a)}
   .m-search button{border:0;border-radius:12px;background:var(--ink,#1a1a1a);color:var(--lime,#c6f000);font:inherit;font-weight:700;font-size:14.5px;padding:0 20px;cursor:pointer}
 }
+
+/* Product cards: photo shown in full with nothing on top of it; WhatsApp enquiry button inside the card body */
+.pimg{height:auto!important;aspect-ratio:1/1;background:#fff}
+.pimg img{object-fit:contain!important;padding:8px!important;object-position:center!important}
+.pcard:hover .pimg img{transform:none}
+.pcard-oos{margin-left:8px;font-size:11px;font-weight:800;color:#c0392b}
+.pcard-wa{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;padding:11px 10px;border-radius:12px;background:var(--wa,#25d366);color:#fff;font-weight:700;font-size:13.5px;line-height:1;text-decoration:none;font-family:"Plus Jakarta Sans",system-ui,sans-serif;transition:transform .2s,box-shadow .2s}
+.pcard-wa:hover{transform:translateY(-1px);box-shadow:0 8px 18px -8px rgba(37,211,102,.7)}
+@media(max-width:640px){.pcard-wa{font-size:12.5px;padding:10px 6px;gap:5px}}
