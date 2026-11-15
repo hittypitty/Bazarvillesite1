@@ -972,6 +972,7 @@ function openQuickView(id){
 ${p.colors.length?`        <div class="opt-title">Colour</div>
         <div class="swatches" id="qvSwatches">${p.colors.map((c,i)=>`<span class="swatch ${i===0?'active':''}" style="background:${c}" data-c="${i}" title="${colorName(p,c)}"></span>`).join("")}</div>`:""}
         ${(p.sizes&&p.sizes.length)? `<div class="opt-title">Size</div><div class="sizerow" id="qvSizes">${p.sizes.map((s,i)=>`<span class="sizebtn ${i===0?'active':''}" data-s="${i}">${s}</span>`).join("")}</div>` : ""}
+        <div class="pd-rating" id="qvStock" style="margin-top:12px"></div>
         <p class="ad-hint" style="margin-top:14px">MOQ ${p.moq} pcs • Bulk enquiry from ${p.bulk} pcs</p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
           <a class="btn btn-wa btn-sm" id="qvWaBtn" target="_blank" href="${waLink(p, p.moq)}">🟢 WhatsApp Enquiry</a>
@@ -990,7 +991,9 @@ ${p.colors.length?`        <div class="opt-title">Colour</div>
     const sizeEl = body.querySelector("#qvSizes .sizebtn.active");
     const colorVal = colorEl ? (p.colors[Number(colorEl.dataset.c)]||"") : "";
     body.querySelector("#qvWaBtn").href = waLink(p, p.moq, "", colorVal, sizeEl?sizeEl.textContent:"");
+    const st = body.querySelector("#qvStock"); if(st) st.innerHTML = pdStockHtml(p, colorVal, sizeEl?sizeEl.textContent:"");
   }
+  updateQvWaLink();
   body.querySelectorAll("#qvSwatches .swatch").forEach(s=>s.addEventListener("click",()=>{
     body.querySelectorAll("#qvSwatches .swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
     updateQvWaLink();
@@ -1384,18 +1387,28 @@ function initQuotePage(){
 
 /* ---------- product detail page ---------- */
 /* stock line for the product page: "In Stock · 12 pcs available" for the selected colour (when quantities are tracked in admin Inventory) */
-function pdStockHtml(p, colorHex){
+function pdStockHtml(p, colorHex, size){
   const cs = p.colorStock || {};
   const vals = Object.values(cs).filter(x=>x!=null && !isNaN(x)).map(Number), tracked = vals.length > 0;
   let n = null;
-  if(colorHex){
+  // Size-wise stock is saved as "<colour>|<size>" (or "|<size>"-less colour keys for colour-wise stock).
+  // When a size is picked, show THAT size's quantity; otherwise the colour's total.
+  if(size){
+    const key = (colorHex ? colorHex : "") + "|" + size;
+    if(cs[key]!=null && !isNaN(cs[key])) n = Number(cs[key]);
+    else if(!colorHex){
+      const sz = Object.entries(cs).filter(([k,v])=>k.endsWith("|"+size) && v!=null && !isNaN(v));
+      if(sz.length) n = sz.reduce((a,[,v])=>a+Number(v),0);
+    }
+  }
+  if(n==null && colorHex){
     const mine = Object.entries(cs).filter(([k,v])=>(k===colorHex||k.startsWith(colorHex+"|")) && v!=null && !isNaN(v));
     if(mine.length) n = mine.reduce((a,[,v])=>a+Number(v),0);
     else if(cs._total!=null) n = Number(cs._total);
   }
   if(n==null && tracked) n = vals.reduce((a,b)=>a+b,0);
   if(n==null) return p.stock ? '<b style="color:#5b8a00">In Stock</b>' : '<b style="color:#c0392b">Out of Stock</b>';
-  if(n<=0) return '<b style="color:#c0392b">Out of Stock</b>' + (colorHex && p.stock ? ' <span style="color:#6b7280">· this colour — try another</span>' : '');
+  if(n<=0) return '<b style="color:#c0392b">Out of Stock</b>' + (p.stock ? ' <span style="color:#6b7280">· ' + (size ? 'this size' : 'this colour') + ' — try another</span>' : '');
   if(n<=5) return `<b style="color:#b45309">Only ${n} pcs left</b>`;
   return `<b style="color:#5b8a00">In Stock</b> <span style="color:#374151">· ${n} pcs available</span>`;
 }
@@ -1569,13 +1582,14 @@ function initProductPage(){
   const firstColorImgs = p.colorImages && firstColorHex ? p.colorImages[firstColorHex] : null;
   renderPdGallery(firstColorImgs && firstColorImgs.length ? firstColorImgs : null);
   initProductViews(p);
+  setTimeout(()=>refreshStock(),0);
   document.querySelectorAll(".swatch").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".swatch").forEach(x=>x.classList.remove("active")); s.classList.add("active");
     // If this colour has its own photos saved (admin → Edit Product → Colour-specific
     // images), swap the gallery to show them; otherwise keep showing the main photos.
     const colorHex = p.colors[Number(s.dataset.c)];
     const cnEl = document.querySelector("#pdColorName"); if(cnEl) { const n = colorName(p, colorHex); cnEl.textContent = n ? " - " + n : ""; }
-    const stEl = document.querySelector("#pdStock"); if(stEl) stEl.innerHTML = pdStockHtml(p, colorHex);
+    refreshStock();
     const colorImgs = p.colorImages && colorHex ? p.colorImages[colorHex] : null;
     renderPdGallery(colorImgs && colorImgs.length ? colorImgs : null);
     recalc(); // selected colour is part of the WhatsApp enquiry message — keep it in sync
@@ -1586,9 +1600,24 @@ function initProductPage(){
   }));
   document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(s=>s.addEventListener("click",()=>{
     document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(x=>x.classList.remove("active")); s.classList.add("active");
+    refreshStock();
     recalc();
   }));
 
+  // Live stock for the selected colour + size (also greys out sizes that are sold out for this colour).
+  function refreshStock(){
+    const cEl = document.querySelector(".swatch.active");
+    const colorHex = cEl ? p.colors[Number(cEl.dataset.c)] : (p.colors[0] || "");
+    const sEl = document.querySelector(".sizerow:not(#printOptRow) .sizebtn.active");
+    const size = sEl ? p.sizes[Number(sEl.dataset.s)] : "";
+    const stEl = document.querySelector("#pdStock"); if(stEl) stEl.innerHTML = pdStockHtml(p, colorHex, size);
+    const cs = p.colorStock || {};
+    document.querySelectorAll(".sizerow:not(#printOptRow) .sizebtn").forEach(b=>{
+      const key = (colorHex||"") + "|" + p.sizes[Number(b.dataset.s)];
+      const v = cs[key];
+      b.classList.toggle("oos", v!=null && !isNaN(v) && Number(v)<=0);
+    });
+  }
   const qtyInput = document.querySelector("#qtyInput");
   function recalc(){
     let qty = Math.max(1, Number(qtyInput.value)||1);
@@ -2214,13 +2243,6 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     if(wishBtn){ e.preventDefault(); toggleWishlist(Number(wishBtn.dataset.wishId)); return; }
     const qvBtn = e.target.closest(".qv-btn");
     if(qvBtn){ e.preventDefault(); openQuickView(Number(qvBtn.dataset.qvId)); return; }
-    // Tap a product card (photo or name) -> quick view opens first; its "View full details" button then opens the full product page.
-    const cardLink = e.target.closest(".pcard-wrap a[href^='product.html']");
-    if(cardLink && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button)){
-      const wrap = cardLink.closest(".pcard-wrap");
-      const pid = wrap && Number(wrap.dataset.pid);
-      if(pid){ e.preventDefault(); openQuickView(pid); return; }
-    }
   });
   // Compare checkbox delegation — revert the checkbox if the COMPARE_MAX cap blocked it.
   document.addEventListener("change", (e)=>{
