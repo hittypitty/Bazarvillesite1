@@ -728,6 +728,14 @@ function applyProductSeo(p){
   let metaDesc = document.querySelector('meta[name="description"]');
   if(!metaDesc){ metaDesc = document.createElement("meta"); metaDesc.name = "description"; document.head.appendChild(metaDesc); }
   metaDesc.setAttribute("content", desc);
+  // canonical + social tags per product (the page is product.html?id=N, so each id gets its own canonical)
+  const setHead = (sel, make, attr, val)=>{ let el=document.head.querySelector(sel); if(!el){ el=make(); document.head.appendChild(el); } el.setAttribute(attr, val); };
+  const pUrl = "https://www.bazarville.com/product?id=" + p.id;
+  const pImg = (p.img && p.img[0]) ? (/^https?:/.test(p.img[0]) ? p.img[0] : "https://www.bazarville.com/"+p.img[0].replace(/^\//,"")) : "https://www.bazarville.com/assets/og-image.png";
+  setHead('link[rel="canonical"]', ()=>{const e=document.createElement("link"); e.rel="canonical"; return e;}, "href", pUrl);
+  [["og:title",title],["og:description",desc],["og:url",pUrl],["og:image",pImg],["og:type","product"]].forEach(([k,v])=>
+    setHead(`meta[property="${k}"]`, ()=>{const e=document.createElement("meta"); e.setAttribute("property",k); return e;}, "content", v));
+  setHead('meta[name="twitter:image"]', ()=>{const e=document.createElement("meta"); e.name="twitter:image"; return e;}, "content", pImg);
 
   let ld = document.querySelector('script[type="application/ld+json"]#pd-jsonld');
   if(!ld){ ld = document.createElement("script"); ld.type = "application/ld+json"; ld.id = "pd-jsonld"; document.head.appendChild(ld); }
@@ -738,6 +746,8 @@ function applyProductSeo(p){
     description: desc,
     image: p.img,
     category: p.cat,
+    url: pUrl,
+    brand: {"@type":"Brand", name:"Bazarville"},
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "INR",
@@ -1517,7 +1527,7 @@ function initProductPage(){
     grid.innerHTML = galleryImages.map((src,i)=>{
       const spanFull = (galleryImages.length % 2 === 1) && (i === galleryImages.length - 1);
       return `<div class="pd-gallery-cell${spanFull?' span2':''}" data-i="${i}">
-        <img src="${T(src,1000)}" alt="${p.name}" loading="${i<2?'eager':'lazy'}" decoding="async" onerror="imgFallback(this)">
+        <img src="${T(src,1000)}" alt="${p.name} — view ${i+1}" loading="${i<2?'eager':'lazy'}" decoding="async" onerror="imgFallback(this)">
       </div>`;
     }).join("");
     // Mobile only (see .pd-gallery-grid's max-width:640px rule in style.css):
@@ -2042,6 +2052,10 @@ function initCollectionPage(){
   document.querySelector("#collName").textContent = found.name;
   document.querySelector("#collTag").textContent = found.tag;
   document.querySelector("#collImg").src = found.img;
+  document.querySelector("#collImg").alt = found.name;
+  document.title = found.name + " — Corporate Gifting Collection | Bazarville";
+  const cl = document.head.querySelector('link[rel="canonical"]');
+  if(cl) cl.href = "https://www.bazarville.com/collection?name=" + encodeURIComponent(found.name);
   renderGrid("#collectionGrid", publishedProducts().slice(0, 8));
 }
 

@@ -117,7 +117,25 @@ const BazDS = (function(){
     let stripped = [];
     let data, error;
     for(let attempt = 0; attempt <= MIGRATABLE_COLUMNS.length; attempt++){
-      ({data, error} = await runQuery(safeRow).select().single());
+      // .select() (not .single()) — an UPDATE that touches 0 rows (row deleted, or blocked by
+      // row-level security) used to surface as the cryptic "Cannot coerce the result to a single JSON object".
+      let rows;
+      ({data: rows, error} = await runQuery(safeRow).select());
+      if(!error && (!rows || !rows.length)){
+        if(id){
+          // Row not updated: figure out whether the product is gone or we're simply not allowed.
+          const chk = await sb.from("products").select("id").eq("id", id).maybeSingle();
+          if(chk.data){
+            error = {message: "Save blocked: this login doesn't have permission to edit products. Log out and log in again with the admin account (and make sure supabase/add_user_permissions.sql / RLS policies are run)."};
+          }else{
+            // product no longer exists in this database (e.g. DB was changed) — save it as a new product instead
+            ({data: rows, error} = await sb.from("products").insert(safeRow).select());
+          }
+        }else{
+          error = {message: "Save blocked: product was not created (permission/RLS issue). Log in again with the admin account."};
+        }
+      }
+      data = rows && rows[0];
       if(!error) break;
       const col = MIGRATABLE_COLUMNS.find(c => !stripped.includes(c) && new RegExp(`'${c}'|${c}\\b`, "i").test(error.message));
       if(!col) break; // not a missing-migration error (or nothing left to strip) — surface it as-is

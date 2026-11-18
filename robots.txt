@@ -1,6 +1,12 @@
 User-agent: *
 Allow: /
-Disallow: /admin.html
-Disallow: /dashboard.html
+Disallow: /admin
+Disallow: /pos
+Disallow: /dashboard
+Disallow: /account
+Disallow: /checkout
+Disallow: /quote
+Disallow: /order-confirmation
+Disallow: /cart
 
-Sitemap: https://bazarvillesite1.vercel.app/sitemap.xml
+Sitemap: https://www.bazarville.com/sitemap.xml
