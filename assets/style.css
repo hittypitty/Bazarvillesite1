@@ -1284,3 +1284,7 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .shell>*{min-width:0}
 .shell .reveal-right{min-width:0;max-width:100%}
 .catbar{max-width:100%;width:100%;box-sizing:border-box}
+
+/* Closed mobile menu drawer must not leak its shadow onto the right edge of the screen */
+.mnav-drawer:not(.open){box-shadow:none!important;visibility:hidden;transition:transform .3s cubic-bezier(.16,1,.3,1),visibility 0s .3s}
+.mnav-drawer.open{visibility:visible;transition:transform .3s cubic-bezier(.16,1,.3,1),visibility 0s}
