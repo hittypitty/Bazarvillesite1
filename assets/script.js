@@ -497,7 +497,19 @@ function initFilters(){
   if(params.get("occasion")) state.occasion = params.get("occasion");
   if(params.get("q")) state.q = params.get("q").trim();
 
+  // Category chips (same list the POS shows: All + every product category) — one tap filters the grid.
+  const catBar = document.querySelector("#catBar");
+  function renderCatBar(){
+    if(!catBar) return;
+    const cats = [...new Set(publishedProducts().map(p=>p.cat).filter(Boolean))].sort();
+    catBar.innerHTML = [`<button type="button" data-c="" class="${!state.cat?"active":""}">All</button>`]
+      .concat(cats.map(c=>`<button type="button" data-c="${c.replace(/"/g,"&quot;")}" class="${state.cat===c?"active":""}">${c}</button>`)).join("");
+    const on = catBar.querySelector("button.active"); if(on && catBar.scrollWidth>catBar.clientWidth) catBar.scrollLeft = Math.max(0, on.offsetLeft - 40);
+  }
+  if(catBar) catBar.addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b) return; state.cat = b.dataset.c; apply(); });
+
   function apply(){
+    renderCatBar();
     let list = publishedProducts();
     if(state.cat) list = list.filter(p=>p.cat===state.cat);
     if(state.profession && state.profession!=="All") list = list.filter(p=>p.profession===state.profession);

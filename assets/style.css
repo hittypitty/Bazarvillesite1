@@ -1271,3 +1271,11 @@ a:hover>.cs-fb{color:#1877f2}a:hover>.cs-li{color:#0a66c2}a:hover>.cs-ig{color:#
 .qv-grid>*{min-width:0}
 .qv-thumbs{flex-wrap:wrap}
 .sizebtn.oos{opacity:.45;text-decoration:line-through}
+
+/* Category chips above the product grid (mirrors the POS category bar) */
+.catbar{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;margin:0 0 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.catbar::-webkit-scrollbar{display:none}
+.catbar button{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:8px 16px;font:600 13px/1 inherit;font-family:inherit;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.catbar button:hover{border-color:var(--ink)}
+.catbar button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+@media(max-width:700px){.catbar{margin-left:-4px}.catbar button{padding:9px 15px}}
