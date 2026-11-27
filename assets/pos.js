@@ -336,7 +336,21 @@ function lbSave(rec, notes){
 async function refreshOrders(){
   let srv = []; try{ srv = (await BazDS.posGetBills()).filter(isPos); }catch(e){ srv = []; }
   const have = new Set(srv.map(billNoOf));
-  const loc = lbRead().filter(x=>!have.has(billNoOf(x)));
+  let loc = lbRead().filter(x=>!have.has(billNoOf(x)));
+  // Server is readable -> upload bills that only exist on this device (so every device sees them), then keep only failures locally.
+  if(!window.__posBillsErr && !refreshOrders._syncing){
+    refreshOrders._syncing = true;
+    try{
+      const left = [];
+      for(const b of loc){
+        try{ await BazDS.createPosSale({customerName:b.customer_name==="Walk-in counter sale"?"":b.customer_name, customerPhone:b.customer_phone||"", items:b.items, subtotal:b.subtotal, paymentMethod:b.payment_method, notes:b.notes}); }
+        catch(e){ left.push(b); }
+      }
+      lbWrite(left);
+      if(left.length < loc.length){ try{ srv = (await BazDS.posGetBills()).filter(isPos); }catch(e){} }
+      loc = left;
+    } finally { refreshOrders._syncing = false; }
+  }
   posOrders = srv.concat(loc).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
 }
 
