@@ -661,9 +661,10 @@ const BazDS = (function(){
   async function posGetBills(){
     const sb = getClient(); if(!sb) return [];
     const { data, error } = await rpcCall(sb, "pos_get_bills");
-    if(!error) return data || [];
+    if(!error){ window.__posBillsErr = ""; return data || []; }
+    window.__posBillsErr = rpcMissing(error) ? "missing" : (error.message || "error");
     if(!rpcMissing(error)) console.error("pos_get_bills:", error.message);
-    return getOrders();
+    try{ const o = await getOrders(); if(o && o.length) window.__posBillsErr = ""; return o; }catch(e){ return []; }
   }
   async function posSetStock(p){
     const sb = getClient(); if(!sb) return false;

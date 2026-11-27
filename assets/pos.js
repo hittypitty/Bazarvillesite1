@@ -322,7 +322,23 @@ function resetBill(){
   $("#note").hidden = true; $("#billPanel").classList.remove("open");
   renderCart(); newBillNo();
 }
-async function refreshOrders(){ try{ posOrders = (await BazDS.posGetBills()).filter(isPos); }catch(e){ posOrders = []; } }
+/* Bills saved on THIS device are also kept locally, so the counter always shows its own bills even if the server list can't be read
+   (pos_get_bills SQL not installed / not logged in). Server bills win when the same Bill No exists there. */
+const LB_KEY = "baz_pos_local_bills_v1";
+const lbRead = () => { try{ return JSON.parse(localStorage.getItem(LB_KEY)||"[]"); }catch(e){ return []; } };
+const lbWrite = l => { try{ localStorage.setItem(LB_KEY, JSON.stringify(l.slice(0,400))); }catch(e){} };
+const billNoOf = o => (/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1] || o.ref;
+function lbSave(rec, notes){
+  const l = lbRead().filter(x=>billNoOf(x)!==rec.billNo);
+  l.unshift({id:"L"+Date.now(), ref:rec.billNo, source:"pos", _local:true, created_at:rec.date, customer_name:rec.customer||"Walk-in counter sale", customer_phone:rec.phone||"", items:rec.items, subtotal:rec.total, payment_method:rec.mode, notes});
+  lbWrite(l);
+}
+async function refreshOrders(){
+  let srv = []; try{ srv = (await BazDS.posGetBills()).filter(isPos); }catch(e){ srv = []; }
+  const have = new Set(srv.map(billNoOf));
+  const loc = lbRead().filter(x=>!have.has(billNoOf(x)));
+  posOrders = srv.concat(loc).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+}
 
 /* ---------------- hold / recall ---------------- */
 async function refreshHolds(){
@@ -357,7 +373,7 @@ $("#lBody").addEventListener("click", async e => {
     const bn = (/Bill No: (POS-\d+)/.exec(o.notes||"")||[])[1] || o.ref;
     if(!confirm(`${bn} (${money(o.subtotal||0)}) delete karna hai?\nBill ke items ka stock wapas add ho jayega.`)) return;
     try{
-      await BazDS.deletePosSale(o.id);
+      if(o._local) lbWrite(lbRead().filter(x=>x.id!==o.id)); else { await BazDS.deletePosSale(o.id); lbWrite(lbRead().filter(x=>billNoOf(x)!==bn)); }
       const touched = new Set();
       for(const it of (Array.isArray(o.items)?o.items:[])){ const p = PRODUCTS.find(x=>String(x.id)===String(it.productId)); if(deductStock(p, it.color, -(it.qty||0), it.size)) touched.add(p); }
       for(const p of touched){ try{ await BazDS.posSetStock(p); }catch(err){ console.error(err); } }
@@ -379,7 +395,7 @@ $("#lBody").addEventListener("click", async e => {
     try{ await BazDS.deletePosHold(dl.dataset.del); }catch(err){ toast("Delete nahi hua","err"); }
     await refreshHolds(); openHolds();
   }else if(ed){
-    const o = posOrders.find(x=>String(x.id)===ed.dataset.edit); if(o) loadForEdit(o);
+    const o = posOrders.find(x=>String(x.id)===ed.dataset.edit); if(o){ if(o._local) toast("Ye bill sirf is device pe hai — edit ke liye pehle pos_open_access.sql run karo","err"); else loadForEdit(o); }
   }else if(rp){
     const o = posOrders.find(x=>String(x.id)===rp.dataset.reprint); if(o){ hide("mList"); showReceipt(receiptFromOrder(o)); }
   }
@@ -401,7 +417,7 @@ async function completeSale(){
   const old = editing;
   try{
     if(old) await BazDS.updatePosSale(old.id, {customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes});
-    else await BazDS.createPosSale({customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes});
+    else { await BazDS.createPosSale({customerName:cust, customerPhone:phone, items:rec.items, subtotal:rec.total, paymentMethod:payMode, notes}); lbSave(rec, notes); }
   }catch(e){ toast((old?"Bill save nahi hua: ":"Sale save nahi hui: ") + (e.message||""), "err"); busy(btn,false); return; }
   /* stock: best-effort, never blocks the sale */
   const touched = new Set();
@@ -490,7 +506,8 @@ $("#btnRecent").addEventListener("click", async () => {
       <div class="px-bl-foot"><span>${items.length} item${items.length===1?"":"s"} · ${pcs} pcs</span>${extras.length?`<span class="px-bl-ex">${extras.map(esc).join(" · ")}</span>`:""}</div>
       <div class="px-li-actions"><button class="px-btn px-btn-outline" data-edit="${o.id}">✏️ Edit</button><button class="px-btn px-btn-outline" data-reprint="${o.id}">🖨 Reprint</button><button class="px-btn px-btn-outline px-del-bill" data-delbill="${o.id}" title="Bill delete karo">🗑 Delete</button></div></div>`;
   }).join("") : '<div class="px-empty">Koi bill nahi mila</div>';
-  $("#lBody").innerHTML = '<input id="billSearch" placeholder="Bill no., customer, phone ya product search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
+  const warn = window.__posBillsErr ? `<div class="px-note" style="background:#fff7e6;border:1px solid #f5c26b;color:#7a4b00;padding:10px 12px;border-radius:10px;margin-bottom:10px;font-size:13px;line-height:1.4">⚠️ Server se bills nahi aa rahe${window.__posBillsErr==="missing"?" — Supabase → SQL Editor me <b>supabase/pos_open_access.sql</b> run karo":" ("+esc(window.__posBillsErr)+")"}. Tab tak sirf is device ke bills dikh rahe hain.</div>` : "";
+  $("#lBody").innerHTML = warn + '<input id="billSearch" placeholder="Bill no., customer, phone ya product search karo…" style="margin-bottom:10px"><div id="billRows"></div>';
   const draw = () => { const q = $("#billSearch").value.trim().toLowerCase(); $("#billRows").innerHTML = billRows(posOrders.filter(o => !q || ((o.notes||"")+" "+(o.customer_name||"")+" "+(o.customer_phone||"")+" "+(o.ref||"")+" "+(Array.isArray(o.items)?o.items.map(i=>i.name).join(" "):"")).toLowerCase().includes(q)).slice(0,60)); };
   $("#billSearch").addEventListener("input", draw); draw();
   show("mList");
